@@ -58,6 +58,8 @@ CSV_HEADERS = {
     "reading_history.csv": "Week,Topic,Paper_ID,Title,DOI,Journal,Year,Study_Type,Core_Finding,Method_Value,Transfer_Value,Major_Limitation,Open_Questions,Next_Reading_Direction,Zotero_Item_Key,A_Attachment_Key,B_Attachment_Key,Git_Review_Path,Completed_Date".split(","),
     "selection_log.csv": "Week,Topic,Paper_ID,Title,DOI,Journal,Year,Role,Quality_Gate,Weighted_Score,Selection_Decision,Selection_Reason,Zotero_Item_Key,Logged_Date".split(","),
 }
+COMMENT_HEADING_PATTERN = re.compile(r"^##\s+(?:评论|评译评论|Comment|Review)\s*$", re.IGNORECASE)
+SECTION_END_PATTERN = re.compile(r"^#{1,2}\s+")
 
 
 @dataclass
@@ -135,8 +137,33 @@ def effective_chinese_characters(text: str) -> int:
     return len(re.findall(r"[\u3400-\u4dbf\u4e00-\u9fff]", text))
 
 
+def extract_comment_section(markdown: str) -> str:
+    """Extract only the dedicated comment/review section from a weekly review.
+
+    The 500-character requirement applies to the evaluator's comment body, not
+    metadata, original abstract, translated abstract, titles, or references.
+    """
+    lines = markdown.splitlines()
+    start: int | None = None
+    for index, line in enumerate(lines):
+        if COMMENT_HEADING_PATTERN.fullmatch(line.strip()):
+            start = index + 1
+            break
+    if start is None:
+        raise ValueError(
+            "Comment section not found. Use a level-2 heading such as '## 评论' "
+            "or pass --comment-text with the comment body only."
+        )
+    end = len(lines)
+    for index in range(start, len(lines)):
+        if SECTION_END_PATTERN.match(lines[index].strip()):
+            end = index
+            break
+    return "\n".join(lines[start:end]).strip()
+
+
 def check_comment(root: Path, text: str | None, file: Path | None) -> Check:
-    """Check C against the configured minimum Chinese comment characters."""
+    """Check only C's evaluator-comment body against the configured minimum."""
     try:
         profile = json.loads((root / "knowledge" / "submission_profile.yaml").read_text(encoding="utf-8"))
         minimum = profile["weekly_review"]["minimum_comment_chars"]
@@ -144,13 +171,14 @@ def check_comment(root: Path, text: str | None, file: Path | None) -> Check:
         return Check("comment_chars", False, f"cannot load threshold: {exc}")
     if file is not None:
         try:
-            text = file.read_text(encoding="utf-8")
-        except OSError as exc:
+            markdown = file.read_text(encoding="utf-8")
+            text = extract_comment_section(markdown)
+        except (OSError, ValueError) as exc:
             return Check("comment_chars", False, str(exc))
     if text is None:
         return Check("comment_chars", True, f"interface ready; configured minimum={minimum}")
     count = effective_chinese_characters(text)
-    return Check("comment_chars", count >= minimum, f"{count}/{minimum} Chinese characters")
+    return Check("comment_chars", count >= minimum, f"{count}/{minimum} Chinese characters in comment body")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -165,8 +193,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--require-b", action="store_true")
     parser.add_argument("--require-c", action="store_true")
     comment = parser.add_mutually_exclusive_group()
-    comment.add_argument("--comment-text")
-    comment.add_argument("--comment-file", type=Path)
+    comment.add_argument("--comment-text", help="Comment body only; do not include metadata/abstracts.")
+    comment.add_argument(
+        "--comment-file",
+        type=Path,
+        help="Weekly-review Markdown containing a dedicated '## 评论' (or equivalent) section.",
+    )
     return parser
 
 
