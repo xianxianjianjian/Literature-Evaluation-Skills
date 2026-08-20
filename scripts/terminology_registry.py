@@ -79,6 +79,25 @@ def print_rows(rows: list[dict[str, str]]) -> None:
     print(json.dumps(rows, ensure_ascii=False, indent=2))
 
 
+def normalized_component(value: str | None) -> str:
+    """Normalize one terminology identity component for comparison."""
+    return (value or "").strip().casefold()
+
+
+def terminology_identity(record: dict[str, str]) -> tuple[str, str, str, str]:
+    """Return the context-aware identity used for duplicate prevention.
+
+    The same English string may legitimately have different Chinese translations
+    across disciplines/subfields/contexts, so English_Term alone is not unique.
+    """
+    return (
+        normalized_component(record.get("English_Term")),
+        normalized_component(record.get("Discipline")),
+        normalized_component(record.get("Subfield")),
+        normalized_component(record.get("Context")),
+    )
+
+
 def command_lookup(args: argparse.Namespace) -> None:
     """Find terms by ID, English term, abbreviation, or Chinese form."""
     rows = read_registry(args.registry)
@@ -103,13 +122,11 @@ def command_add(args: argparse.Namespace) -> None:
         raise TerminologyError("Term_ID must use TERM-0001 format.")
     if any(row["Term_ID"] == args.term_id for row in rows):
         raise TerminologyError(f"Term_ID already exists: {args.term_id}")
-    english_key = args.english_term.casefold().strip()
-    if any(row["English_Term"].casefold().strip() == english_key for row in rows):
-        raise TerminologyError(f"English term already exists: {args.english_term}")
     if args.evidence_level and not EVIDENCE_LEVEL_PATTERN.fullmatch(args.evidence_level):
         raise TerminologyError("Evidence level must be TE1 through TE7.")
     if args.verified_date:
         validate_iso_date(args.verified_date, "verified_date")
+
     record = {field: "" for field in FIELDS}
     record.update(
         {
@@ -131,6 +148,18 @@ def command_add(args: argparse.Namespace) -> None:
             "Notes": args.notes or "",
         }
     )
+
+    identity = terminology_identity(record)
+    duplicate = next((row for row in rows if terminology_identity(row) == identity), None)
+    if duplicate is not None:
+        raise TerminologyError(
+            "Equivalent terminology context already exists: "
+            f"{duplicate['Term_ID']} ({duplicate['English_Term']}; "
+            f"discipline={duplicate['Discipline'] or '-'}, "
+            f"subfield={duplicate['Subfield'] or '-'}, "
+            f"context={duplicate['Context'] or '-'})"
+        )
+
     rows.append(record)
     write_registry(args.registry, rows)
     print(f"Added terminology record: {args.term_id}")
