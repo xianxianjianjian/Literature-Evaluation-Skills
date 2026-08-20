@@ -60,25 +60,62 @@ def read_rows(path: Path, expected_fields: list[str]) -> list[dict[str, str]]:
         return list(reader)
 
 
-def duplicate_of(rows: Iterable[dict[str, str]], record: dict[str, str]) -> dict[str, str] | None:
-    """Return an obvious duplicate matched by Paper_ID or normalized DOI."""
-    paper_id = record.get("Paper_ID", "").strip().lower()
-    doi = normalize_doi(record.get("DOI", ""))
+def same_identity(left: dict[str, str], right: dict[str, str]) -> bool:
+    """Match the same paper by Paper_ID or normalized DOI when either is available."""
+    left_id = left.get("Paper_ID", "").strip().casefold()
+    right_id = right.get("Paper_ID", "").strip().casefold()
+    if left_id and right_id and left_id == right_id:
+        return True
+    left_doi = normalize_doi(left.get("DOI", ""))
+    right_doi = normalize_doi(right.get("DOI", ""))
+    return bool(left_doi and right_doi and left_doi == right_doi)
+
+
+def duplicate_selection(
+    rows: Iterable[dict[str, str]], record: dict[str, str]
+) -> dict[str, str] | None:
+    """Reject duplicate selection entries only within the same week.
+
+    A paper may legitimately re-enter the candidate pool in a later week under a
+    new topic or role, so selection history is not globally unique by DOI/Paper_ID.
+    """
+    week = record.get("Week", "").strip()
     for row in rows:
-        if paper_id and row.get("Paper_ID", "").strip().lower() == paper_id:
-            return row
-        if doi and normalize_doi(row.get("DOI", "")) == doi:
+        if row.get("Week", "").strip() == week and same_identity(row, record):
             return row
     return None
 
 
-def append_record(path: Path, fields: list[str], record: dict[str, str]) -> None:
-    """Append a schema-aligned record after duplicate checks."""
+def duplicate_reading(
+    rows: Iterable[dict[str, str]], record: dict[str, str]
+) -> dict[str, str] | None:
+    """Reject a paper already recorded as a completed Deep Reading."""
+    for row in rows:
+        if same_identity(row, record):
+            return row
+    return None
+
+
+def append_record(
+    path: Path,
+    fields: list[str],
+    record: dict[str, str],
+    *,
+    record_type: str,
+) -> None:
+    """Append a schema-aligned record after record-type-specific duplicate checks."""
     rows = read_rows(path, fields)
-    duplicate = duplicate_of(rows, record)
+    if record_type == "selection":
+        duplicate = duplicate_selection(rows, record)
+        duplicate_scope = f"week {record.get('Week', '').strip()}"
+    elif record_type == "reading":
+        duplicate = duplicate_reading(rows, record)
+        duplicate_scope = "completed-reading history"
+    else:
+        raise HistoryError(f"Unknown record_type: {record_type}")
     if duplicate is not None:
         raise HistoryError(
-            "Duplicate record detected by Paper_ID or DOI: "
+            f"Duplicate {record_type} record detected in {duplicate_scope}: "
             f"{duplicate.get('Paper_ID') or duplicate.get('DOI')}"
         )
     with path.open("a", encoding="utf-8", newline="") as handle:
@@ -127,7 +164,7 @@ def command_append_selection(args: argparse.Namespace) -> None:
     if not record["Logged_Date"].strip():
         raise HistoryError("Selection records require Logged_Date in ISO 8601 format.")
     validate_iso_date(record["Logged_Date"], "Logged_Date")
-    append_record(args.file, SELECTION_FIELDS, record)
+    append_record(args.file, SELECTION_FIELDS, record, record_type="selection")
     print(f"Appended selection record: {record['Paper_ID'] or record['DOI']}")
 
 
@@ -137,7 +174,7 @@ def command_append_reading(args: argparse.Namespace) -> None:
     if not record["Completed_Date"].strip():
         raise HistoryError("Reading records require Completed_Date in ISO 8601 format.")
     validate_iso_date(record["Completed_Date"], "Completed_Date")
-    append_record(args.file, READING_FIELDS, record)
+    append_record(args.file, READING_FIELDS, record, record_type="reading")
     print(f"Appended completed-reading record: {record['Paper_ID'] or record['DOI']}")
 
 
