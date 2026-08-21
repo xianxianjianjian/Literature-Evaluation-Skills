@@ -33,7 +33,7 @@ Hardening result:
 - two-Gate `WAITING_USER` semantics;
 - `set-paper`, `set-output`, blocker, pending-Zotero and source-check commands;
 - resume-oriented `summary` command;
-- backward-compatible normalization for earlier manifests.
+- backward-compatible additive normalization for earlier manifests.
 
 ### validate_deliverables.py — UPDATED
 
@@ -54,38 +54,86 @@ Hardening result:
 - optional Canonical Abstract equality check;
 - basic manifest completion consistency checks.
 
-These are structural checks only. Visual PDF/DOCX QA and academic-quality judgments remain specialist responsibilities.
+These are deterministic structural checks only. Visual PDF/DOCX QA and academic-quality judgments remain specialist responsibilities.
 
 ### terminology_registry.py — PASS WITH LATER ENHANCEMENT POSSIBLE
 
 Current behavior correctly allows one English term to have different records by `English_Term + Discipline + Subfield + Context`, while rejecting the same contextual identity. TE1–TE7 is kept separate from HIGH/MEDIUM/LOW confidence in the shared policy.
 
-Possible later enhancement: dedicated terminology-evidence JSONL management. Not a blocker for the frozen V1 registry contract.
+Possible later enhancement: dedicated terminology-evidence JSONL management/export commands. This is not currently treated as a release-blocking contradiction in the frozen V1 rule layer because evidence IDs and context are already persistable in the registry, but it remains a useful implementation improvement.
 
 ### history_manager.py — PASS
 
 Selection history deduplicates within a week but allows the same paper to re-enter in later weeks. Completed reading history remains globally deduplicated by stable paper identity.
 
-### mirror_pdf.py — NEEDS V1 LABEL/QA HARDENING
+### mirror_pdf.py — UPDATED WITH HONEST V1 SCOPE
 
-The frozen V1 scope treats this as a deterministic layout helper, not a publisher-grade automatic relayout engine. The current script still labels itself `PHASE_1_LAYOUT_PLAN_ONLY` and lacks explicit plan-validation/render-QC interfaces. It should be upgraded without pretending it can replace the required render → inspect → iterate workflow.
+Previous issue:
 
-### zotero_bridge.py — PARTIAL BY DESIGN, WRITE ROUTE UNRESOLVED
+- still labeled itself as a Phase 1/future-engine placeholder;
+- lacked explicit plan validation and render-QC state.
 
-Read-only Local API operations are implemented and correct. Zotero Desktop Local API itself is read-only. Safe writes require the Connector server/plugin route or another explicitly supported write adapter. The helper must not claim `create` / `attach` success until such a route is implemented and verified.
+Hardening result:
 
-This is an explicit integration gap, not permission to fake writes.
+- now identifies itself as a V1 deterministic layout/QC helper;
+- validates source PDF signature and page-map structure;
+- freezes `Strict Mirror → Adaptive Mirror → Readable Extension`;
+- enforces 1.05–1.15 initial Chinese font scale and 8.5 pt safety floor;
+- records per-page strategy, overflow, extension-page and render-inspection state;
+- `LAYOUT_QC_PASSED` cannot be declared until all planned pages are marked inspected;
+- explicitly requires the human/tool loop `render → inspect → iterate → re-render`.
 
-### Automated tests — IN PROGRESS
+It still does **not** pretend to be a publisher-grade fully automatic relayout engine and does not translate content.
 
-Add stdlib-only regression tests for state, history, terminology, validator and layout helpers, plus a GitHub Actions smoke workflow. Zotero read behavior can be tested with a local mock HTTP server; real library writes remain an integration test.
+### zotero_bridge.py — UPDATED, WRITE ADAPTER STILL AN EXPLICIT GAP
+
+Previous issue:
+
+- safe read interfaces existed but the script still described itself as Phase 1;
+- `create` / `attach` returned old Phase 1 stub language;
+- Connector-server readiness was not exposed.
+
+Hardening result:
+
+- Local API read interfaces remain `status / find / children / verify`;
+- Local API is explicitly labeled read-only;
+- `status` now distinguishes Local API availability from Connector-server availability;
+- `connector-status` probes `/connector/ping`;
+- `create` / `attach` remain declared but return `WRITE_ROUTE_NOT_IMPLEMENTED_OR_VERIFIED` rather than pretending success;
+- `pending` can prepare a `pending_zotero_actions` record without modifying Zotero.
+
+Remaining V1 integration gap: a verified Connector/plugin adapter for bibliographic-parent creation and local-file attachment. The Local API itself cannot satisfy this because it is read-only. This gap must remain explicit until a real write route is implemented and tested.
+
+### Automated tests — ADDED, REMOTE RUN NOT YET VERIFIED
+
+Added:
+
+- `tests/test_core.py` with stdlib regression checks for workflow state, history dedupe, terminology context identity, C comment isolation, B DOCX Base Schema markers and mirror layout policy;
+- `.github/workflows/v1-smoke.yml` for Python 3.11/3.12 compile + unittest + repository validation.
+
+The current ChatGPT execution container cannot resolve `github.com`, so a direct `git clone` test run from that container is unavailable. The GitHub connector currently exposes no verified push-triggered workflow run for the latest branch commits. Therefore the repository must **not** yet claim that GitHub Actions passed. Confirm the actual Actions run before release/merge.
+
+### Branch hygiene — PASS SO FAR
+
+`phase-6-v1-hardening` is ahead of `phase-5-orchestration` with no divergence. Current Phase 6 changes are limited to hardening scripts, tests, CI, README and documentation; the specialist academic rule files and suspended Mullins manifest were not rewritten by Phase 6.
+
+## Remaining release work
+
+Before merging to `main`:
+
+1. confirm smoke/unit tests actually run and pass in an environment with the full repository;
+2. decide whether the Zotero write adapter is required for V1 release or remains a documented `PROVISIONAL` integration boundary;
+3. optionally add terminology-evidence JSONL helper operations if they are judged necessary for V1 rather than a later enhancement;
+4. execute final repository hygiene/diff review;
+5. resume real T01–T04 / specialist-mode / resume / new-SI tests when suitable source packages are available;
+6. keep the real Mullins acceptance manifest factual (`Translation/A = BLOCKED`) until its source-PDF blocker is actually resolved.
 
 ## Merge rule
 
 Do not merge the development chain to `main` until:
 
-- V1 rule ↔ script consistency audit is closed or each remaining gap is explicitly documented;
+- V1 rule ↔ script consistency audit is closed or each remaining gap is explicitly accepted/documented;
 - automated smoke tests pass;
-- no temporary/copyrighted paper binaries are committed;
+- no temporary/copyrighted paper binaries or secrets are committed;
 - the suspended Mullins acceptance record remains factually unchanged;
 - a final branch diff confirms that V2 features have not leaked into V1.
