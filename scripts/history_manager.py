@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Append and query selection and completed-reading CSV records safely."""
+"""Append and query selection and completed-reading CSV records safely.
+
+Selection history is week-scoped. Completed-reading history is global by stable
+paper identity and may only be appended after a workflow manifest verifies that
+Deep Reading genuinely reached COMPLETE.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +17,7 @@ from datetime import date
 from pathlib import Path
 from typing import Iterable
 
+from workflow_state import WorkflowStateError, load_manifest
 
 SELECTION_FIELDS = [
     "Week", "Topic", "Paper_ID", "Title", "DOI", "Journal", "Year", "Role",
@@ -48,7 +54,7 @@ def normalize_doi(value: str) -> str:
 
 
 def read_rows(path: Path, expected_fields: list[str]) -> list[dict[str, str]]:
-    """Read a CSV and verify its exact Phase 1 header."""
+    """Read a CSV and verify its exact V1 header."""
     if not path.is_file():
         raise HistoryError(f"CSV file does not exist: {path}")
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -74,11 +80,7 @@ def same_identity(left: dict[str, str], right: dict[str, str]) -> bool:
 def duplicate_selection(
     rows: Iterable[dict[str, str]], record: dict[str, str]
 ) -> dict[str, str] | None:
-    """Reject duplicate selection entries only within the same week.
-
-    A paper may legitimately re-enter the candidate pool in a later week under a
-    new topic or role, so selection history is not globally unique by DOI/Paper_ID.
-    """
+    """Reject duplicate selection entries only within the same week."""
     week = record.get("Week", "").strip()
     for row in rows:
         if row.get("Week", "").strip() == week and same_identity(row, record):
@@ -135,7 +137,10 @@ def record_from_args(args: argparse.Namespace, fields: list[str]) -> dict[str, s
         unknown = sorted(set(value) - set(fields))
         if unknown:
             raise HistoryError(f"Unknown record fields: {', '.join(unknown)}")
-        record = {key: "" if value.get(key) is None else str(value.get(key, "")) for key in fields}
+        record = {
+            key: "" if value.get(key) is None else str(value.get(key, ""))
+            for key in fields
+        }
     else:
         record = {field: "" for field in fields}
         record.update(
@@ -158,6 +163,60 @@ def record_from_args(args: argparse.Namespace, fields: list[str]) -> dict[str, s
     return record
 
 
+def verify_completed_reading_manifest(
+    manifest_path: Path, record: dict[str, str]
+) -> dict:
+    """Mechanically verify that a reading-history row represents COMPLETE work.
+
+    This does not judge academic quality. It only enforces the state contract so
+    a PROVISIONAL/BLOCKED archive cannot be logged as completed history.
+    """
+    try:
+        manifest = load_manifest(manifest_path)
+    except (WorkflowStateError, OSError) as exc:
+        raise HistoryError(f"Cannot verify completion manifest: {exc}") from exc
+
+    if manifest["week"] != record["Week"].strip():
+        raise HistoryError(
+            f"Reading Week {record['Week']!r} does not match manifest week {manifest['week']!r}."
+        )
+
+    record_paper_id = record["Paper_ID"].strip()
+    if not record_paper_id:
+        raise HistoryError(
+            "Completed reading records require Paper_ID so identity can be matched to the manifest."
+        )
+    manifest_paper_id = str(manifest.get("paper_id") or "").strip()
+    if not manifest_paper_id or manifest_paper_id.casefold() != record_paper_id.casefold():
+        raise HistoryError(
+            "Reading Paper_ID does not match the active manifest paper_id."
+        )
+
+    deep = manifest["stages"]["deep_reading"]
+    if deep["status"] != "COMPLETE":
+        raise HistoryError(
+            f"Deep Reading must be COMPLETE before history append; current={deep['status']}."
+        )
+    if deep["needs_update"]:
+        raise HistoryError(
+            "Deep Reading has unresolved needs_update and cannot enter completed history."
+        )
+    if any(
+        blocker.get("stage") == "deep_reading"
+        for blocker in manifest.get("blocking_issues", [])
+    ):
+        raise HistoryError(
+            "Deep Reading still has a recorded blocker and cannot enter completed history."
+        )
+
+    b_output = manifest["outputs"]["B"]
+    if b_output["status"] != "COMPLETE" or not b_output.get("zotero_attachment_key"):
+        raise HistoryError(
+            "Completed reading history requires B COMPLETE with a verified Zotero attachment key."
+        )
+    return manifest
+
+
 def command_append_selection(args: argparse.Namespace) -> None:
     """Append one Search-stage selection record."""
     record = record_from_args(args, SELECTION_FIELDS)
@@ -169,11 +228,12 @@ def command_append_selection(args: argparse.Namespace) -> None:
 
 
 def command_append_reading(args: argparse.Namespace) -> None:
-    """Append one genuinely completed Deep Reading record."""
+    """Append one manifest-verified completed Deep Reading record."""
     record = record_from_args(args, READING_FIELDS)
     if not record["Completed_Date"].strip():
         raise HistoryError("Reading records require Completed_Date in ISO 8601 format.")
     validate_iso_date(record["Completed_Date"], "Completed_Date")
+    verify_completed_reading_manifest(args.manifest, record)
     append_record(args.file, READING_FIELDS, record, record_type="reading")
     print(f"Appended completed-reading record: {record['Paper_ID'] or record['DOI']}")
 
@@ -222,9 +282,18 @@ def build_parser() -> argparse.ArgumentParser:
     selection.add_argument("--logged-date")
     selection.set_defaults(handler=command_append_selection)
 
-    reading = subparsers.add_parser("append-reading", help="Append a completed reading.")
+    reading = subparsers.add_parser(
+        "append-reading",
+        help="Append a completed reading after verifying a COMPLETE workflow manifest.",
+    )
     add_common_record_arguments(reading)
     reading.add_argument("--completed-date")
+    reading.add_argument(
+        "--manifest",
+        type=Path,
+        required=True,
+        help="Workflow manifest proving Deep Reading COMPLETE for this paper/week.",
+    )
     reading.set_defaults(handler=command_append_reading)
 
     by_doi = subparsers.add_parser("find-by-doi", help="Find records by DOI.")
