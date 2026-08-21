@@ -50,14 +50,16 @@ Phase 1–5 已累计完成四个 Skill 的 V1 规则层：Foundation → Litera
 当前已完成的 hardening 包括：
 
 - `workflow_state.py` 升级为 V1 manifest helper，支持 `paper_id`、全阶段 `needs_update`、A/B/C 状态、`blocking_issues`、`pending_zotero_actions`、source-check date，以及两个固定 `WAITING_USER` Gate 的语义校验；
+- `history_manager.py` 保留 Selection 同周去重/跨周允许，并在写入 `reading_history.csv` 前机械验证 `Deep Reading = COMPLETE`、无未解决更新/阻塞且 B 已完成挂接；
 - `validate_deliverables.py` 升级为 V1 结构验证器，检查 19 个 specialist references、A PDF、B DOCX Base Schema、C 必填字段/评论字数/Canonical Abstract 一致性及关键 manifest 完成关系；
 - `mirror_pdf.py` 升级为 V1 确定性 layout/QC helper，并明确 `Strict Mirror → Adaptive Mirror → Readable Extension` 与 render-first QA；
-- 增加 `tests/test_core.py` 和 GitHub Actions `V1 Smoke Tests`；
-- 增加 `docs/v1-hardening-audit.md` 与 `docs/branch-strategy.md`。
+- `zotero_bridge.py` 明确区分 Local API 只读能力、Connector server 可用性和尚未验证的写适配器，不会伪造 `create/attach` 成功；
+- 增加 `tests/test_core.py`、`tests/test_acceptance_scenarios.py` 和 GitHub Actions `V1 Smoke Tests`；
+- 增加 branch、CI、hardening 和 release checklist 文档。
 
 ## Branch 关系
 
-本仓库的 Phase 分支是**累积式里程碑**，不是互相独立的五套实现：
+本仓库的 Phase 分支是**累积式里程碑**，不是互相独立的多套实现：
 
 ```text
 main
@@ -77,6 +79,20 @@ phase-6-v1-hardening
 
 因此最终通过验收后，通常只需要把最新的已接受累积分支合入 `main`，无需逐个再次合并 Phase 1→5。详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)。
 
+## 自动验证状态
+
+Draft PR #1 (`phase-6-v1-hardening → main`) 作为 release-candidate 审核/CI 容器，不代表已授权合并。
+
+`V1 Smoke Tests` 已在 Python 3.11 和 3.12 上实际通过，包括：
+
+```bash
+python -m compileall scripts tests
+python -m unittest discover -s tests -v
+python scripts/validate_deliverables.py --repo-root .
+```
+
+无版权合成验收场景已经覆盖 T01–T04 的状态/布局合同，以及 Search-only、Translation-only、Deep-Reading-only、Resume、Zotero downgrade 和 new-SI `needs_update`。这些测试只证明结构与 helper 行为，不替代真实论文科学验收。
+
 ## 真实验收状态
 
 真实 Mullins et al. (2025), DOI `10.1111/jsr.14281` 端到端测试已主动暂停，但测试现场保留在 `weekly_reviews/2026/2026-W34/`。
@@ -87,10 +103,11 @@ phase-6-v1-hardening
 
 ## 当前尚未关闭的 V1 集成点
 
-- Zotero Desktop Local API 只读；`create / attach` 仍需要经过可验证的 Connector/plugin write route，不能假装成功。
-- `mirror_pdf.py` 是确定性布局/QC辅助器，不是出版社级全自动重排引擎；真正 A 仍必须 render → inspect → iterate → re-render。
-- 自动测试已加入仓库，但 GitHub Actions 的实际运行状态需在 release 前确认。
-- T01–T04、Search-only、Translation-only、Deep-Reading-only、Resume、Zotero downgrade、new-SI update 等真实验收仍待统一执行。
+- **真实论文科学验收**：真实 T01–T04、A 的视觉镜像 QA、B 的证据闭环和真实 weekly C 仍待完整源包执行。
+- **Zotero 写入适配器**：Zotero Desktop Local API 只读；`create / attach` 仍需在目标运行环境中通过受支持且可验证的 Connector/plugin write route 实现并验证，不能假装成功。
+- **Mirror PDF 能力边界**：`mirror_pdf.py` 是确定性布局/QC辅助器，不是出版社级全自动重排引擎；真正 A 仍必须 render → inspect → iterate → re-render。
+
+详见 [`docs/v1-release-checklist.md`](docs/v1-release-checklist.md)。
 
 ## V1 / V2 边界
 
