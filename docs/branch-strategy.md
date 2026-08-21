@@ -1,17 +1,21 @@
 # Branch Strategy
 
-## What `main` means
+## Stable line
 
-`main` is the stable published branch. Development branches do not become part of the usable project merely because they exist; they become stable only after an explicit release decision and merge.
+`main` is now the stable published V1 line.
 
-At the current V1 release-candidate stage, `main` still represents the original repository baseline.
-
-## Historical Phase branches
-
-The numbered Phase branches were created sequentially as cumulative development snapshots:
+V1 was released by merging `v1-release-candidate` into `main` on 2026-08-21. The merge commit is:
 
 ```text
-main
+9a2f6e4c148f82853101d706751123afd91d3f20
+```
+
+The numbered Phase branches were cumulative development snapshots, not independent Skill systems.
+
+## Historical Phase lineage
+
+```text
+main baseline
   ↓
 phase-1-foundation
   ↓
@@ -28,71 +32,86 @@ phase-6-v1-hardening
 phase-7-zotero-write-adapter
   ↓
 phase-8-zotero-local-attachments
+  ↓
+v1-release-candidate
+  ↓
+main (V1 release)
 ```
 
-They are not separate Skill systems. Each successor contains the earlier work.
+Phase 9 was a paused post-V1 Zotero-parent-create experiment and was not part of the V1 release requirement.
 
-The historical meaning is:
+Because the V1 release commit contains the cumulative history, deleting the old branch refs after a real `v1.0.0` tag is verified does not remove the commits from repository history.
 
-- Phase 1: repository foundation/shared/knowledge/helper base;
-- Phase 2: Search rule layer;
-- Phase 3: Translation rule layer;
-- Phase 4: Deep Reading rule layer;
-- Phase 5: thin weekly orchestrator;
-- Phase 6: consistency hardening, validators, CI and synthetic acceptance;
-- Phase 7: Zotero parent-create integration work;
-- Phase 8: Zotero 10+ existing-parent local attachment integration work.
+## Retention decision
 
-## Numbered Phase development is now frozen
+### Keep permanently
 
-V1 is no longer being developed by opening Phase 9, Phase 10, etc.
+```text
+main
+```
 
-The Phase-9 experiment is deferred as a future optimization and is not part of the current release line. Parent-create Local API unification, group-library routing and further Zotero automation can be revisited after a usable V1 is published.
+`main` is the only permanent working/stable branch required for V1.
 
-All remaining V1 release work happens on:
+### Keep temporarily until the release tag is verified
 
 ```text
 v1-release-candidate
 ```
 
-This branch starts from the accepted cumulative Phase-8 tree and changes only release-blocking contradictions, usability/completion semantics, documentation, tests and final hygiene.
+This remains a convenient audit anchor for the exact pre-merge release candidate. Once a real Git tag `v1.0.0` points to the V1 release, this branch can also be deleted.
 
-## Release meaning
-
-The V1 release target is a **complete usable academic Skill system**:
-
-- Search → Translation → Deep Reading → A/B/C works without requiring a specific Zotero write transport;
-- Zotero remains the preferred long-term archive;
-- automatic/manual/deferred Zotero handling is an archive dimension, not a condition for academic stage completion;
-- source/evidence gaps still correctly produce `PROVISIONAL`/`BLOCKED`;
-- no Zotero operation may be falsely reported as successful.
-
-See `docs/v1-scope-freeze.md`.
-
-## Merge implication
-
-Because the history is cumulative, do **not** merge Phase 1, then Phase 2, etc. separately.
-
-After final RC acceptance, merge only:
+### Approved for deletion after tag verification
 
 ```text
-v1-release-candidate → main
+phase-1-foundation
+phase-2-search
+phase-3-translation
+phase-4-deep-reading
+phase-5-orchestration
+phase-6-v1-hardening
+phase-7-zotero-write-adapter
+phase-8-zotero-local-attachments
+phase-9-zotero-local-parent-create
+post-v1-release-housekeeping
+v1-release-candidate
 ```
 
-Before that merge:
+The old Phase branches no longer carry unique release value:
 
-1. stop feature expansion;
-2. pass compile/unit/foundation tests on the exact RC HEAD;
-3. run academic-completion regression tests;
-4. confirm archive-completion checks remain strict and truthful;
-5. confirm no copyrighted Main/SI/A/B binaries, secrets, Local API keys, Zotero databases or temporary work are committed;
-6. verify the Mullins blocked trace remains factual;
-7. review the final `main...v1-release-candidate` diff;
-8. obtain explicit release approval;
-9. merge and verify `main` contains the expected V1 tree.
+- Phase 1–8 are ancestors of the released cumulative tree.
+- Phase 9 was intentionally deferred and does not contain required V1 functionality.
+- `v1-release-candidate` is superseded by the immutable release tag once that tag exists.
+- `post-v1-release-housekeeping` is only a temporary documentation-cleanup branch.
 
-## After release
+## Pull-request cleanup
 
-Old Phase branches may be retained as development history or eventually replaced by immutable tags/releases and deleted to reduce branch clutter. Do not delete them until the V1 merge and history have been verified.
+The final release PR (#4) is merged.
 
-Future improvements should normally use issue/topic branches named for the optimization (for example `zotero-local-parent-create`) rather than restarting the Phase numbering scheme.
+The old Phase 7 and Phase 8 draft integration PRs are closed because their relevant code is already present in the released `main` history. Earlier Phase review history remains available through GitHub PR/commit history even after branch deletion.
+
+## Release tags
+
+For stable releases, prefer immutable Git tags rather than keeping milestone branches indefinitely.
+
+V1 target:
+
+```text
+v1.0.0 → 9a2f6e4c148f82853101d706751123afd91d3f20
+```
+
+See `docs/releases/v1.0.0.md`.
+
+## Future development
+
+Do not restart the numbered Phase sequence.
+
+Future work should use issue/topic branches such as:
+
+```text
+zotero-local-parent-create
+zotero-group-routing
+real-paper-t03-validation
+mirror-layout-improvements
+```
+
+Merge reviewed improvements back into `main` using normal PRs and create new semantic-version tags for releases.
