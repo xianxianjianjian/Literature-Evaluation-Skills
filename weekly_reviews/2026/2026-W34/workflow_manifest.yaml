@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "workflow_id": "2026-W34-weekly-literature-evaluation",
+  "week": "2026-W34",
+  "paper_id": null,
+  "stages": {
+    "topic": {
+      "status": "WAITING_USER"
+    },
+    "search": {
+      "status": "NOT_STARTED"
+    },
+    "translation": {
+      "status": "NOT_STARTED",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "deep_reading": {
+      "status": "NOT_STARTED",
+      "needs_update": false,
+      "update_reason": []
+    }
+  },
+  "outputs": {
+    "A": {
+      "status": "NOT_STARTED",
+      "zotero_attachment_key": null
+    },
+    "B": {
+      "status": "NOT_STARTED",
+      "zotero_attachment_key": null
+    },
+    "C": {
+      "status": "NOT_STARTED",
+      "git_path": null
+    }
+  },
+  "pending_zotero_actions": [],
+  "source_change": {
+    "last_checked": null
+  }
+}
