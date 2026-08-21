@@ -1,6 +1,6 @@
 # Translation QC
 
-A may be described as `COMPLETE` only after four QC passes. Translation QC checks fidelity of the translation artifact; it does not replace the later research audit.
+A may be described as academically `COMPLETE` only after four QC passes. Translation QC checks fidelity of the translation artifact; it does not replace the later research audit or the optional archive-completion check.
 
 ## QC-1 Content Coverage
 
@@ -63,9 +63,9 @@ Check:
 
 Layout QC requires actual render/visual inspection. A valid layout plan alone is not proof that the rendered PDF is visually correct.
 
-## Completion Gate
+## Academic Completion Gate
 
-For `FULL_MIRROR`, Translation can be `COMPLETE` only when:
+For `FULL_MIRROR`, Translation/A can be `COMPLETE` when:
 
 - Canonical Abstract exists and passes alignment;
 - terminology issues are resolved or explicitly accounted for;
@@ -73,11 +73,22 @@ For `FULL_MIRROR`, Translation can be `COMPLETE` only when:
 - SI status is explicitly accounted for;
 - no critical unlogged source gap remains;
 - all four QC passes succeed;
-- A has been generated and verified;
-- A is verified as the correct Zotero child attachment of the selected paper.
+- A has been generated and verified against the active paper/source version.
 
-If the translation/A is scientifically usable but Zotero attachment is still pending, keep Translation/A `PROVISIONAL` and record `pending_zotero_actions`; do **not** mark Translation `COMPLETE` merely because the file exists locally.
+A Zotero attachment key is **not** part of this academic Translation gate. If Zotero archive work is still pending, keep Translation/A `COMPLETE`, record the pending action, and report archive closure separately.
 
-Likewise, consequential missing SI/source coverage keeps the stage `PROVISIONAL` or `BLOCKED` according to whether defensible work can continue.
+## Archive Completion Add-on
+
+When the user/workflow specifically requires a fully closed Zotero archive, additionally verify:
+
+- A exists as the intended Zotero child attachment;
+- parent identity matches the active paper;
+- attachment key is observable and stored;
+- no conflicting/duplicate A attachment remains unresolved;
+- the corresponding pending Zotero action is cleared.
+
+Failure of this add-on means **archive pending**, not Translation failure.
+
+Consequential missing SI/source coverage still keeps the academic stage `PROVISIONAL` or `BLOCKED` according to whether defensible work can continue.
 
 `TRI-xxx` is reserved for translation/production issues. Do not use `TRI` for methodological or statistical research-audit findings.
