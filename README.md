@@ -224,16 +224,28 @@ Mullins et al. (2025) 的首次真实流程测试保留在 `weekly_reviews/2026/
 - 自动重跑论文原始统计/实验代码；
 - publisher-grade 一键 PDF 重排。
 
-## 分支策略
+## Release 状态
 
-早期 `phase-1` 到 `phase-8` 是累计开发里程碑，不是八套不同 Skill。现在停止继续新增编号 Phase。
-
-正式收束工作只在：
+V1 已于 2026-08-21 正式合并到 `main`。发布 merge commit：
 
 ```text
-v1-release-candidate
+9a2f6e4c148f82853101d706751123afd91d3f20
 ```
 
-进行。完成最终 CI / diff / hygiene 审核并获得明确发布决定后，再把该累计 RC 合入 `main`。
+`v1.0.0` 的 release note 见 [`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md)。
+
+## 分支策略
+
+早期 `phase-1` 到 `phase-8` 是累计开发里程碑，不是八套不同 Skill；Phase 9 是暂停的后续 Zotero 优化实验。
+
+长期只需要保留：
+
+```text
+main
+```
+
+在真实 `v1.0.0` Git tag 核验前，可暂时保留 `v1-release-candidate` 作为发布审计锚点。Tag 建立后，历史 Phase 分支、RC 分支和临时 housekeeping 分支均可删除，因为其提交历史已经由 `main` 和 release tag 保留。
+
+未来开发不再使用 Phase 编号，改用具体 issue/topic branch。
 
 详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)。
