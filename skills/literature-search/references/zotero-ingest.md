@@ -52,25 +52,52 @@ After any write, verify the actual parent/attachment identity rather than treati
 
 ## 4. V1 capability boundary
 
-`scripts/zotero_bridge.py` exposes truthful capability status:
+`scripts/zotero_bridge.py` exposes per-operation capability rather than one generic “Zotero write works” flag.
 
-- Zotero Desktop Local API under `/api/` is read-only and supports `status`, `find`, `children`, and `verify`;
-- the Zotero Connector server can be probed separately;
-- `create` and `attach` are declared workflow interfaces but **must not report success until a supported write adapter has been implemented and verified in the target runtime**.
+### Read path
 
-Connector availability alone is not proof that the repository helper can safely perform the exact requested parent/file write.
+Zotero Desktop Local API under `/api/` remains read-only and supports:
 
-When no verified write route exists:
+- `status`;
+- `find`;
+- `children`;
+- `verify`.
 
-1. if a local working runtime exists, stage acquired Main/SI files under `work/<paper_id>/handoff/`;
-2. append concrete records to `workflow_manifest.yaml.pending_zotero_actions` (the bridge `pending` command may prepare the record but does not write Zotero);
-3. record the expected parent identity, source id and attachment label;
-4. keep Search `PROVISIONAL` when Zotero/archive completion is the only remaining gap;
-5. verify and clear each pending action only after the real Zotero parent/attachment is observable.
+### Parent create path
 
-If the source files themselves are unavailable, record that source blocker separately; a Zotero outage and a source-availability failure are not the same condition.
+Bibliographic parent creation is implemented through the Zotero Connector server's official `/connector/saveItems` route.
 
-A temporary Zotero write limitation does not invalidate an otherwise defensible Search selection, but it prevents the archive from being described as fully complete.
+Required safety sequence:
+
+1. prepare structured metadata; do not guess creator parsing or missing bibliographic fields;
+2. `find` by normalized DOI or exact title before writing;
+3. refuse a duplicate/ambiguous parent;
+4. execute `create --metadata <file> --yes` only when the write is already authorized;
+5. require Connector HTTP 201;
+6. search the read-only Local API again by DOI/title;
+7. only one verified matching parent may be recorded as `CREATED_AND_VERIFIED` with its item key.
+
+A successful POST without a unique post-write identity check is **not** ingest completion.
+
+### Attachment path
+
+Local-file attachment to an existing parent is still explicitly unsupported by the repository helper:
+
+`LOCAL_FILE_ATTACH_ROUTE_NOT_IMPLEMENTED_OR_VERIFIED`
+
+Do not invent an undocumented Connector/plugin request in order to attach Main/SI/A/B. Parent creation and attachment capability are separate gates.
+
+When attachment capability is unavailable:
+
+1. retain any already verified parent key;
+2. if a local working runtime exists, stage acquired Main/SI files under `work/<paper_id>/handoff/`;
+3. append concrete attachment records to `workflow_manifest.yaml.pending_zotero_actions`;
+4. record expected source IDs and attachment labels;
+5. keep the relevant archive state `PROVISIONAL` until each attachment is actually observable and verified.
+
+If the source files themselves are unavailable, record that source blocker separately; a Zotero attachment limitation and a source-availability failure are not the same condition.
+
+A temporary Zotero limitation does not invalidate an otherwise defensible Search selection, but it prevents the archive from being described as fully complete.
 
 ## 5. `selected_paper.yaml`
 
