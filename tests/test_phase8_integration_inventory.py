@@ -16,6 +16,7 @@ class Phase8IntegrationInventoryTests(unittest.TestCase):
             "skills/literature-search/references/zotero-ingest.md",
             "docs/zotero-write-adapter.md",
             "docs/zotero-local-attachments.md",
+            "docs/zotero-live-validation.md",
             "tests/test_zotero_local_write.py",
             "tests/test_zotero_local_archive.py",
         ]
