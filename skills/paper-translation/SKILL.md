@@ -1,56 +1,144 @@
 ---
 name: paper-translation
-description: Translate a user-supplied or selected academic paper into evidence-faithful Chinese outputs, including a canonical abstract and mirror-PDF handoff; Phase 1 provides the contract skeleton only.
+description: Professionally translate an academic paper into Chinese with terminology verification, a canonical abstract, full-text/SI coverage, figure/table integrity, and a page-structure-aware Chinese mirror PDF. Can run independently or from the weekly workflow.
 ---
 
 # Paper Translation
 
 ## Purpose
 
-Own terminology verification, Canonical Abstract translation, full-text/Supplement translation, Figure/Table handling, A production, Zotero attachment, and proposed terminology updates. Full translation procedures belong to Phase 3 references.
+Produce a faithful, terminology-controlled Chinese translation and deliverable A without changing scientific meaning, causal strength, numbers, statistics, source data or source-version identity.
 
-## Entry Modes and Scope
+The Translation Skill owns translation and production quality. It does **not** perform the later independent methodological/statistical critique that belongs to Deep Reading.
 
-Support weekly context and Translation-only requests. Search completion is not a prerequisite when the user supplies a paper or Zotero item.
+## Required shared contracts
+
+Before substantive work, read:
+
+- [`../../shared/evidence-policy.md`](../../shared/evidence-policy.md)
+- [`../../shared/identifier-policy.md`](../../shared/identifier-policy.md)
+- [`../../shared/source-identity-policy.md`](../../shared/source-identity-policy.md)
+- [`../../shared/zotero-policy.md`](../../shared/zotero-policy.md)
+- [`../../shared/state-contract.md`](../../shared/state-contract.md)
+- [`../../shared/data-format-policy.md`](../../shared/data-format-policy.md)
+
+When running in weekly context, use `weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the workflow source of truth.
+
+## Reference routing
+
+Read the reference that owns each translation decision:
+
+- terminology verification and registry use → [`references/terminology-policy.md`](references/terminology-policy.md)
+- canonical Abstract → [`references/abstract-translation.md`](references/abstract-translation.md)
+- Translation Units and full scientific coverage → [`references/fulltext-translation.md`](references/fulltext-translation.md)
+- figures, tables and SI → [`references/figures-tables-supplement.md`](references/figures-tables-supplement.md)
+- mirror layout → [`references/mirror-layout.md`](references/mirror-layout.md)
+- completion QC → [`references/translation-qc.md`](references/translation-qc.md)
+
+## Entry modes and scopes
+
+Accept handoff from Search, a Zotero item, or a directly supplied source package. Supported scopes:
+
+- `ABSTRACT_ONLY`
+- `SECTION_ONLY`
+- `SUPPLEMENT_ONLY`
+- `FULL_MIRROR`
+- `UPDATE_EXISTING`
+
+If the user simply asks to translate a paper without narrowing scope, default to `FULL_MIRROR`.
+
+Search completion is not a prerequisite when the user directly supplies a paper, but a Minimal Intake is still mandatory.
 
 ## Minimal Intake
 
-When Search artifacts are absent, establish paper identity, source manifest, source version, and minimum file-integrity information. Do not run a hidden full Search.
+Before translation:
 
-## Terminology Preflight
+1. establish focal-paper identity and `paper_id`;
+2. distinguish Version of Record, accepted manuscript, preprint and supplementary files;
+3. assign stable source IDs (`SRC-M1`, `SRC-S1`, ...);
+4. check source readability and expected page/figure/table/SI coverage;
+5. record missing or ambiguous sources explicitly.
 
-Read the terminology registry and evidence records, then identify terms that need verification. The script may manage records but must not decide the best Chinese translation automatically.
+Prefer Version of Record for identity and page mapping. A legal author manuscript or other official version may be used as a working text source when necessary, but version differences must be recorded and never silently merged.
+
+## Translation workflow
+
+For `FULL_MIRROR`:
+
+1. Minimal Intake and source identity check.
+2. Build Source/Page/Structure Map.
+3. Run terminology preflight and create/update `paper_terminology.csv`.
+4. Translate the Abstract through two translation passes plus an alignment pass and write `canonical_abstract.md`.
+5. Translate Main Article by stable Translation Units and record `translation_ledger.jsonl`.
+6. Translate/verify tables, figures, captions, notes and Supporting Information.
+7. Record translation-specific issues in `translation_issues.jsonl` using `TRI-xxx`.
+8. Run Coverage, Semantic, Numeric and Layout QC.
+9. Render and verify A: `[A] 中文全文翻译镜像版`.
+10. Attach A to the correct Zotero parent when possible; otherwise stage a pending action without pretending success.
+11. Propose evidence-backed terminology-registry updates where warranted.
 
 ## Canonical Abstract
 
-Create one source-grounded canonical Chinese abstract for reuse by downstream deliverables. Preserve uncertainty, direction, numbers, and causal strength.
+Create exactly one canonical Chinese Abstract. Preserve sample, methods, all reported directions/statistics, uncertainty and causal strength. A/B/C must reuse this version exactly rather than independently retranslate it.
 
-## Full-text Translation
+## Full-text and SI coverage
 
-Cover all material that should be translated, including relevant Supporting Information. References normally remain in English. Missing or unreadable content must be marked, never reconstructed.
+Translate all scientifically relevant content required by the selected scope. For `FULL_MIRROR`, this includes Main and available scientific SI by default.
 
-## Mirror PDF Production
+References normally remain in their original language. Missing/unreadable source content must be labeled using the shared source-gap vocabulary, never reconstructed from common practice or model knowledge.
 
-A is the Chinese full-text mirror PDF. Phase 3 will implement layout behavior using Strict Mirror → Adaptive Mirror → Readable Extension while preserving source data and readable typography.
+## Figure and table integrity
 
-## Zotero Attachment
+Numerical table cells and figure data are locked to the source. Do not alter plotted points, axes, scales, error bars, significance markers or values.
 
-Attach verified A as `[A] 中文全文翻译镜像版` when supported. If unavailable, stage and record the pending action under the shared Zotero contract.
+Original conceptual figures may be localized only without changing structure and with clear identification. Explanatory redraws made later for Deep Reading must say `【根据原文重建，并非作者原图】`.
 
-## Terminology Update
+## Mirror PDF production
 
-Propose evidence-backed registry updates with stable TERM/TERMEV identifiers. Do not silently change a preferred translation or long-term terminology record.
+A follows the escalation:
 
-## Completion States
+`Strict Mirror → Adaptive Mirror → Readable Extension`
 
-`COMPLETE` requires source coverage, terminology issue accounting, canonical abstract, A verification, and verified or pending attachment state. Use `PROVISIONAL` when the source package is incomplete.
+Prioritize page correspondence, then structure, nearby figure/table placement, paragraph correspondence and finally line correspondence. Protect readability. Chinese body text may often begin around 105%–115% of the source visual size when space allows; approximately 8.5 pt is an extreme safety floor rather than a target.
 
-## Hard Translation Rules
+## Zotero attachment
 
-- Do not change causal strength.
-- Do not change numbers, directions, statistical results, or significance markers.
-- Do not add information absent from the source.
-- If authors themselves overstate causality, translate faithfully and separate any evaluator warning.
-- References remain in English by default.
-- Figure data, axes, points, lines, error bars, scales, and markers must not change.
-- Original errors must not be silently corrected.
+Attach verified A as `[A] 中文全文翻译镜像版` when a write-capable Zotero route is available. A successful request is not sufficient; verify the returned parent/attachment identity.
+
+If Zotero is unavailable, stage the file under `work/<paper_id>/handoff/`, record `pending_zotero_actions`, and use `PROVISIONAL` when the missing attachment prevents the archive from being fully complete.
+
+## Terminology update
+
+The registry is context-sensitive. Reuse a term only when the English term, discipline/subfield, conceptual meaning and paper context match. `HIGH / MEDIUM / LOW` confidence is distinct from TE1–TE7 evidence-source type.
+
+Never silently overwrite an existing preferred translation; preserve evidence history and alternatives.
+
+## Completion states
+
+For `FULL_MIRROR`, `COMPLETE` requires:
+
+- source identity/package accounted for;
+- canonical Abstract complete;
+- terminology issues resolved or explicitly accounted for;
+- 100% expected translatable coverage accounted for;
+- Main and SI status explicit;
+- no critical unlogged source gaps;
+- Coverage/Semantic/Numeric/Layout QC complete;
+- A generated and verified;
+- Zotero attachment verified.
+
+Use `PROVISIONAL` when a named source/SI/layout/Zotero gap remains but the available translation is still usable. Use `BLOCKED` when the missing source prevents defensible translation.
+
+## Hard translation rules
+
+- Accuracy > professionalism > fidelity > fluency.
+- Do not intensify or weaken causal language beyond the source.
+- If authors themselves overstate causality, translate faithfully; criticism belongs to Deep Reading.
+- Preserve all numbers, statistics, equations, parameters, software names and data.
+- Do not add unreported experimental steps or parameter values.
+- Preserve non-significant findings and uncertainty language.
+- Do not silently correct source errors or inconsistencies.
+- Do not independently translate author names.
+- References normally remain in the original language.
+- Do not change figure/table data.
+- OCR is a last resort; unreliable source text must be marked rather than guessed.
