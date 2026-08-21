@@ -8,7 +8,7 @@
       "status": "COMPLETE"
     },
     "search": {
-      "status": "IN_PROGRESS"
+      "status": "WAITING_USER"
     },
     "translation": {
       "status": "NOT_STARTED",
