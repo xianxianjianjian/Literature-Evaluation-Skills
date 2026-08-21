@@ -54,6 +54,30 @@ class HistoryTests(unittest.TestCase):
         with path.open("w", encoding="utf-8", newline="") as handle:
             csv.writer(handle).writerow(fields)
 
+    def _reading_record(self) -> dict[str, str]:
+        record = {field: "" for field in history.READING_FIELDS}
+        record.update(
+            {
+                "Week": "2026-W34",
+                "Paper_ID": "paper-a",
+                "Title": "Paper",
+                "DOI": "10.1/example",
+            }
+        )
+        return record
+
+    def _manifest(self, path: Path, status: str) -> Path:
+        data = state.initial_manifest("2026-W34")
+        data["paper_id"] = "paper-a"
+        data["stages"]["deep_reading"]["status"] = status
+        if status == "COMPLETE":
+            data["outputs"]["B"] = {
+                "status": "COMPLETE",
+                "zotero_attachment_key": "BKEY0001",
+            }
+        state.write_manifest(path, data)
+        return path
+
     def test_selection_duplicate_scope_is_week_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "selection.csv"
@@ -77,18 +101,30 @@ class HistoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "reading.csv"
             self._csv(path, history.READING_FIELDS)
-            first = {field: "" for field in history.READING_FIELDS}
-            first.update({
-                "Week": "2026-W34",
-                "Paper_ID": "paper-a",
-                "Title": "Paper",
-                "DOI": "10.1/example",
-            })
+            first = self._reading_record()
             history.append_record(path, history.READING_FIELDS, first, record_type="reading")
             second = dict(first)
             second["Week"] = "2026-W35"
             with self.assertRaises(history.HistoryError):
                 history.append_record(path, history.READING_FIELDS, second, record_type="reading")
+
+    def test_reading_history_requires_complete_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = self._manifest(root / "manifest.yaml", "COMPLETE")
+            verified = history.verify_completed_reading_manifest(
+                manifest, self._reading_record()
+            )
+            self.assertEqual(verified["stages"]["deep_reading"]["status"], "COMPLETE")
+
+    def test_provisional_reading_cannot_enter_completed_history(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = self._manifest(root / "manifest.yaml", "PROVISIONAL")
+            with self.assertRaises(history.HistoryError):
+                history.verify_completed_reading_manifest(
+                    manifest, self._reading_record()
+                )
 
 
 class TerminologyTests(unittest.TestCase):
