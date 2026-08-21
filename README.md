@@ -32,21 +32,25 @@ Zotero: Main / SI / A / B
 Git:    Skills / shared policies / knowledge / search decisions / C / workflow state
 ```
 
-Git 不长期重复保存 A/B。Zotero 暂时不可用时，待挂接产物可暂存于 `work/<paper_id>/handoff/`，并在当周 `workflow_manifest.yaml` 的 `pending_zotero_actions` 中登记。
+Git 不长期重复保存 A/B。Zotero 暂时不可用时，待挂接产物可暂存于 `work/<paper_id>/handoff/`，并在当周 `workflow_manifest.yaml.pending_zotero_actions` 中登记。
 
 ## 当前开发阶段
 
 `phase-6-v1-hardening` 已封为 **V1 rule-layer / structural Release Candidate**：规则、状态、helper、合成验收、CI 与仓库 hygiene 已通过审核，但真实论文 Production validation 仍保持 OPEN。
 
-当前隔离开发分支为 **Phase 7 — Zotero Write Adapter**。Phase 7 不改学术规则，只缩小 Zotero 生产集成缺口：
+`phase-7-zotero-write-adapter` 已封为 parent-create 集成基线：使用官方 Connector `/connector/saveItems` 建立 bibliographic parent，写前查重/目标解析，写后通过 Local API DOI/标题回查。
 
-- bibliographic parent create：使用官方 Zotero Connector `/connector/saveItems`；
-- create 前先查重，写后必须通过只读 Local API 做 DOI/标题身份回查；
-- 没有 `--yes` 时 `create` 只预览，不执行写入；
-- local-file attach（Main/SI/A/B → 已有 parent）仍未实现，继续明确记录为 pending/provisional；
-- 不会因为 Connector 在线或 HTTP 201 就把整个 Zotero 档案标记 COMPLETE。
+当前隔离开发分支为 **Phase 8 — Zotero Local Attachments**。Phase 8 使用 Zotero 10+ Local API v3 的本机授权与 full-upload 能力补齐 durable existing-parent attachment：
 
-详见 [`docs/zotero-write-adapter.md`](docs/zotero-write-adapter.md)。
+- Main/SI/A/B 可以在 parent 创建很久之后独立挂接，不依赖短生命周期 Connector session；
+- `attach` 默认只预览，`--yes` 才请求 Zotero Desktop 本机写入授权；
+- Local API key 只驻留当前进程，不打印、不持久化；
+- 写入与验证绑定同一 `Zotero-Server-ID`；
+- attachment 只有 parent + filename + MD5 回查一致才成功；
+- 已有相同附件幂等复用，断点留下的空 child 可继续上传，同名不同文件停止为冲突；
+- CI 使用 synthetic files/mocks，不修改真实 Zotero library。
+
+详见 [`docs/zotero-local-attachments.md`](docs/zotero-local-attachments.md)；Phase 7 的设计背景保留在 [`docs/zotero-write-adapter.md`](docs/zotero-write-adapter.md)。
 
 ## 已完成的 V1 hardening
 
@@ -76,18 +80,20 @@ phase-4-deep-reading
   ↓
 phase-5-orchestration
   ↓
-phase-6-v1-hardening        ← sealed rule-layer RC
+phase-6-v1-hardening          ← sealed rule-layer RC
   ↓
-phase-7-zotero-write-adapter ← isolated integration work
+phase-7-zotero-write-adapter ← parent-create baseline
+  ↓
+phase-8-zotero-local-attachments ← durable attachment integration
 ```
 
-`main` 仍保持初始提交，等待明确的 release 决策。不要逐个重新 merge Phase 1–5；最终只合入被接受的最新累积线。
+`main` 仍保持初始提交，等待明确 release 决策。不要逐个重新 merge Phase 1–7；最终只合入被接受的最新累积线。
 
 ## 自动验证状态
 
-Draft PR #1 (`phase-6-v1-hardening → main`) 是 Phase 6 RC 的审核/CI 容器，不代表已授权合并。
+Draft PR #1 (`phase-6-v1-hardening → main`) 是 Phase 6 RC 的审核/CI 容器，不代表已授权合并。Draft PR #2 审核 Phase 7 parent-create adapter；Draft PR #3 审核 Phase 8 durable attachment adapter。
 
-Phase 6 exact-head `V1 Smoke Tests` 已在 Python 3.11 和 3.12 实际通过：
+Phase 8 exact-head smoke tests 已在 Python 3.11 和 3.12 通过：
 
 ```bash
 python -m compileall scripts tests
@@ -95,7 +101,30 @@ python -m unittest discover -s tests -v
 python scripts/validate_deliverables.py --repo-root .
 ```
 
-Phase 7 使用独立 PR/CI 验证 Zotero parent-create adapter；mock 测试不能代替未来在用户本地 Zotero Desktop 上的 live write verification。
+自动测试只验证 deterministic contracts；不能替代用户本机 Zotero Desktop 授权/真实文件写入测试。
+
+## Zotero 10+ durable attachment
+
+预览：
+
+```bash
+python scripts/zotero_bridge.py attach \
+  --parent-key <ZOTERO_PARENT_KEY> \
+  --file <LOCAL_FILE> \
+  --name "[ORIGINAL] Main Article"
+```
+
+真实写入：
+
+```bash
+python scripts/zotero_bridge.py attach \
+  --parent-key <ZOTERO_PARENT_KEY> \
+  --file <LOCAL_FILE> \
+  --name "[ORIGINAL] Main Article" \
+  --yes
+```
+
+默认目标是 `users/0`。Group library 只有在目标明确且可写时才使用 `--library-prefix groups/<id>`。项目 helper 当前自设单文件 256 MiB 安全上限。
 
 ## 真实验收状态
 
@@ -118,8 +147,11 @@ Deep Reading = NOT_STARTED
 - A 的真实 render → inspect → iterate → re-render；
 - B 的真实 evidence/source-anchor closure；
 - C 的真实 Canonical Abstract/comment/reviewer 验收；
-- Zotero local-file attachment adapter 及 Main/SI/A/B post-write verification；
-- Phase 7 parent-create adapter 的真实本地 Zotero live verification。
+- Phase 7 parent-create adapter 的真实本地 Zotero live verification；
+- Phase 8 existing-parent Main/SI/A/B local attachment 的真实 Zotero 10+ live authorization/write/post-write verification；
+- Mullins 测试所需 Main PDF source blocker。
+
+因此当前结论是：**Zotero durable attachment 的代码/协议/mock 验证已实现；Production live validation 仍 OPEN。**
 
 ## V1 / V2 边界
 
