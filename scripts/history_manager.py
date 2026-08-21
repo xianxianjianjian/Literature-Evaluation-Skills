@@ -3,7 +3,8 @@
 
 Selection history is week-scoped. Completed-reading history is global by stable
 paper identity and may only be appended after a workflow manifest verifies that
-Deep Reading genuinely reached COMPLETE.
+Deep Reading genuinely reached academic COMPLETE. Zotero archive keys are
+optional metadata and may be reconciled later.
 """
 
 from __future__ import annotations
@@ -166,10 +167,12 @@ def record_from_args(args: argparse.Namespace, fields: list[str]) -> dict[str, s
 def verify_completed_reading_manifest(
     manifest_path: Path, record: dict[str, str]
 ) -> dict:
-    """Mechanically verify that a reading-history row represents COMPLETE work.
+    """Mechanically verify that a reading-history row represents academic COMPLETE work.
 
-    This does not judge academic quality. It only enforces the state contract so
-    a PROVISIONAL/BLOCKED archive cannot be logged as completed history.
+    This does not judge academic quality. It enforces only the state contract:
+    Deep Reading/B must be complete and free of unresolved academic blockers or
+    update flags. Zotero parent/attachment keys are optional archive metadata and
+    may remain pending after the reading itself is complete.
     """
     try:
         manifest = load_manifest(manifest_path)
@@ -206,13 +209,22 @@ def verify_completed_reading_manifest(
         for blocker in manifest.get("blocking_issues", [])
     ):
         raise HistoryError(
-            "Deep Reading still has a recorded blocker and cannot enter completed history."
+            "Deep Reading still has a recorded academic blocker and cannot enter completed history."
         )
 
     b_output = manifest["outputs"]["B"]
-    if b_output["status"] != "COMPLETE" or not b_output.get("zotero_attachment_key"):
+    if b_output["status"] != "COMPLETE":
         raise HistoryError(
-            "Completed reading history requires B COMPLETE with a verified Zotero attachment key."
+            "Completed reading history requires B academic status COMPLETE."
+        )
+
+    # Zotero identifiers are useful archive metadata but are not prerequisites
+    # for recording that the paper was genuinely read and audited.
+    manifest_b_key = str(b_output.get("zotero_attachment_key") or "").strip()
+    record_b_key = record.get("B_Attachment_Key", "").strip()
+    if manifest_b_key and record_b_key and manifest_b_key != record_b_key:
+        raise HistoryError(
+            "B_Attachment_Key in the reading record conflicts with the verified manifest key."
         )
     return manifest
 
@@ -228,7 +240,7 @@ def command_append_selection(args: argparse.Namespace) -> None:
 
 
 def command_append_reading(args: argparse.Namespace) -> None:
-    """Append one manifest-verified completed Deep Reading record."""
+    """Append one manifest-verified academically completed Deep Reading record."""
     record = record_from_args(args, READING_FIELDS)
     if not record["Completed_Date"].strip():
         raise HistoryError("Reading records require Completed_Date in ISO 8601 format.")
@@ -284,7 +296,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     reading = subparsers.add_parser(
         "append-reading",
-        help="Append a completed reading after verifying a COMPLETE workflow manifest.",
+        help="Append a completed reading after verifying academic Deep Reading completion.",
     )
     add_common_record_arguments(reading)
     reading.add_argument("--completed-date")
@@ -292,7 +304,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--manifest",
         type=Path,
         required=True,
-        help="Workflow manifest proving Deep Reading COMPLETE for this paper/week.",
+        help="Workflow manifest proving academic Deep Reading COMPLETE for this paper/week.",
     )
     reading.set_defaults(handler=command_append_reading)
 
