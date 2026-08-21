@@ -280,18 +280,23 @@ class MirrorPlanTests(unittest.TestCase):
 
 
 class ZoteroBridgeTests(unittest.TestCase):
-    def test_connector_availability_does_not_enable_unverified_writes(self) -> None:
+    def test_status_exposes_parent_create_but_not_local_file_attach(self) -> None:
         payload = zotero.status_payload(
             api_available=True,
             connector_available=True,
         )
         self.assertTrue(payload["local_api"]["available"])
         self.assertTrue(payload["connector"]["available"])
-        self.assertFalse(payload["writes"]["enabled"])
-        self.assertEqual(payload["writes"]["implemented"], [])
+        self.assertEqual(payload["writes"]["implemented"], ["create"])
+        self.assertTrue(payload["writes"]["operations"]["create"]["enabled"])
         self.assertEqual(
-            payload["writes"]["reason"],
-            "WRITE_ROUTE_NOT_IMPLEMENTED_OR_VERIFIED",
+            payload["writes"]["operations"]["create"]["verification"],
+            "POST_WRITE_LOCAL_API_IDENTITY_CHECK",
+        )
+        self.assertFalse(payload["writes"]["operations"]["attach"]["enabled"])
+        self.assertEqual(
+            payload["writes"]["operations"]["attach"]["reason"],
+            zotero.ATTACH_UNSUPPORTED,
         )
 
     def test_pending_command_only_emits_manifest_template(self) -> None:
