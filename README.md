@@ -36,28 +36,24 @@ Git 不长期重复保存 A/B。Zotero 暂时不可用时，待挂接产物可�
 
 ## 当前开发阶段
 
-当前开发分支进入 **Phase 2 — Literature Search**。
+当前开发分支进入 **Phase 3 — Paper Translation**。
 
-Phase 1 已建立：
+Phase 1 已建立共享协议、Knowledge Schema、状态与基础脚本。Phase 2 已完成 `literature-search` 的规则层，并使用 2026-W34 的真实主题完成 Topic → Search → Screening → Paper Selection 验收；焦点论文已确认为 Mullins et al. (2025), DOI `10.1111/jsr.14281`。由于当前 ChatGPT 会话不能访问用户本机 Zotero Desktop，Search 的 Zotero handoff 按规则保持 `PROVISIONAL`，没有伪装写入成功。
 
-- 共享证据、身份、Zotero、状态和数据格式协议；
-- 长期知识库 Schema；
-- 工作流状态与基础数据管理 CLI；
-- 四个 Skill 的职责边界和总控路由骨架。
+Phase 3 当前已实现 `paper-translation` 的规则层：
 
-Phase 2 当前已实现 `literature-search` 的规则层：
+- Context-sensitive terminology + TE1–TE7 evidence-source types；
+- Abstract 两遍翻译 + alignment + 唯一 Canonical Abstract；
+- Page/Section/Paragraph Translation Units 与 translation ledger；
+- Main + Supporting Information 全覆盖与 Source Gap 标记；
+- Figure/Table 数据锁定和 SI 处理；
+- `Strict Mirror → Adaptive Mirror → Readable Extension` 镜像排版；
+- Coverage / Semantic / Numeric / Layout 四层 Translation QC；
+- Zotero unavailable 时的 `PROVISIONAL` / pending handoff 规则。
 
-- 主题规划与用户 Topic Gate；
-- Journal Mapping；
-- Search Question Profile、Concept Blocks、Database Routing 与时间角色；
-- 两轮筛选、固定排除码、Quality Gate、七维评分和 Method Transfer Checklist；
-- Retraction/Correction/Version/SI/Data/Code/Preregistration 等 Integrity Check；
-- Primary + Strong Alternatives 推荐逻辑；
-- 用户 Paper Gate 后的 selected-paper/source-manifest/Zotero handoff 规则。
+当前真实 Mullins 2025 验收已完成出版身份、Wiley Version of Record、PMID/PMCID 和 Supporting Figure S1 核验。网页通道能够读取出版社/PMC 正文信息，但 Wiley PDF 二进制下载在当前环境返回 403；在取得真实 Main PDF 之前，不得伪造页面对应的 A 镜像 PDF。
 
-下一步是用真实周主题执行一次完整的 Topic → Search → Screening → Paper Selection → Zotero/PROVISIONAL handoff 验收。Translation 和 Deep Reading 的完整实现仍属于后续 Phase 3/4。
-
-当前 PDF 重排和 Zotero 写入接口仍有明确的能力边界；未实现的操作不得伪装成功。
+Deep Reading 的完整实现仍属于 Phase 4。
 
 ## V1 / V2 边界
 
