@@ -7,6 +7,8 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +21,7 @@ import mirror_pdf
 import terminology_registry as terms
 import validate_deliverables as validator
 import workflow_state as state
+import zotero_bridge as zotero
 
 
 class WorkflowStateTests(unittest.TestCase):
@@ -172,6 +175,39 @@ class MirrorPlanTests(unittest.TestCase):
                 ["strict-mirror", "adaptive-mirror", "readable-extension"],
             )
             self.assertEqual(plan["pages"][0]["adaptive_font_sizing"]["minimum_font_pt"], 8.5)
+            mirror_pdf.validate_plan_data(plan)
+
+
+class ZoteroBridgeTests(unittest.TestCase):
+    def test_connector_availability_does_not_enable_unverified_writes(self) -> None:
+        payload = zotero.status_payload(
+            api_available=True,
+            connector_available=True,
+        )
+        self.assertTrue(payload["local_api"]["available"])
+        self.assertTrue(payload["connector"]["available"])
+        self.assertFalse(payload["writes"]["enabled"])
+        self.assertEqual(payload["writes"]["implemented"], [])
+        self.assertEqual(
+            payload["writes"]["reason"],
+            "WRITE_ROUTE_NOT_IMPLEMENTED_OR_VERIFIED",
+        )
+
+    def test_pending_command_only_emits_manifest_template(self) -> None:
+        args = argparse.Namespace(
+            action="attach",
+            paper_id="paper-1",
+            reason="Zotero unavailable",
+            source_id="SRC-M1",
+            expected_attachment_name="[ORIGINAL] Main Article",
+        )
+        stream = StringIO()
+        with redirect_stdout(stream):
+            code = zotero.command_pending_template(args)
+        payload = json.loads(stream.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["pending_zotero_action"]["action"], "attach")
+        self.assertIn("does not modify Zotero", payload["note"])
 
 
 if __name__ == "__main__":
