@@ -280,19 +280,31 @@ class ZoteroParentCreateTests(unittest.TestCase):
             self.assertEqual(code, 5)
             self.assertEqual(payload["status"], "WRITE_SUCCEEDED_VERIFICATION_AMBIGUOUS")
 
-    def test_attach_remains_explicitly_unsupported(self) -> None:
-        args = argparse.Namespace(
-            parent_key="PARENT01",
-            file=Path("paper.pdf"),
-            name="[ORIGINAL] Main Article",
-        )
-        stream = StringIO()
-        with redirect_stdout(stream):
-            code = zotero.command_attach_unavailable(args)
-        payload = json.loads(stream.getvalue())
+    def test_attach_without_yes_previews_and_never_connects(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "paper.pdf"
+            path.write_bytes(b"%PDF-1.4\nsynthetic")
+            args = argparse.Namespace(
+                parent_key="PARENT01",
+                file=path,
+                name="[ORIGINAL] Main Article",
+                library_prefix="users/0",
+                yes=False,
+                api_base_url="http://127.0.0.1:23119/api",
+                timeout=1.0,
+            )
+            stream = StringIO()
+            with (
+                patch.object(zotero.local_write.LocalWriteClient, "connect") as connect,
+                redirect_stdout(stream),
+            ):
+                code = zotero.command_attach(args)
+            payload = json.loads(stream.getvalue())
         self.assertEqual(code, 3)
-        self.assertEqual(payload["status"], zotero.ATTACH_UNSUPPORTED)
-        self.assertIn("Do not claim an attachment exists", payload["next_action"])
+        self.assertEqual(payload["status"], zotero.CONFIRMATION_REQUIRED)
+        self.assertEqual(payload["would_use"], zotero.LOCAL_ATTACH_ROUTE)
+        self.assertIn("No Zotero probe", payload["note"])
+        connect.assert_not_called()
 
 
 if __name__ == "__main__":
