@@ -2,6 +2,23 @@ work/
 __pycache__/
 *.pyc
 *.pyo
-.DS_Store
 .pytest_cache/
 .coverage
+.DS_Store
+
+# Local Python/runtime environments
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Research binaries belong in Zotero/handoff, not public Git
+*.pdf
+*.docx
+
+# Zotero/local database artifacts
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db
