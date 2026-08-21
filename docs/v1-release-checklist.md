@@ -84,23 +84,25 @@ Required regression coverage includes:
 - [x] strict archive completion requiring Zotero keys/no pending actions;
 - [x] Mullins blocked trace remains un-fabricated.
 
-Final exact-head CI:
+Scope-freeze CI evidence observed before this checklist-only update:
 
-- [ ] Python 3.11 green after V1 scope-freeze changes.
-- [ ] Python 3.12 green after V1 scope-freeze changes.
-- [ ] foundation validator green after V1 scope-freeze changes.
+- [x] Python 3.11 green after V1 scope-freeze changes.
+- [x] Python 3.12 green after V1 scope-freeze changes.
+- [x] foundation validator green after V1 scope-freeze changes.
+
+The checklist commit itself must still receive one final exact-head CI pass before merge.
 
 ## 7. Real-paper validation backlog — not a V1 release blocker
 
 These are important confidence-building tests, but they can continue after a usable V1 is published:
 
-- [ ] real T01 ordinary empirical paper without SI;
-- [ ] real T02 neuroscience paper with many figures/tables;
-- [ ] real T03 Main + complex SI;
-- [ ] real T04 missing SI → later upgrade;
-- [ ] real A render → inspect → iterate → re-render;
-- [ ] real B source-anchor closure;
-- [ ] real weekly C production;
+- [ ] real T01 ordinary empirical paper without SI.
+- [ ] real T02 neuroscience paper with many figures/tables.
+- [ ] real T03 Main + complex SI.
+- [ ] real T04 missing SI → later upgrade.
+- [ ] real A render → inspect → iterate → re-render.
+- [ ] real B source-anchor closure.
+- [ ] real weekly C production.
 - [ ] resume Mullins 2025 when a usable Main PDF becomes available.
 
 The existing Mullins run must remain factually blocked rather than being rewritten to satisfy the checklist.
@@ -121,18 +123,19 @@ Manual Zotero import/attachment followed by verification is an acceptable V1 ope
 
 ## 9. Final RC audit before merge
 
-- [ ] exact `v1-release-candidate` HEAD identified.
-- [ ] exact-head CI is green on Python 3.11 and 3.12.
-- [ ] `main...v1-release-candidate` is ahead-only with no accidental reverse divergence.
-- [ ] final changed-file list contains no research binaries/secrets/temp data.
-- [ ] no stale rule still says “Zotero pending ⇒ academic stage PROVISIONAL”.
-- [ ] no stale rule still requires A/B Zotero attachment key for academic completion/history.
-- [ ] README describes the usable V1 rather than an unfinished Phase roadmap.
-- [ ] release meaning is explicitly approved by the user.
+- [x] exact `v1-release-candidate` HEAD identified for the scope-freeze audit.
+- [x] scope-freeze HEAD CI was green on Python 3.11 and 3.12.
+- [x] `main...v1-release-candidate` is ahead-only with no accidental reverse divergence.
+- [x] final changed-file list contains no research binaries/secrets/temp data.
+- [x] active V1 rules no longer say “Zotero pending ⇒ academic stage PROVISIONAL”.
+- [x] active V1 rules no longer require A/B Zotero attachment key for academic completion/history.
+- [x] README describes the usable V1 rather than an unfinished Phase roadmap.
+- [x] release meaning is explicitly approved: V1 is a complete usable academic Skill system; Zotero Local API refinements are deferred optimizations.
+- [ ] final checklist-only HEAD CI green.
 
 ## 10. Release verdict model
 
-After Section 9 passes, the repository may be described as:
+After the last Section 9 item passes, the repository may be described as:
 
 > **Literature Evaluation Skills V1 — usable academic workflow release**
 
@@ -144,7 +147,7 @@ It does **not** mean every paper/source combination has been scientifically acce
 
 Do not merge automatically merely because CI is green.
 
-After the final audit, obtain explicit release approval, then merge only:
+After the final audit, obtain explicit **merge approval**, then merge only:
 
 ```text
 v1-release-candidate → main
