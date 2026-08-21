@@ -74,7 +74,7 @@ For `FULL_MIRROR`:
 7. Record translation-specific issues in `translation_issues.jsonl` using `TRI-xxx`.
 8. Run Coverage, Semantic, Numeric and Layout QC.
 9. Render and verify A: `[A] 中文全文翻译镜像版`.
-10. Attach A to the correct Zotero parent when possible; otherwise stage a pending action without pretending success.
+10. Archive A to Zotero when available; otherwise stage a handoff/pending action without changing the academic completion state.
 11. Propose evidence-backed terminology-registry updates where warranted.
 
 ## Canonical Abstract
@@ -101,11 +101,19 @@ A follows the escalation:
 
 Prioritize page correspondence, then structure, nearby figure/table placement, paragraph correspondence and finally line correspondence. Protect readability. Chinese body text may often begin around 105%–115% of the source visual size when space allows; approximately 8.5 pt is an extreme safety floor rather than a target.
 
-## Zotero attachment
+## Zotero archive handoff
 
-Attach verified A as `[A] 中文全文翻译镜像版` when a write-capable Zotero route is available. A successful request is not sufficient; verify the returned parent/attachment identity.
+Zotero remains the preferred long-term location for A. When a write-capable route is available, attach A as `[A] 中文全文翻译镜像版` and verify the returned parent/attachment identity.
 
-If Zotero is unavailable, stage the file under `work/<paper_id>/handoff/`, record `pending_zotero_actions`, and use `PROVISIONAL` when the missing attachment prevents the archive from being fully complete.
+If Zotero is unavailable, automation is not live-validated, or the user chooses manual archive handling:
+
+- keep the verified A file;
+- stage under `work/<paper_id>/handoff/` when a local runtime exists;
+- record `pending_zotero_actions`;
+- allow Translation/A to remain `COMPLETE` once their own translation/QC gate passes;
+- report archive closure separately.
+
+Never claim that A is in Zotero until the attachment is actually observed and verified.
 
 ## Terminology update
 
@@ -115,7 +123,7 @@ Never silently overwrite an existing preferred translation; preserve evidence hi
 
 ## Completion states
 
-For `FULL_MIRROR`, `COMPLETE` requires:
+For `FULL_MIRROR`, Translation `COMPLETE` requires:
 
 - source identity/package accounted for;
 - canonical Abstract complete;
@@ -124,10 +132,11 @@ For `FULL_MIRROR`, `COMPLETE` requires:
 - Main and SI status explicit;
 - no critical unlogged source gaps;
 - Coverage/Semantic/Numeric/Layout QC complete;
-- A generated and verified;
-- Zotero attachment verified.
+- A generated and verified as the correct artifact for the active `paper_id`/source version.
 
-Use `PROVISIONAL` when a named source/SI/layout/Zotero gap remains but the available translation is still usable. Use `BLOCKED` when the missing source prevents defensible translation.
+**A verified Zotero attachment key is not required for Translation academic completion.** Pending Zotero work belongs to the archive layer.
+
+Use `PROVISIONAL` when a named source/SI/content/layout gap affects the requested translation scope but the available translation remains usable. Use `BLOCKED` when missing source evidence prevents defensible translation. Do not use `PROVISIONAL` solely because Zotero automatic writing is unavailable.
 
 ## Hard translation rules
 
