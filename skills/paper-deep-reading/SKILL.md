@@ -62,7 +62,7 @@ Accept a directly supplied PDF/source package, DOI, or Zotero item. Perform a Mi
 
 ### Resume
 
-Read the workflow manifest and existing `source_manifest.json`, `audit_log.jsonl`, `claim_evidence_map.csv`, canonical Abstract, translation artifacts, and partial B. Resume from the first incomplete or update-required component.
+Read the workflow manifest and existing `source_manifest.json`, `audit_log.jsonl`, `claim_evidence_map.csv`, canonical Abstract, translation artifacts, and partial B. Resume from the first incomplete or update-required **academic** component. Zotero pending actions may be resumed separately after B/C are complete.
 
 ### Update existing archive
 
@@ -228,24 +228,33 @@ C is a second-stage synthesis of B and must not introduce unsupported critique o
 
 ## Knowledge updates
 
-Append a paper to `knowledge/reading_history.csv` **only after Deep Reading genuinely reaches `COMPLETE`**.
+Append a paper to `knowledge/reading_history.csv` **after Deep Reading genuinely reaches academic `COMPLETE`**.
 
 After completion:
 
-- append the completed paper to `knowledge/reading_history.csv`;
-- record verified Zotero A/B attachment keys;
+- append the completed paper to `knowledge/reading_history.csv` even if Zotero attachment fields are temporarily empty;
+- record verified Zotero A/B attachment keys when they exist;
 - record C Git path;
+- keep unresolved archive work in `pending_zotero_actions`;
 - propose updates to `knowledge/research_profile.md` but never apply a research-direction change without explicit user approval.
 
-A `PROVISIONAL` archive may remain usable and C may still be submitted when appropriate, but it must stay represented as provisional in the workflow manifest/C/pending actions until the completion gate is satisfied. Do not write a provisional reading into `reading_history.csv` as if it were completed.
+A `PROVISIONAL` Deep Reading caused by a real source/evidence gap must not enter completed reading history. A Zotero-only pending action does not make an otherwise complete Deep Reading provisional.
+
+## Zotero archive handoff
+
+Preferred B label remains `[B] 文献研究笔记·完整精读版`. Verify the parent/attachment when written automatically or manually.
+
+If Zotero is unavailable, stage B under `work/<paper_id>/handoff/` when possible, record a pending action, and continue to close the academic Deep Reading workflow. Archive completion is reported separately.
 
 ## Completion states
 
-`COMPLETE` requires the applicable Deep Reading completion gate in `deliverables-and-qc.md`, including audit, dynamic coverage closure, B/C requirements, evidence anchoring, statistical checks, and verified archive handoff.
+`COMPLETE` requires the applicable Deep Reading academic completion gate in `deliverables-and-qc.md`, including audit, Dynamic Coverage closure, B/C requirements, evidence anchoring and statistical checks.
 
-Use `PROVISIONAL` when the archive is scientifically usable but a named SI/source/Zotero/attachment gap remains.
+Use `PROVISIONAL` when a named SI/source/version/evidence gap affects the requested research archive but the available analysis remains scientifically usable.
 
 Use `BLOCKED` when missing source evidence prevents defensible reconstruction of a core part of the study.
+
+Do **not** use `PROVISIONAL` solely because Zotero automatic writing or attachment verification is pending.
 
 ## Hard prohibitions
 
