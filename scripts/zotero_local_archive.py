@@ -105,6 +105,41 @@ def read_children(
     return [item for item in value if isinstance(item, dict)]
 
 
+def create_attachment_child(
+    client: local.LocalWriteClient,
+    library_prefix: str,
+    *,
+    parent_key: str,
+    title: str,
+    descriptor: dict[str, Any],
+) -> str:
+    """Create a child from the Zotero v3 imported-file attachment template shape."""
+    parent_key = parent_key.strip()
+    title = title.strip()
+    if not parent_key or not title:
+        raise ArchiveError("parent_key and attachment title are required.")
+    item = {
+        "itemType": "attachment",
+        "parentItem": parent_key,
+        "linkMode": "imported_file",
+        "title": title,
+        "accessDate": "",
+        "url": "",
+        "note": "",
+        "tags": [],
+        "relations": {},
+        "contentType": str(descriptor["content_type"]),
+        "charset": "",
+        "filename": str(descriptor["filename"]),
+        "md5": None,
+        "mtime": None,
+    }
+    try:
+        return local.create_item(client, library_prefix, item)
+    except local.LocalAPIError as exc:
+        raise ArchiveError(str(exc)) from exc
+
+
 def attachment_identity(item: dict[str, Any]) -> dict[str, Any]:
     data = item_data(item)
     return {
@@ -163,9 +198,10 @@ def plan_attachment(
     if filename == expected_filename and md5 == expected_md5:
         return {"action": "ALREADY_VERIFIED", "candidate": candidate}
 
-    # A child created during an interrupted previous run may exist before any
-    # file metadata was registered. Reuse only that genuinely empty shell.
-    if not filename and not md5:
+    # A correctly created attachment-template child already contains filename,
+    # contentType, etc. before file registration. The resumable signal is an
+    # empty MD5 with no conflicting filename.
+    if not md5 and filename in {"", expected_filename}:
         return {"action": "REUSE_PARTIAL", "candidate": candidate}
 
     return {
@@ -215,11 +251,12 @@ def attach_file(
     if reused:
         attachment_key = str(plan["candidate"]["key"])
     else:
-        attachment_key = local.create_attachment_item(
+        attachment_key = create_attachment_child(
             client,
             library_prefix,
             parent_key=parent_key,
             title=title,
+            descriptor=descriptor,
         )
 
     try:
