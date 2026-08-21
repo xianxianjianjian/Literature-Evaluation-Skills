@@ -32,7 +32,6 @@ class TerminologyError(ValueError):
 
 
 def validate_iso_date(value: str, field: str) -> None:
-    """Require a canonical ISO 8601 calendar date when one is supplied."""
     try:
         parsed = date.fromisoformat(value)
     except ValueError as exc:
@@ -42,7 +41,6 @@ def validate_iso_date(value: str, field: str) -> None:
 
 
 def read_registry(path: Path) -> list[dict[str, str]]:
-    """Read and validate the registry header and row enums."""
     if not path.is_file():
         raise TerminologyError(f"Registry does not exist: {path}")
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -76,7 +74,6 @@ def read_registry(path: Path) -> list[dict[str, str]]:
 
 
 def write_registry(path: Path, rows: list[dict[str, str]]) -> None:
-    """Rewrite a registry using the frozen V1 schema."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS, extrasaction="raise")
@@ -85,17 +82,14 @@ def write_registry(path: Path, rows: list[dict[str, str]]) -> None:
 
 
 def print_rows(rows: list[dict[str, str]]) -> None:
-    """Print rows as readable JSON."""
     print(json.dumps(rows, ensure_ascii=False, indent=2))
 
 
 def normalized_component(value: str | None) -> str:
-    """Normalize one terminology identity component for comparison."""
     return (value or "").strip().casefold()
 
 
 def terminology_identity(record: dict[str, str]) -> tuple[str, str, str, str]:
-    """Return the context-aware identity used for duplicate prevention."""
     return (
         normalized_component(record.get("English_Term")),
         normalized_component(record.get("Discipline")),
@@ -120,15 +114,26 @@ def append_note(existing: str, note: str | None) -> str:
 
 
 def split_alternatives(value: str) -> list[str]:
-    """Split the lightweight semicolon-delimited Alternative_Chinese field."""
     return [part.strip() for part in value.split(";") if part.strip()]
 
 
 def merge_alternative(value: str, candidate: str) -> str:
     alternatives = split_alternatives(value)
-    if candidate.strip() and candidate.strip() not in alternatives:
-        alternatives.append(candidate.strip())
+    candidate = candidate.strip()
+    if candidate and candidate not in alternatives:
+        alternatives.append(candidate)
     return "; ".join(alternatives)
+
+
+def merge_alternative_values(existing: str, supplied: str | None, *required: str) -> str:
+    """Merge alternatives without ever erasing required historical wordings."""
+    merged = existing
+    if supplied is not None:
+        for candidate in split_alternatives(supplied):
+            merged = merge_alternative(merged, candidate)
+    for candidate in required:
+        merged = merge_alternative(merged, candidate)
+    return merged
 
 
 def ensure_unique_identity(
@@ -155,7 +160,6 @@ def ensure_unique_identity(
 
 
 def command_lookup(args: argparse.Namespace) -> None:
-    """Find terms by ID, English term, abbreviation, or Chinese form."""
     rows = read_registry(args.registry)
     target = args.query.casefold().strip()
     searchable = (
@@ -173,7 +177,6 @@ def command_lookup(args: argparse.Namespace) -> None:
 
 
 def command_add(args: argparse.Namespace) -> None:
-    """Add an explicitly chosen, evidence-traceable terminology record."""
     rows = read_registry(args.registry)
     if not TERM_ID_PATTERN.fullmatch(args.term_id):
         raise TerminologyError("Term_ID must use TERM-0001 format.")
@@ -183,7 +186,6 @@ def command_add(args: argparse.Namespace) -> None:
         raise TerminologyError("Evidence level must be TE1 through TE7.")
     if args.verified_date:
         validate_iso_date(args.verified_date, "verified_date")
-
     record = {field: "" for field in FIELDS}
     record.update(
         {
@@ -218,11 +220,9 @@ def command_update(args: argparse.Namespace) -> None:
     rows = read_registry(args.registry)
     row = find_term(rows, args.term_id)
     validate_iso_date(args.verified_date, "verified_date")
-
     updates = {
         "Abbreviation": args.abbreviation,
         "Preferred_Chinese": args.preferred_chinese,
-        "Alternative_Chinese": args.alternative_chinese,
         "Discipline": args.discipline,
         "Subfield": args.subfield,
         "Definition": args.definition,
@@ -231,25 +231,31 @@ def command_update(args: argparse.Namespace) -> None:
         "Evidence_Level": args.evidence_level,
         "Evidence_IDs": args.evidence_ids,
     }
-    if all(value is None for value in updates.values()) and not args.note:
+    if (
+        all(value is None for value in updates.values())
+        and args.alternative_chinese is None
+        and not args.note
+    ):
         raise TerminologyError("No update fields were supplied.")
     if args.evidence_level and not EVIDENCE_LEVEL_PATTERN.fullmatch(args.evidence_level):
         raise TerminologyError("Evidence level must be TE1 through TE7.")
 
     old_preferred = row["Preferred_Chinese"]
     new_preferred = (args.preferred_chinese or "").strip()
-    if new_preferred and new_preferred != old_preferred:
-        if not args.note:
-            raise TerminologyError(
-                "Changing Preferred_Chinese requires --note explaining the evidence/context change."
-            )
-        row["Alternative_Chinese"] = merge_alternative(
-            row["Alternative_Chinese"], old_preferred
+    preferred_changed = bool(new_preferred and new_preferred != old_preferred)
+    if preferred_changed and not args.note:
+        raise TerminologyError(
+            "Changing Preferred_Chinese requires --note explaining the evidence/context change."
         )
 
     for field, value in updates.items():
         if value is not None:
             row[field] = value.strip() if isinstance(value, str) else value
+
+    required_history = (old_preferred,) if preferred_changed else ()
+    row["Alternative_Chinese"] = merge_alternative_values(
+        row["Alternative_Chinese"], args.alternative_chinese, *required_history
+    )
 
     if not row["Preferred_Chinese"].strip():
         raise TerminologyError("Preferred_Chinese cannot be empty.")
@@ -261,7 +267,6 @@ def command_update(args: argparse.Namespace) -> None:
 
 
 def command_update_status(args: argparse.Namespace) -> None:
-    """Update only the lifecycle status of an existing term."""
     rows = read_registry(args.registry)
     row = find_term(rows, args.term_id)
     if args.verified_date:
@@ -282,7 +287,6 @@ def context_candidates(
     subfield: str | None,
     context: str | None,
 ) -> dict[str, object]:
-    """Return context candidates without choosing a preferred record."""
     english = normalized_component(english_term)
     candidates = [
         row for row in rows if normalized_component(row["English_Term"]) == english
@@ -334,7 +338,6 @@ def command_context(args: argparse.Namespace) -> None:
 
 
 def command_list_ambiguous(args: argparse.Namespace) -> None:
-    """List records that still require contextual or evidence review."""
     rows = read_registry(args.registry)
     ambiguous = [
         row
@@ -348,12 +351,10 @@ def command_list_ambiguous(args: argparse.Namespace) -> None:
 
 
 def command_export(args: argparse.Namespace) -> None:
-    """Export registry rows deterministically without changing source records."""
     rows = read_registry(args.registry)
     if args.status:
         allowed = set(args.status)
         rows = [row for row in rows if row["Status"] in allowed]
-
     if args.format == "json":
         payload = json.dumps(rows, ensure_ascii=False, indent=2) + "\n"
         if args.output:
@@ -363,7 +364,6 @@ def command_export(args: argparse.Namespace) -> None:
         else:
             print(payload, end="")
         return
-
     if args.output is None:
         raise TerminologyError("CSV export requires --output.")
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -387,7 +387,6 @@ def add_status_parser(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -466,12 +465,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repeat to export selected lifecycle statuses only.",
     )
     export.set_defaults(handler=command_export)
-
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the terminology-registry CLI."""
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
