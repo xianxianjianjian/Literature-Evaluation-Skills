@@ -1,163 +1,176 @@
-# V1 Hardening and Integration Audit
+# V1 Hardening Audit
 
-This document separates three meanings that must not be collapsed:
+This document records the final release-candidate audit after the numbered Phase development was frozen.
 
-1. **rule-layer / structural hardening**;
-2. **integration implementation + deterministic/mock verification**;
-3. **real-paper / live production validation**.
+## Release basis
 
-Passing one level does not imply the next.
+The usable release line is now:
 
-## Branch basis
-
-- `phase-6-v1-hardening` is the sealed cumulative Phase 1–5 rule-layer RC.
-- `phase-7-zotero-write-adapter` adds bibliographic-parent creation.
-- `phase-8-zotero-local-attachments` adds durable Zotero 10+ existing-parent attachment.
-- Draft PR #1, #2 and #3 are audit/CI containers only; none is merge authorization.
-
-## Audit dimensions
-
-1. Skill rules ↔ shared contracts
-2. Skill rules ↔ knowledge schemas
-3. Skill rules ↔ workflow manifest behavior
-4. Skill rules ↔ helper scripts
-5. deterministic tests / regression protection
-6. truthful capability boundaries
-7. release/copyright/branch hygiene
-8. live external integration validation
-
-## Phase-6 rule-layer findings
-
-### workflow_state.py — HARDENED
-
-Provides V1 manifest normalization/validation, two-Gate `WAITING_USER` semantics, stable `paper_id`, A/B/C state, blockers, pending Zotero actions, source-check date, `needs_update`, resume summary, and backward-compatible additive normalization.
-
-Search cannot become `PROVISIONAL/COMPLETE` without a selected `paper_id`; Translation/Deep Reading/A/B/C cannot start before Minimal Intake establishes `paper_id`.
-
-### validate_deliverables.py — HARDENED
-
-Verifies the frozen Skill/reference inventory, A PDF signature, B DOCX package/Base Schema markers, C required sections, comment-only Chinese-character threshold, optional Canonical Abstract equality, manifest relationships, and `--require-workflow-complete` closure rules.
-
-These are deterministic structural checks only; they do not judge translation accuracy, statistical interpretation, methodological critique or visual quality.
-
-### terminology_registry.py — FROZEN V1 INTERFACES COMPLETE
-
-Supports `lookup / add / update / context / status / export / list-ambiguous`. Context identity remains `English_Term + Discipline + Subfield + Context`; no automatic preferred-term decision is made. Prior preferred wording/history is preserved. TE1–TE7 remains separate from HIGH/MEDIUM/LOW confidence.
-
-### history_manager.py — HARDENED
-
-Selection history is week-scoped for duplicate prevention. Completed reading history is globally deduplicated by stable identity. `append-reading` requires manifest consistency, `Deep Reading = COMPLETE`, no unresolved update/blocker, and verified B attachment state.
-
-### mirror_pdf.py — HARDENED WITH HONEST V1 SCOPE
-
-Freezes `Strict Mirror → Adaptive Mirror → Readable Extension`, layout/QC metadata and mandatory visual inspection. It remains a deterministic helper rather than a publisher-grade fully automatic relayout engine.
-
-### Search / Translation / Deep Reading rule audits — PASS
-
-The frozen evidence model, topic/paper Gates, two-round Search, Quality Gate + fixed 7D scoring, integrity wording, Canonical Abstract, Translation Units, Main+SI handling, full research audit, sample/model-N discipline, non-significant-result retention, author/evaluator separation, Dynamic Coverage and COMPLETE-only reading history remain aligned.
-
-### Public-source/data-format boundary — HARDENED
-
-Web visibility is not treated as permission to republish exact source text in a public Git repository. Exact Original Abstract/source-text fields require an acceptable source basis or remain an explicit gap/PROVISIONAL.
-
-## Phase-7 Zotero parent-create audit — PASS AT IMPLEMENTATION/MOCK LEVEL
-
-Phase 7 established a truthful Connector parent-create path:
-
-- `selected-target` via `/connector/getSelectedCollection`;
-- structured personal/institutional creator normalization;
-- duplicate check by normalized DOI/exact title;
-- `--yes` mechanical write boundary;
-- `/connector/saveItems` requires HTTP 201;
-- post-write Local API identity lookup is mandatory;
-- only one DOI/title match yields `CREATED_AND_VERIFIED`;
-- ambiguous/unverified writes are explicitly non-complete.
-
-Connector `/saveAttachment` was deliberately rejected as the generic archive solution because it depends on a short-lived Connector save session and Connector-side parent id. That design decision remains valid.
-
-Live parent-create validation against the user's Zotero Desktop remains OPEN.
-
-## Phase-8 Zotero durable attachment audit — PASS AT IMPLEMENTATION/MOCK LEVEL
-
-A later official-capability review established Zotero 10+ Local API write/full-upload support. Phase 8 uses that capability for durable existing-parent Main/SI/A/B attachment.
-
-### Security / identity controls
-
-- Requires discovery of `Zotero-Server-ID`.
-- Requests write authorization through Zotero Desktop.
-- Local API key stays in process memory only; never printed or persisted.
-- Temporary/non-remembered authorization is discarded after successful write use.
-- One 401 reauthorization attempt is supported.
-- Server-ID mismatch/HTTP 412 stops the active archive operation.
-- Local helper requests use a non-browser application User-Agent.
-
-### File-upload controls
-
-- Creates an imported-file child under a verified parent.
-- Computes filename/filesize/mtime/MD5 locally.
-- Uses the documented full-upload authorization → byte upload → upload-key registration flow.
-- Performs read-after-write verification against the same Server-ID.
-- Requires parent + filename + MD5 agreement before `ATTACHED_AND_VERIFIED`.
-- Applies a project-side 256 MiB single-file safety limit.
-
-### Resume / idempotency controls
-
-- Exact same-title + filename + MD5 child → `ALREADY_ATTACHED_AND_VERIFIED`, no rewrite.
-- Empty same-title child from an interrupted run → reuse and resume.
-- Multiple same-title children or same-title different-file identity → `ATTACHMENT_CONFLICT`, no silent overwrite.
-- Child-created/file-upload-incomplete → preserve attachment key in `ATTACHMENT_FILE_UPLOAD_INCOMPLETE` for recovery.
-- Preview without `--yes` does not probe/authorize/write Zotero.
-
-A real CI failure exposed a null-MD5 normalization edge case; the code was corrected so Zotero `md5: null` is treated as empty metadata for interrupted-child recovery. The corrected exact HEAD subsequently passed Python 3.11/3.12 smoke tests.
-
-Live Phase-8 authorization/write validation against the user's Zotero Desktop remains OPEN.
-
-## Automated verification — GREEN FOR CURRENT PHASE-8 CODE LINE
-
-The workflow runs:
-
-```bash
-python -m compileall scripts tests
-python -m unittest discover -s tests -v
-python scripts/validate_deliverables.py --repo-root .
+```text
+v1-release-candidate
 ```
 
-Regression coverage includes state/identity, terminology, history completion gating, A/B/C structure, mirror policy, synthetic T01–T04, specialist-only modes, Resume, Zotero downgrade/new-SI update, parent creation, Local API authorization, full file upload, Server-ID binding, attachment idempotency, conflict refusal and interrupted-run recovery.
+It is based on the cumulative Phase-8 tree. Phase 1–8 remain development history; no Phase 9+ work is required for V1 release.
 
-Synthetic/mock tests protect deterministic contracts only; they do not replace real-paper scientific/visual acceptance or live Zotero Desktop testing.
+The release claim is deliberately narrower and more useful than “everything has been production-tested everywhere”:
 
-## Branch and repository hygiene
+> V1 is a complete usable academic literature-evaluation workflow with truthful optional archive integrations.
 
-The cumulative development line contains source code, Markdown/policies, CSV/JSONL/YAML state/schema files, tests/CI and the intentionally preserved weekly Search trace. No paper PDF/DOCX binaries, A/B files, Zotero databases, API keys, credentials or secrets are part of the repository changes. `work/` and research binaries remain ignored.
+## Core architecture — PASS
 
-The real Mullins acceptance manifest remains factual: Search is provisional, Translation/A are blocked by unavailable Main PDF, and Deep Reading has not been falsely marked complete.
+The repository contains four Skills:
 
-## Current acceptance verdict
+- thin weekly router/state/resume coordinator;
+- Literature Search;
+- Paper Translation;
+- Paper Deep Reading.
 
-- **Phase 6 rule-layer / structural RC: PASS.**
-- **Phase 7 parent-create implementation/mock verification: PASS.**
-- **Phase 8 durable attachment implementation/mock verification: PASS.**
-- **Live Zotero production validation: OPEN.**
-- **Real-paper A/B/C/T01–T04 scientific acceptance: OPEN.**
+The three specialist Skills remain independently usable.
 
-The remaining Zotero gap is now live-environment validation, not the absence of a durable existing-parent attachment implementation.
+All 19 specialist reference files are present and the shared contracts cover evidence, identifiers, source identity, state, data format and Zotero archive policy.
 
-## Remaining production gates
+## Evidence/research rules — PASS
 
-Before describing the full system as production-validated, still require:
+The final V1 preserves:
 
-- controlled live Zotero 10+ Server-ID/authorization test;
-- live synthetic parent create + verification;
-- live synthetic existing-parent file attach + parent/filename/MD5 verification;
-- idempotent rerun confirming no duplicate attachment;
-- real Main/SI/A/B Zotero archive validation when actual source/output files are available;
-- real T01–T04 scientific acceptance;
-- real A render/visual iteration;
-- real B evidence/source-anchor closure;
-- real weekly C production from an acceptable exact Abstract source.
+- four evidence classes with separate Source Anchors;
+- stable `EXT / EX / AUD / CLM / TRI / TERM / TERMEV / AN / SRC / H` namespaces;
+- Main + SI audit;
+- no invention of unreported methods/parameters/results/model N;
+- non-significant prespecified findings;
+- corrected vs uncorrected distinctions;
+- mandatory consistency checks when information permits;
+- author interpretation separated from evaluator critique;
+- ED0–ED3 interpretation distance;
+- A0–A3 audit severity;
+- causal-strength warnings;
+- Dynamic Coverage rather than a closed notebook template.
 
-The Mullins Main PDF source blocker remains independent of Zotero capability.
+## Search — PASS
 
-## Merge rule
+Search includes topic planning, Journal Mapping, Search Question Profile, database/source routing, recency roles, Round 1/2 screening, EX codes, Quality Gate before 7D scoring, RED cannot win by score, Method Transfer Checklist, integrity checks, saturation/stop rule, Primary + Alternatives and two fixed user Gates.
 
-Do not merge to `main` merely because CI is green. Before any merge, identify the exact cumulative branch intended for release, re-check its HEAD/compare/CI, define whether the release claim is structural, integration, or production, and obtain explicit release approval.
+Search academic completion now depends on an auditable selection and usable source/package handoff—not on Zotero transport.
+
+## Translation — PASS
+
+Translation includes context-sensitive terminology, TE1–TE7/source-type separation from confidence, one Canonical Abstract reused by A/B/C, Translation Units, Main/SI coverage, numeric/table/figure locks, source-gap handling, `Strict Mirror → Adaptive Mirror → Readable Extension`, and Coverage/Semantic/Numeric/Layout QC.
+
+Translation/A academic completion requires the artifact and its QC, but not a Zotero attachment key. Archive pending is tracked separately.
+
+## Deep Reading — PASS
+
+Deep Reading includes Full Research Audit, Paper Structure Inventory, Introduction argument/gap/hypothesis reconstruction, Sample Ledger, Measurement Chain, participant/researcher methods views, acquisition/preprocessing separation, Analysis Question Tree, Result Matrix, hypothesis closure, Discussion/critique separation, Innovation/Limitation/Redesign/Transfer matrices and Source→Notebook closure.
+
+Deep Reading/B/C academic completion no longer depends on Zotero attachment keys. A completed reading may enter `reading_history.csv` while archive fields remain empty; real source/evidence provisional work still cannot.
+
+## Completion model — HARDENED
+
+V1 now distinguishes two deterministic levels:
+
+### Academic completion
+
+Requires applicable stages and A/B/C to be complete, stable paper identity, no consequential `needs_update`, no academic blocker, and a dated source-change check. `pending_zotero_actions` are allowed.
+
+Validator:
+
+```bash
+python scripts/validate_deliverables.py \
+  --manifest <workflow_manifest.yaml> \
+  --require-academic-complete
+```
+
+### Archive completion
+
+Adds verified A/B Zotero keys and no pending Zotero actions. The older `--require-workflow-complete` remains a compatibility alias for this stricter level.
+
+Validator:
+
+```bash
+python scripts/validate_deliverables.py \
+  --manifest <workflow_manifest.yaml> \
+  --require-archive-complete
+```
+
+This prevents both failure modes: Zotero cannot erase completed academic work, and completed academic work cannot be misreported as completed Zotero archival work.
+
+## State/resume — PASS
+
+`workflow_state.py` provides one manifest, stable `paper_id`, two-Gate `WAITING_USER`, A/B/C states, blockers, pending archive actions, source-change date and `needs_update`.
+
+The router resumes the smallest unresolved academic dependency and does not repeat satisfied Gates or redo complete Translation/Deep Reading because an archive task remains pending.
+
+## Knowledge/history — PASS
+
+- Selection duplicate prevention is week-scoped.
+- Completed reading dedupe is global by stable identity.
+- `reading_history.csv` requires Deep Reading/B academic COMPLETE and no Deep Reading blocker/update.
+- Zotero key columns are optional archive metadata and can be reconciled later.
+- `research_profile.md` cannot be silently changed from one paper.
+
+## A/B/C structural validation — PASS
+
+`validate_deliverables.py` verifies:
+
+- required repository/Skill/reference inventory;
+- A PDF signature;
+- B DOCX package and Base Schema markers;
+- C required sections;
+- comment-body-only Chinese-character minimum;
+- reviewer profile when configured;
+- Canonical Abstract equality when supplied;
+- academic and archive completion as separate levels.
+
+It does not pretend to judge scientific quality or visual layout quality.
+
+## Zotero integration — OPTIONAL / TRUTHFUL
+
+Zotero remains the preferred archive for Main/SI/A/B.
+
+The repository contains:
+
+- Connector parent-create integration;
+- Zotero 10+ Local API existing-parent attachment implementation;
+- Server-ID/authorization/full-upload/idempotency/conflict/recovery tests.
+
+These helpers are retained as optional enhancements. Real desktop live validation, Local API parent-create unification, group-library routing and collection targeting are post-V1 optimizations.
+
+When unavailable, V1 uses handoff files + `pending_zotero_actions` or manual Zotero handling. No unverified write may be reported as successful.
+
+## Mirror PDF scope — HONEST
+
+`mirror_pdf.py` is a deterministic layout/QC helper, not a publisher-grade automatic typesetting engine. The Translation Skill still requires render → inspect → iterate → re-render and can use the available document/PDF generation environment to produce A.
+
+## Repository/copyright hygiene — PASS
+
+The repository is intended to contain source code, rules, schemas, tests, C/weekly state and decision history—not copyrighted research binaries. Main/SI/A/B, local Zotero databases, secrets and temporary files remain excluded.
+
+Public web visibility is not treated as permission to republish exact source text.
+
+## Real Mullins trace — FACTUAL
+
+The Mullins 2025 run remains an intentionally incomplete real acceptance trace because the Main PDF was unavailable. It must not be rewritten to `COMPLETE` simply to make a release checklist green.
+
+That trace is now a Resume/blocker example rather than a V1 release blocker.
+
+## Remaining validation backlog — NON-BLOCKING FOR V1 RELEASE
+
+- additional real T01–T04 scientific acceptance;
+- real A visual iteration;
+- real B source-anchor closure;
+- real weekly C production on a suitable source package;
+- live Zotero Desktop write testing;
+- group-library/archive-routing optimization.
+
+These increase confidence and coverage but do not represent missing core Skill rules.
+
+## Final release blockers
+
+Before merging `v1-release-candidate` to `main`, only the following remain release-blocking:
+
+1. exact-head Python 3.11/3.12 CI green;
+2. foundation validator green;
+3. final stale-rule scan finds no Zotero-only academic downgrade/key requirement;
+4. final `main...v1-release-candidate` diff is clean and ahead-only;
+5. no research binaries/secrets/temp files in the release diff;
+6. explicit user approval to publish the usable V1.
