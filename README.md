@@ -15,7 +15,7 @@ weekly-literature-evaluation
 - `weekly-literature-evaluation`：薄总控，只负责意图路由、状态、断点恢复、用户决策 Gate 和子 Skill 调度。
 - `literature-search`：规划主题、检索与筛选文献、确认最终论文并准备 Zotero 入库。
 - `paper-translation`：术语核验、Canonical Abstract、全文与补充材料翻译，以及 A 的制作。
-- `paper-deep-reading`：证据审计、分章节精读、批判性评译，以及 B/C 的制作。
+- `paper-deep-reading`：证据审计、理论/方法/结果/讨论重建、批判性评译，以及 B/C 的制作。
 
 三个专业 Skill 必须可以独立运行；总控不得承担实际学术分析。
 
@@ -36,24 +36,26 @@ Git 不长期重复保存 A/B。Zotero 暂时不可用时，待挂接产物可�
 
 ## 当前开发阶段
 
-当前开发分支进入 **Phase 3 — Paper Translation**。
+当前开发分支进入 **Phase 4 — Paper Deep Reading**。
 
-Phase 1 已建立共享协议、Knowledge Schema、状态与基础脚本。Phase 2 已完成 `literature-search` 的规则层，并使用 2026-W34 的真实主题完成 Topic → Search → Screening → Paper Selection 验收；焦点论文已确认为 Mullins et al. (2025), DOI `10.1111/jsr.14281`。由于当前 ChatGPT 会话不能访问用户本机 Zotero Desktop，Search 的 Zotero handoff 按规则保持 `PROVISIONAL`，没有伪装写入成功。
+Phase 1 已建立共享协议、Knowledge Schema、状态与基础脚本。Phase 2 已完成 `literature-search` 规则层，并用真实周主题完成 Topic → Search → Screening → Paper Selection 验收。Phase 3 已完成 `paper-translation` 规则层，包括术语证据、Canonical Abstract、Translation Units、Main+SI、Figure/Table、镜像排版与四层 QC。
 
-Phase 3 当前已实现 `paper-translation` 的规则层：
+真实 Mullins 2025 端到端测试当前暂停：焦点论文身份和来源已核验，但当前环境无法取得用于逐页镜像的 Main PDF 二进制，因此测试状态保留为 `Translation = BLOCKED`。该真实测试记录不被删除，也不妨碍继续完成 V1 Skill 规则层；未来取得 Main PDF 后可从 manifest 直接恢复。
 
-- Context-sensitive terminology + TE1–TE7 evidence-source types；
-- Abstract 两遍翻译 + alignment + 唯一 Canonical Abstract；
-- Page/Section/Paragraph Translation Units 与 translation ledger；
-- Main + Supporting Information 全覆盖与 Source Gap 标记；
-- Figure/Table 数据锁定和 SI 处理；
-- `Strict Mirror → Adaptive Mirror → Readable Extension` 镜像排版；
-- Coverage / Semantic / Numeric / Layout 四层 Translation QC；
-- Zotero unavailable 时的 `PROVISIONAL` / pending handoff 规则。
+Phase 4 当前已实现 `paper-deep-reading` 的规则层：
 
-当前真实 Mullins 2025 验收已完成出版身份、Wiley Version of Record、PMID/PMCID 和 Supporting Figure S1 核验。网页通道能够读取出版社/PMC 正文信息，但 Wiley PDF 二进制下载在当前环境返回 403；在取得真实 Main PDF 之前，不得伪造页面对应的 A 镜像 PDF。
+- Search Intake / Translation Intake / Full Research Audit 三层审计；
+- Publication Identity、Source Package、Paper Structure Inventory 与 A0–A3；
+- Introduction 论证链、Research Gap、RQ/Aim/Hypothesis 与 Hypothesis Matrix；
+- Study Architecture、Sample Ledger、Measurement Chain、被试/研究者双流程；
+- Acquisition 与 Preprocessing 分离、Reproducibility Gap Table；
+- Analysis Question Tree、Result Matrix、非显著结果、校正与统计一致性复核；
+- Author Discussion 与 Evaluator Critique 分离、ED0–ED3；
+- Innovation / Limitations / Redesign / Transfer Value；
+- Dynamic Coverage 与 Source→Notebook closure；
+- B/C 交付与最终 Evidence/Methods/Results/Discussion QC。
 
-Deep Reading 的完整实现仍属于 Phase 4。
+下一步为 Phase 5：完成 `weekly-literature-evaluation` 薄总控、跨 Skill handoff/resume/state 路由和 V1 全局完成条件。真实 T01–T04 端到端验收将在规则层全部封板后统一恢复。
 
 ## V1 / V2 边界
 
