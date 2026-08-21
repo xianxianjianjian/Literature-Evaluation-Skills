@@ -11,7 +11,7 @@
       "status": "PROVISIONAL"
     },
     "translation": {
-      "status": "NOT_STARTED",
+      "status": "BLOCKED",
       "needs_update": false,
       "update_reason": []
     },
@@ -23,7 +23,7 @@
   },
   "outputs": {
     "A": {
-      "status": "NOT_STARTED",
+      "status": "BLOCKED",
       "zotero_attachment_key": null
     },
     "B": {
@@ -58,6 +58,14 @@
       "expected_attachment_name": "[SUPPLEMENT] Figure S1 - Bland-Altman plots",
       "source": "Wiley Supporting Information jsr14281-sup-0001-FigureS1.docx; PMC counterpart NIHMS2003008-supplement-SUP_INFO.docx",
       "reason": "Pending local Zotero access."
+    }
+  ],
+  "blocking_issues": [
+    {
+      "stage": "translation",
+      "type": "SOURCE_BINARY_UNAVAILABLE",
+      "source_id": "SRC-M1",
+      "detail": "Publisher and PMC full-text identities are verified, but the current environment cannot retrieve the source PDF binary required for page-mapped FULL_MIRROR production; Wiley PDF endpoint returned HTTP 403 in this session."
     }
   ],
   "source_change": {
