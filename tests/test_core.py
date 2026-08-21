@@ -168,6 +168,71 @@ class TerminologyTests(unittest.TestCase):
             with self.assertRaises(terms.TerminologyError):
                 terms.command_add(self._args(path, "TERM-0002", "sleep medicine", "PSG arousal"))
 
+    def test_context_reports_candidates_without_auto_selecting(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "terms.csv"
+            self._empty_registry(path)
+            terms.command_add(self._args(path, "TERM-0001", "sleep medicine", "PSG arousal"))
+            terms.command_add(self._args(path, "TERM-0002", "psychology", "emotional arousal"))
+            payload = terms.context_candidates(
+                terms.read_registry(path),
+                english_term="arousal",
+                discipline="sleep medicine",
+                subfield="sleep",
+                context="PSG arousal",
+            )
+            self.assertIsNone(payload["auto_selected_term_id"])
+            self.assertEqual(len(payload["exact_or_filtered_matches"]), 1)
+            self.assertEqual(len(payload["all_english_term_candidates"]), 2)
+
+    def test_update_preferred_preserves_previous_translation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "terms.csv"
+            self._empty_registry(path)
+            terms.command_add(self._args(path, "TERM-0001", "sleep medicine", "PSG arousal"))
+            update = argparse.Namespace(
+                registry=path,
+                term_id="TERM-0001",
+                abbreviation=None,
+                preferred_chinese="睡眠觉醒",
+                alternative_chinese=None,
+                discipline=None,
+                subfield=None,
+                definition=None,
+                context=None,
+                confidence=None,
+                evidence_level="TE1",
+                evidence_ids="TERMEV-0002",
+                verified_date="2026-08-22",
+                note="Adopted guideline wording",
+            )
+            terms.command_update(update)
+            row = terms.read_registry(path)[0]
+            self.assertEqual(row["Preferred_Chinese"], "睡眠觉醒")
+            self.assertIn("觉醒", terms.split_alternatives(row["Alternative_Chinese"]))
+            self.assertEqual(row["Evidence_Level"], "TE1")
+            self.assertEqual(row["Last_Verified"], "2026-08-22")
+
+    def test_export_json_does_not_modify_registry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "terms.csv"
+            output = root / "terms.json"
+            self._empty_registry(path)
+            terms.command_add(self._args(path, "TERM-0001", "sleep medicine", "PSG arousal"))
+            before = path.read_text(encoding="utf-8")
+            terms.command_export(
+                argparse.Namespace(
+                    registry=path,
+                    status=None,
+                    format="json",
+                    output=output,
+                )
+            )
+            exported = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(exported[0]["Term_ID"], "TERM-0001")
+            self.assertEqual(path.read_text(encoding="utf-8"), before)
+
 
 class DeliverableValidatorTests(unittest.TestCase):
     def test_comment_count_excludes_other_sections(self) -> None:
