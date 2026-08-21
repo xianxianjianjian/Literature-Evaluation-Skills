@@ -61,17 +61,23 @@ Check:
 - Main/SI boundaries;
 - source-page reverse mapping.
 
+Layout QC requires actual render/visual inspection. A valid layout plan alone is not proof that the rendered PDF is visually correct.
+
 ## Completion Gate
 
 For `FULL_MIRROR`, Translation can be `COMPLETE` only when:
 
 - Canonical Abstract exists and passes alignment;
-- terminology issues are resolved or explicitly provisional;
+- terminology issues are resolved or explicitly accounted for;
 - Main coverage is complete;
 - SI status is explicitly accounted for;
 - no critical unlogged source gap remains;
 - all four QC passes succeed;
 - A has been generated and verified;
-- Zotero attachment is verified, or a clearly recorded pending Zotero action exists under the workflow's allowed provisional rules.
+- A is verified as the correct Zotero child attachment of the selected paper.
+
+If the translation/A is scientifically usable but Zotero attachment is still pending, keep Translation/A `PROVISIONAL` and record `pending_zotero_actions`; do **not** mark Translation `COMPLETE` merely because the file exists locally.
+
+Likewise, consequential missing SI/source coverage keeps the stage `PROVISIONAL` or `BLOCKED` according to whether defensible work can continue.
 
 `TRI-xxx` is reserved for translation/production issues. Do not use `TRI` for methodological or statistical research-audit findings.
