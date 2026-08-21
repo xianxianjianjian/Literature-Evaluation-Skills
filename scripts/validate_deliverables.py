@@ -159,13 +159,15 @@ def check_foundation(root: Path) -> list[Check]:
     return checks
 
 
-def check_manifest(path: Path) -> list[Check]:
+def check_manifest(path: Path, *, require_workflow_complete: bool = False) -> list[Check]:
     try:
         data = load_manifest(path)
     except (WorkflowStateError, OSError) as exc:
         return [Check("manifest", False, str(exc))]
+
     checks = [Check("manifest", True, f"valid: {path}")]
     stages, outputs = data["stages"], data["outputs"]
+
     if stages["translation"]["status"] == "COMPLETE":
         passed = outputs["A"]["status"] == "COMPLETE"
         checks.append(
@@ -175,6 +177,16 @@ def check_manifest(path: Path) -> list[Check]:
                 "A COMPLETE" if passed else "Translation COMPLETE requires A COMPLETE",
             )
         )
+    if outputs["A"]["status"] == "COMPLETE":
+        passed = stages["translation"]["status"] == "COMPLETE"
+        checks.append(
+            Check(
+                "manifest:A-translation",
+                passed,
+                "Translation COMPLETE" if passed else "A COMPLETE requires Translation COMPLETE",
+            )
+        )
+
     if stages["deep_reading"]["status"] == "COMPLETE":
         passed = outputs["B"]["status"] == "COMPLETE"
         checks.append(
@@ -184,6 +196,16 @@ def check_manifest(path: Path) -> list[Check]:
                 "B COMPLETE" if passed else "Deep Reading COMPLETE requires B COMPLETE",
             )
         )
+    if outputs["B"]["status"] == "COMPLETE":
+        passed = stages["deep_reading"]["status"] == "COMPLETE"
+        checks.append(
+            Check(
+                "manifest:B-deep-reading",
+                passed,
+                "Deep Reading COMPLETE" if passed else "B COMPLETE requires Deep Reading COMPLETE",
+            )
+        )
+
     if outputs["A"]["status"] == "COMPLETE":
         passed = bool(outputs["A"].get("zotero_attachment_key"))
         checks.append(
@@ -218,6 +240,64 @@ def check_manifest(path: Path) -> list[Check]:
                 "manifest:blocker-record",
                 passed,
                 "blocking issue recorded" if passed else "BLOCKED stage requires blocking_issues entry",
+            )
+        )
+
+    if require_workflow_complete:
+        all_stages = all(stage["status"] == "COMPLETE" for stage in stages.values())
+        checks.append(
+            Check(
+                "workflow:stages-complete",
+                all_stages,
+                "all four stages COMPLETE" if all_stages else "full workflow requires all four stages COMPLETE",
+            )
+        )
+        all_outputs = all(output["status"] == "COMPLETE" for output in outputs.values())
+        checks.append(
+            Check(
+                "workflow:outputs-complete",
+                all_outputs,
+                "A/B/C COMPLETE" if all_outputs else "full workflow requires A/B/C COMPLETE",
+            )
+        )
+        paper_ok = bool(data.get("paper_id"))
+        checks.append(
+            Check(
+                "workflow:paper-id",
+                paper_ok,
+                "paper_id present" if paper_ok else "full workflow requires paper_id",
+            )
+        )
+        no_updates = not any(stage["needs_update"] for stage in stages.values())
+        checks.append(
+            Check(
+                "workflow:no-needs-update",
+                no_updates,
+                "no unresolved needs_update" if no_updates else "full workflow has unresolved needs_update",
+            )
+        )
+        no_blockers = not data.get("blocking_issues")
+        checks.append(
+            Check(
+                "workflow:no-blockers",
+                no_blockers,
+                "no blockers" if no_blockers else "full workflow has unresolved blocking_issues",
+            )
+        )
+        no_pending = not data.get("pending_zotero_actions")
+        checks.append(
+            Check(
+                "workflow:no-pending-zotero",
+                no_pending,
+                "no pending Zotero actions" if no_pending else "full workflow has pending_zotero_actions",
+            )
+        )
+        source_checked = bool(data.get("source_change", {}).get("last_checked"))
+        checks.append(
+            Check(
+                "workflow:source-check",
+                source_checked,
+                "source-change check dated" if source_checked else "full workflow requires source_change.last_checked",
             )
         )
     return checks
@@ -406,15 +486,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--require-a", action="store_true")
     parser.add_argument("--require-b", action="store_true")
     parser.add_argument("--require-c", action="store_true")
+    parser.add_argument(
+        "--require-workflow-complete",
+        action="store_true",
+        help="Require full weekly workflow closure; also requires --manifest.",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = args.repo_root.resolve()
+    if args.require_workflow_complete and args.manifest is None:
+        print("[FAIL] workflow: --require-workflow-complete requires --manifest")
+        return 1
     checks = check_foundation(root)
     if args.manifest:
-        checks.extend(check_manifest(args.manifest))
+        checks.extend(
+            check_manifest(
+                args.manifest,
+                require_workflow_complete=args.require_workflow_complete,
+            )
+        )
     checks.append(check_pdf(args.a_path, args.require_a))
     checks.append(check_docx_b(args.b_path, args.require_b))
     checks.extend(
