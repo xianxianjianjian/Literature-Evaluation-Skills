@@ -30,7 +30,7 @@ Prefer Version of Record metadata and legally accessible sources. Retrieve and r
 - correction/erratum material;
 - version/status information.
 
-Do not bypass paywalls, institutional authentication, download restrictions, or other access controls.
+Do not bypass paywalls, institutional authentication, download restrictions, or other access controls. Source-text reuse in public Git must also follow `shared/data-format-policy.md`; access to a webpage is not automatic permission to republish its text.
 
 ## 3. Attachment labels
 
@@ -41,29 +41,36 @@ Use the shared Zotero naming contract:
 [SUPPLEMENT] <descriptive name>
 ```
 
-Later phases add:
+Later stages add:
 
 ```text
 [A] 中文全文翻译镜像版
 [B] 文献研究笔记·完整精读版
 ```
 
-After attachment, verify the returned parent/attachment identity rather than treating a submitted request as success.
+After any write, verify the actual parent/attachment identity rather than treating a submitted request or HTTP success code as archive success.
 
-## 4. Current Phase 2 capability boundary
+## 4. V1 capability boundary
 
-The repository's `scripts/zotero_bridge.py` implements Zotero Desktop Local API reads (`status`, `find`, `children`, `verify`). The Local API is read-only.
+`scripts/zotero_bridge.py` exposes truthful capability status:
 
-`create` and `attach` remain explicit write interfaces that may be unavailable in the current runtime. If a verified write-capable Zotero route is available, use it. If not, **do not fake successful ingest**.
+- Zotero Desktop Local API under `/api/` is read-only and supports `status`, `find`, `children`, and `verify`;
+- the Zotero Connector server can be probed separately;
+- `create` and `attach` are declared workflow interfaces but **must not report success until a supported write adapter has been implemented and verified in the target runtime**.
 
-Instead:
+Connector availability alone is not proof that the repository helper can safely perform the exact requested parent/file write.
 
-1. stage the selected Main/SI files under `work/<paper_id>/handoff/`;
-2. add concrete entries to `pending_zotero_actions` in the weekly manifest;
-3. record the expected parent identity and attachment labels;
-4. set the relevant Search/output state to `PROVISIONAL` until ingest is verified.
+When no verified write route exists:
 
-A temporary Zotero write limitation does not invalidate the completed academic search decision, but it prevents the archive from being described as fully complete.
+1. if a local working runtime exists, stage acquired Main/SI files under `work/<paper_id>/handoff/`;
+2. append concrete records to `workflow_manifest.yaml.pending_zotero_actions` (the bridge `pending` command may prepare the record but does not write Zotero);
+3. record the expected parent identity, source id and attachment label;
+4. keep Search `PROVISIONAL` when Zotero/archive completion is the only remaining gap;
+5. verify and clear each pending action only after the real Zotero parent/attachment is observable.
+
+If the source files themselves are unavailable, record that source blocker separately; a Zotero outage and a source-availability failure are not the same condition.
+
+A temporary Zotero write limitation does not invalidate an otherwise defensible Search selection, but it prevents the archive from being described as fully complete.
 
 ## 5. `selected_paper.yaml`
 
@@ -107,6 +114,6 @@ Main, every Supplement, and correction material should be separate source record
 
 ## 7. Selection history
 
-After final confirmation, append the selected paper decision to `knowledge/selection_log.csv`. Do not write to `reading_history.csv`; that file is reserved for papers that later complete Deep Reading.
+After final confirmation, append the selected paper decision to `knowledge/selection_log.csv`. Do not write to `reading_history.csv`; that file is reserved for papers that later genuinely complete Deep Reading.
 
 Do not bulk-import all search candidates into Zotero.
