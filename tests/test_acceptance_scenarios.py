@@ -100,7 +100,7 @@ class SyntheticAcceptanceScenarios(unittest.TestCase):
             self.assertEqual(len(plan["pages"]), 2)
             self.assertEqual(len(plan["pages"][0]["figure_placeholders"]), 3)
             self.assertEqual(len(plan["pages"][0]["table_placeholders"]), 2)
-            self.assertTrue(plan["requires_visual_qa"])
+            self.assertTrue(plan["layout_qc"]["visual_inspection_required"])
 
     def test_t03_main_plus_complex_si_can_remain_one_consistent_workflow(self) -> None:
         data = self._fully_complete_manifest()
