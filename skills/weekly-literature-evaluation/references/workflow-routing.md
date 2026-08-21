@@ -16,13 +16,14 @@ The manifest owns workflow status. Other files contain evidence or stage-specifi
 
 | Request mode | Route |
 | --- | --- |
-| Full weekly workflow | Topic planning → Topic Gate → Search → Paper Gate → Search handoff → Translation → Deep Reading → A/B/C + knowledge verification |
+| Full weekly workflow | Topic planning → Topic Gate → Search → Paper Gate → source handoff → Translation → Deep Reading → A/B/C + knowledge verification → optional archive closure |
 | Topic/Search only | `literature-search` and stop at the user's requested boundary |
 | Translation only | establish Minimal Intake if Search artifacts are absent → `paper-translation` |
 | Deep Reading only | establish Minimal Intake if needed → `paper-deep-reading`; A is optional, never evidentiary prerequisite |
-| Resume | inspect manifest/artifacts → continue from first unresolved dependency or update-required stage |
+| Resume | inspect manifest/artifacts → continue from first unresolved academic dependency or update-required stage |
 | Update existing paper | inspect `needs_update` + source change → rerun only affected stage(s) and downstream consumers |
-| New SI/correction/version | source identity audit → mark affected artifacts `needs_update` → update Translation/Deep Reading as required |
+| New SI/correction/version | source identity audit → mark affected stages `needs_update` → update Translation/Deep Reading as required |
+| Archive cleanup | inspect `pending_zotero_actions` → perform automatic/manual Zotero reconciliation without rerunning completed academic work |
 
 ## Full weekly route
 
@@ -37,16 +38,18 @@ literature-search: Journal Mapping → search → screening → integrity → ra
   ↓
 WAITING_USER — Gate 2: final paper confirmation
   ↓
-literature-search: selected-paper/source package/Zotero handoff
+literature-search: selected-paper/source package handoff
   ↓
 paper-translation: terminology → canonical Abstract → Main/SI → A
   ↓
 paper-deep-reading: audit → Intro/Methods/Results/Discussion → B → C
   ↓
-validation + Zotero/Git/knowledge closure
+academic validation + Git/knowledge closure
+  ↓
+optional Zotero archive reconciliation
 ```
 
-The specialists may return `PROVISIONAL` or `BLOCKED`; the router must preserve those states instead of forcing forward progress.
+The specialists may return `PROVISIONAL` or `BLOCKED`; the router must preserve those states instead of forcing forward progress. A Zotero-only pending action does not itself make an academic stage provisional.
 
 ## Two fixed user Gates
 
@@ -63,8 +66,8 @@ After the user confirms the focal paper, ordinary execution is authorized for:
 
 - identity/version matching;
 - legal-access Main/SI retrieval;
-- normal Zotero parent matching/creation where a safe write route exists;
-- Main/SI attachment;
+- normal Zotero parent/attachment actions where a safe route exists;
+- Main/SI handoff;
 - Translation and A production;
 - Deep Reading and B production;
 - weekly C generation;
@@ -77,6 +80,8 @@ Stop for user input only when there is a genuine exception such as:
 - materially different source versions;
 - a risky/destructive write not already covered by the workflow;
 - a true scientific/technical blocker requiring user material or decision.
+
+Zotero automatic writing being unavailable is normally a recoverable archive condition, not a new user Gate.
 
 ## Manifest stage semantics
 
@@ -105,15 +110,15 @@ Use only for a real decision Gate in the ordinary weekly workflow. Do not use it
 
 ### `BLOCKED`
 
-A dependency prevents defensible continuation. Record the blocker precisely, including stage, source/system, and what would resolve it.
+An academic/source dependency prevents defensible continuation. Record the blocker precisely, including stage, source/system, and what would resolve it.
 
 ### `PROVISIONAL`
 
-The work is scientifically usable at the stated scope, but a named source/system/archive gap prevents full completion. A provisional state is not equivalent to failure and must not be described as a complete research archive.
+The work is scientifically usable at the stated scope, but a named source/evidence/version/content gap prevents academic completion. A Zotero-only archive gap belongs in `pending_zotero_actions`, not in the academic stage state.
 
 ### `COMPLETE`
 
-The specialist's own completion gate has passed and required handoff/verification is complete.
+The specialist's own academic/artifact completion gate has passed. Archive closure is evaluated separately.
 
 ## Dependency-aware routing
 
@@ -121,9 +126,9 @@ Do not treat stages as a simplistic linear pipeline when dependencies differ.
 
 ### Search → Translation
 
-Translation needs an identified source package, not necessarily `Search = COMPLETE`.
+Translation needs an identified source package, not a Zotero parent.
 
-If Search is `PROVISIONAL` only because Zotero attachment is unavailable but paper identity/Main/SI are usable, Translation may continue.
+If Search is complete academically while Zotero is pending, Translation proceeds normally.
 
 If Search is `BLOCKED` because the focal paper/version itself is unresolved, Translation must not proceed.
 
@@ -146,11 +151,12 @@ When the user says “continue”, “resume”, or returns after an interruptio
 1. read the manifest;
 2. read `paper_id`, `pending_zotero_actions`, `blocking_issues`, `source_change`, and all `needs_update` flags;
 3. verify referenced artifacts rather than trusting filenames alone;
-4. determine whether an earlier stage's update invalidates downstream work;
-5. route to the smallest set of steps needed to restore consistency;
-6. preserve already verified work and stable IDs.
+4. determine whether an earlier source update invalidates downstream work;
+5. route to the smallest set of steps needed to restore academic consistency;
+6. preserve already verified work and stable IDs;
+7. process archive-only pending actions separately, without reopening academic stages unless the archive check exposes a real source/version conflict.
 
-Do not rerun expensive academic work solely because the session changed.
+Do not rerun expensive academic work solely because the session changed or Zotero is still pending.
 
 ## Existing artifact detection
 
@@ -196,49 +202,59 @@ Never silently rewrite the historical Search score/ranking with post-reading kno
 
 ## PROVISIONAL propagation
 
-A downstream stage does not automatically become `PROVISIONAL` just because an upstream stage is provisional. Propagate only the actual unresolved dependency.
+A downstream stage does not automatically become `PROVISIONAL` just because an upstream stage is provisional. Propagate only the actual unresolved academic dependency.
 
 Examples:
 
-- Search provisional due to Zotero outage; Main/SI verified → Translation can still be complete at content level but archive attachment remains provisional.
+- Zotero outage; Main/SI verified → Search/Translation/Deep Reading can still reach `COMPLETE`; archive remains pending.
 - Translation provisional due to missing SI that is irrelevant to the focal analysis → Deep Reading may be complete if Full Research Audit independently establishes that the missing item is non-consequential.
 - Missing SI contains required methods/results → Deep Reading remains provisional or blocked.
 
 Always name the reason.
 
-## Zotero outage route
+## Zotero outage / archive-pending route
 
-If Zotero is unavailable:
+If Zotero is unavailable or automatic writing is not suitable:
 
-- continue all safe work that does not require Zotero;
+- continue all safe academic work;
 - stage A/B or source files under `work/<paper_id>/handoff/` when a local runtime exists;
 - append explicit `pending_zotero_actions` to the manifest;
 - preserve expected attachment labels;
-- verify and clear each pending action when Zotero access returns.
+- permit manual Zotero import/attachment later;
+- verify and clear each pending action when archive access returns.
 
 Do not report “saved to Zotero” until the actual parent/attachment is verified.
 
-## Full-workflow completion
+## Academic workflow completion
 
-The weekly workflow is `COMPLETE` only when all required specialist completion conditions and archive conditions pass.
-
-At minimum:
+The weekly **academic workflow** is complete when:
 
 - topic Gate confirmed;
 - focal-paper Gate confirmed;
 - Search decision/audit records exist;
-- selected paper/source identity is stable;
+- selected paper/source identity is stable for the requested scope;
 - canonical Abstract exists for full workflow;
-- A exists and is verified when FULL_MIRROR is required;
+- A exists and passes Translation QC when FULL_MIRROR is required;
 - B exists and passes Deep Reading completion/QC;
 - C exists in weekly context and meets submission-profile requirements;
 - required `selection_log.csv` / `reading_history.csv` records are correct;
-- Zotero Main/SI/A/B attachment state is verified;
-- no unresolved `BLOCKED` stage;
-- no unresolved consequential `needs_update`;
-- any accepted `PROVISIONAL` condition is explicitly reported rather than mislabeled `COMPLETE`.
+- no unresolved academic/source `BLOCKED` stage;
+- no unresolved consequential `needs_update`.
 
-If unresolved provisional gaps remain, the overall weekly archive must remain `PROVISIONAL` even if C can be submitted.
+`pending_zotero_actions` are allowed at this level.
+
+## Archive completion
+
+A stricter archive-complete check additionally requires the intended Zotero Main/SI/A/B records/attachments to be verified and relevant pending actions cleared. This may be completed automatically or manually.
+
+Report these dimensions separately:
+
+```text
+Academic workflow: COMPLETE
+Zotero archive: PENDING | COMPLETE
+```
+
+Do not downgrade academic completion because the archive is pending, and do not claim archive completion merely because A/B/C exist.
 
 ## V1 stop boundary
 
@@ -252,4 +268,4 @@ The router must not expand the workflow into:
 - dashboard construction;
 - raw-data reanalysis or experiment-code reproduction.
 
-Those are separate future capabilities, not hidden responsibilities of the weekly router.
+Zotero Local API parent-create unification, group-library routing and fully live-validated automatic archive transport are deferred optimizations, not reasons to extend V1 construction.
