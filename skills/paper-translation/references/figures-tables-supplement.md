@@ -57,4 +57,4 @@ Rules:
 
 If expected SI is unavailable, Translation remains `PROVISIONAL` when the missing material may affect completeness or interpretation.
 
-If SI arrives later, run `UPDATE_EXISTING`, re-QC the affected translation, and set downstream Deep Reading/A/B/C `needs_update` when relevant.
+If SI arrives later, run `UPDATE_EXISTING`: set Translation `needs_update`, retranslate/re-QC the affected units and regenerate/reverify A; set Deep Reading `needs_update` when the new SI affects B/C evidence, and regenerate/reverify the affected B/C content as needed. A/B/C are outputs and do not themselves invent a separate `needs_update` state outside the workflow contract.
