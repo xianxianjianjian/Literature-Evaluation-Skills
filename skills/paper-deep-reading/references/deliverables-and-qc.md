@@ -93,28 +93,27 @@ C must not introduce a critique or factual claim that B cannot support. Internal
 
 ## Knowledge updates
 
-Append a paper to `knowledge/reading_history.csv` **only after Deep Reading genuinely reaches `COMPLETE`**. A `PROVISIONAL` archive may remain useful and C may be usable, but it must not be recorded as a completed long-term reading.
+Append a paper to `knowledge/reading_history.csv` **only after Deep Reading genuinely reaches academic `COMPLETE`**. A source/evidence-provisional Deep Reading must not be recorded as completed.
 
-After Deep Reading is complete:
+After academic Deep Reading is complete:
 
-- append the completed paper to `knowledge/reading_history.csv` according to the project's completion policy;
-- update verified Zotero A/B attachment keys;
+- append the completed paper to `knowledge/reading_history.csv`;
+- record Zotero parent/A/B attachment keys when already verified, otherwise leave those optional archive fields empty;
 - record C path;
+- keep unresolved Zotero operations in `pending_zotero_actions`;
 - propose, but do not automatically apply, changes to `knowledge/research_profile.md`.
 
-While Deep Reading is `PROVISIONAL`, preserve the state and unresolved gap in the workflow manifest/C/pending actions and upgrade the history only after the completion gate is actually satisfied.
+A Zotero-only pending action does not prevent the reading from entering completed history. A single paper must never silently redefine the long-term research direction.
 
-A single paper must never silently redefine the long-term research direction.
-
-## B attachment
+## B archive handoff
 
 Preferred Zotero attachment label:
 
 `[B] 文献研究笔记·完整精读版`
 
-Verify the parent item and attachment after writing. If Zotero is unavailable, stage under `work/<paper_id>/handoff/` and record a pending action.
+When Zotero is writable, verify the parent item and attachment after writing. If Zotero is unavailable, stage under `work/<paper_id>/handoff/` and record a pending action. This archive pending state must not downgrade a B that already passed its academic/QC gate.
 
-## Deep Reading Completion Gate
+## Deep Reading Academic Completion Gate
 
 For `COMPLETE`, require all applicable items below:
 
@@ -137,18 +136,23 @@ For `COMPLETE`, require all applicable items below:
 - limitations provenance separated;
 - Innovation / Redesign / Transfer Value completed where relevant;
 - every A3 audit issue prominently treated;
-- B generated and verified;
+- B generated and verified as the correct artifact for the active paper/source version;
 - C generated when weekly context requires it;
-- required knowledge/history update recorded;
-- Zotero attachment verified.
+- required knowledge/history update recorded.
+
+A verified Zotero attachment is **not** part of this academic completion gate.
+
+## Archive Completion Add-on
+
+If the user/workflow specifically requires closed Zotero archival status, additionally verify the applicable Main/SI/A/B parent and attachment keys and clear their pending actions. Manual Zotero attachment followed by verification is acceptable; full automation is not required by V1.
 
 ## PROVISIONAL vs BLOCKED
 
-Use `PROVISIONAL` when the archive is scientifically usable but a named source/SI/Zotero/attachment gap prevents full archival completeness.
+Use `PROVISIONAL` when the academic archive is scientifically usable but a named source/SI/version/evidence/content gap prevents full academic completeness.
 
 Use `BLOCKED` when missing Main/SI/source identity prevents defensible reconstruction of a core part of the paper.
 
-Do not call a file `COMPLETE` merely because a DOCX exists.
+Do not use `PROVISIONAL` merely because Zotero automatic writing is unavailable. Do not call a file `COMPLETE` merely because a DOCX exists; it still has to pass the academic gate above.
 
 ## Final QC checklist
 
@@ -184,4 +188,5 @@ Do not call a file `COMPLETE` merely because a DOCX exists.
 - B opens correctly and contains the required/dynamic sections;
 - C uses the canonical Abstract and meets the comment-body length rule;
 - Zotero/Git paths or pending actions match the workflow manifest;
-- final state accurately reflects unresolved gaps.
+- final report distinguishes academic completion from archive completion;
+- final state accurately reflects unresolved source/evidence gaps.
