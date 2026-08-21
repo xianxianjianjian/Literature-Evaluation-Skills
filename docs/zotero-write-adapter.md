@@ -1,15 +1,15 @@
-# Zotero Write Adapter — V1 Integration Note
+# Zotero Write Adapter — Phase 7 Integration Note
 
-This note defines the implemented and unimplemented Zotero write operations for the isolated `phase-7-zotero-write-adapter` branch.
+> **Historical design note.** This document records the Phase-7 parent-create adapter and the Connector-session limitation that was known at that stage. Phase 8 later adds a durable Zotero 10+ Local API existing-parent attachment route. For current attachment behavior, read [`zotero-local-attachments.md`](zotero-local-attachments.md) and `shared/zotero-policy.md`.
 
-## Source-of-truth boundary
+## Phase-7 source boundary
 
-Zotero Desktop exposes two relevant local interfaces on port `23119`:
+Zotero Desktop exposes local interfaces on port `23119`. Phase 7 deliberately used:
 
-- `/api/...`: Zotero Web API v3-compatible local interface, **read-only**;
-- `/connector/...`: Connector server routes used for desktop save/import workflows.
+- `/api/...` for safe read-after-write identity checks;
+- `/connector/...` for Connector save/import operations.
 
-The repository does not treat “Connector is reachable” as proof that every desired write is supported.
+At that phase, the repository did not yet rely on the newer Zotero 10+ Local API write/full-upload contract. The earlier phrase “Local API is read-only” should therefore be read as a **Phase-7 implementation assumption**, not the current Phase-8 capability statement.
 
 ## Implemented: selected save target
 
@@ -30,7 +30,7 @@ POST /connector/getSelectedCollection
 
 ## Implemented: bibliographic parent creation
 
-`scripts/zotero_bridge.py create` uses the documented Connector route:
+`scripts/zotero_bridge.py create` uses the Connector route:
 
 ```text
 POST /connector/saveItems
@@ -48,12 +48,12 @@ The payload is deliberately limited to a bibliographic item with an empty `attac
 4. Normalize institutional creators to Zotero's single-field creator form (`lastName` + `fieldMode: 1`).
 5. Refuse attachment data inside parent creation.
 6. Without `--yes`, output a preview only and perform no Zotero probe/write or target-resolution request.
-7. With `--yes`, require both Local API and Connector availability.
+7. With `--yes`, require Local API read verification and Connector availability.
 8. Resolve and record the writable Connector target.
 9. Pre-check for an existing parent by normalized DOI or exact title.
 10. Refuse the write if a matching parent already exists.
 11. POST to `/connector/saveItems` and require HTTP 201.
-12. Re-query the read-only Local API by the same stable identity.
+12. Re-query the Local API by the same stable identity.
 13. Return `CREATED_AND_VERIFIED` only if exactly one matching parent is observable.
 
 A request that returned HTTP 201 but cannot be uniquely verified is explicitly non-complete:
@@ -63,70 +63,64 @@ A request that returned HTTP 201 but cannot be uniquely verified is explicitly n
 
 The workflow must not record Zotero ingest `COMPLETE` in either case.
 
-## Why generic local-file attachment is still not implemented
+## Why Connector `/saveAttachment` was not adopted as the generic archive route
 
-Zotero does expose an official Connector route:
+Zotero exposes:
 
 ```text
 POST /connector/saveAttachment
 ```
 
-However, this route is **session-bound**, not a generic “existing Zotero item key + local file” API. Zotero's implementation resolves the parent through a Connector save session using:
+but this route is session-bound. Zotero resolves its parent through:
 
-- `sessionID` created by `/connector/saveItems` or `/connector/saveSnapshot`;
-- a Connector-side `parentItemID` that was supplied in that same session.
+- a Connector `sessionID` created by `/connector/saveItems` or `/connector/saveSnapshot`;
+- a Connector-side `parentItemID` supplied within that same save session.
 
-The Connector SessionManager is designed to garbage-collect old save sessions (normally around 10 minutes, shorter when many sessions exist). This can support immediate attachments associated with a just-created Connector item, but it is not a durable mechanism for the complete Literature Evaluation lifecycle:
+Connector save sessions are intentionally short-lived. That makes the endpoint suitable for immediate attachments associated with a newly saved browser item, but not for the full Literature Evaluation lifecycle where:
 
-- an already-existing Zotero parent may not belong to such a session;
-- A and B may be generated much later than Main/SI;
-- the workflow must support resume across sessions/chats/machines;
-- archive completion requires verifiable attachment keys, not dependence on a transient Connector session.
+- an existing parent may predate the current session;
+- A/B may be generated much later than Main/SI;
+- workflows must resume across sessions;
+- archive completion must be keyed by durable Zotero item/attachment identities.
 
-Therefore the generic V1 `attach` interface remains deliberately disabled:
+Phase 7 therefore did **not** expose Connector `/saveAttachment` as a generic existing-parent adapter. That decision remains valid.
+
+## Phase-8 supersession: durable existing-parent attachment
+
+The later Phase-8 audit identified Zotero 10+ Local API authorized writes and full file upload as the appropriate durable route. Phase 8 now implements:
 
 ```text
-LOCAL_FILE_ATTACH_ROUTE_NOT_IMPLEMENTED_OR_VERIFIED
+existing parent key
+→ Local API attachment child
+→ Local API full upload
+→ same-server read-after-write
+→ parent + filename + MD5 verification
 ```
 
-This is a capability boundary, not a claim that Zotero has no attachment endpoint. The repository is refusing to present a short-lived session route as a durable existing-parent attachment adapter.
+This does not depend on a Connector session and therefore supports Main/SI/A/B at different points in the workflow.
 
-Use `pending_zotero_actions` for Main/SI/A/B attachment work until a durable adapter is implemented and live-verified.
+See [`zotero-local-attachments.md`](zotero-local-attachments.md) for the current contract.
 
 ## Verification levels
 
 Do not collapse these states:
 
 ```text
-Connector reachable
-≠ writable target resolved
-≠ request accepted
-≠ parent created
-≠ parent identity verified
-≠ file attachment created
-≠ attachment identity verified
+endpoint reachable
+≠ authorization granted
+≠ write accepted
+≠ parent/child created
+≠ file bytes registered
+≠ identity verified
 ≠ full Zotero archive COMPLETE
 ```
 
-The V1 archive completion gate still requires the applicable verified Main/SI/A/B attachment keys.
+## Testing status
 
-## Testing
+Phase 7 automated tests verify parent-create payloads, creator schema, target resolution, no-write preview, duplicate refusal, HTTP 201 handling and post-write identity verification.
 
-Phase 7 automated tests use mocks and synthetic metadata only. They verify:
-
-- metadata-to-Connector payload construction;
-- personal and institutional creator normalization;
-- free-text creator rejection;
-- attachment payload rejection;
-- selected-target resolution and non-editable-target rejection;
-- preview/no-write behavior without `--yes`;
-- duplicate pre-check;
-- HTTP 201 + unique post-write match → verified success;
-- HTTP 201 + no/ambiguous post-write match → non-complete;
-- generic attachment remains explicitly unsupported.
-
-These tests do not modify a real Zotero library. A live test in the user's local Zotero Desktop environment is still required before calling the parent-create adapter production-validated.
+Phase 8 adds separate Local API attachment tests. Neither CI suite writes to the user's real Zotero Desktop library; live production validation remains a separate gate.
 
 ## Scope rule
 
-This adapter is mechanical infrastructure only. It must never decide which paper should be selected, infer missing metadata, merge ambiguous records, or choose an academically preferred source version.
+These adapters are mechanical infrastructure only. They must never decide which paper should be selected, infer missing metadata, merge ambiguous records, silently replace attachments, or choose an academically preferred source version.
