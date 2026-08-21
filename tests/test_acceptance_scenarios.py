@@ -18,7 +18,7 @@ import workflow_state as state
 
 
 class SyntheticAcceptanceScenarios(unittest.TestCase):
-    """Copyright-free structural acceptance scenarios for the frozen V1 contract.
+    """Copyright-free structural acceptance scenarios for the usable V1 contract.
 
     These tests protect routing/state/deliverable-helper behavior. They do not
     replace real-paper scientific acceptance, source audit, or visual QA.
@@ -34,18 +34,18 @@ class SyntheticAcceptanceScenarios(unittest.TestCase):
         failures = [check.detail for check in checks if not check.passed]
         self.assertFalse(failures, failures)
 
-    def _fully_complete_manifest(self) -> dict:
+    def _fully_complete_manifest(self, *, zotero_keys: bool = False) -> dict:
         data = state.initial_manifest("2026-W34")
         data["paper_id"] = "10.0000-synthetic.t01"
         for stage in state.STAGE_NAMES:
             data["stages"][stage]["status"] = "COMPLETE"
         data["outputs"]["A"] = {
             "status": "COMPLETE",
-            "zotero_attachment_key": "AKEY0001",
+            "zotero_attachment_key": "AKEY0001" if zotero_keys else None,
         }
         data["outputs"]["B"] = {
             "status": "COMPLETE",
-            "zotero_attachment_key": "BKEY0001",
+            "zotero_attachment_key": "BKEY0001" if zotero_keys else None,
         }
         data["outputs"]["C"] = {
             "status": "COMPLETE",
@@ -54,11 +54,18 @@ class SyntheticAcceptanceScenarios(unittest.TestCase):
         data["source_change"]["last_checked"] = "2026-08-21"
         return data
 
-    def test_t01_ordinary_empirical_without_si_can_close_structurally(self) -> None:
-        data = self._fully_complete_manifest()
+    def test_t01_ordinary_empirical_without_si_can_close_academically_without_zotero(self) -> None:
+        data = self._fully_complete_manifest(zotero_keys=False)
+        data["pending_zotero_actions"] = [
+            {"action": "attach", "source_id": "SRC-M1"},
+            {"action": "attach", "source_id": "A"},
+            {"action": "attach", "source_id": "B"},
+        ]
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write_manifest(Path(tmp), data)
-            self._assert_manifest_checks_pass(path)
+            checks = validator.check_manifest(path, require_academic_complete=True)
+            failures = [check.detail for check in checks if not check.passed]
+            self.assertFalse(failures, failures)
 
     def test_t02_many_figures_tables_preserve_layout_placeholders(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -73,9 +80,7 @@ class SyntheticAcceptanceScenarios(unittest.TestCase):
                             {
                                 "page_number": 1,
                                 "text_blocks": [{"id": "p1"}],
-                                "figure_placeholders": [
-                                    {"id": "f1"}, {"id": "f2"}, {"id": "f3"}
-                                ],
+                                "figure_placeholders": [{"id": "f1"}, {"id": "f2"}, {"id": "f3"}],
                                 "table_placeholders": [{"id": "t1"}, {"id": "t2"}],
                             },
                             {
@@ -105,9 +110,6 @@ class SyntheticAcceptanceScenarios(unittest.TestCase):
     def test_t03_main_plus_complex_si_can_remain_one_consistent_workflow(self) -> None:
         data = self._fully_complete_manifest()
         data["paper_id"] = "10.0000-synthetic.t03"
-        # Complex SI is represented by source/evidence artifacts, not by inventing
-        # extra workflow states. The manifest remains the single workflow truth.
-        data["pending_zotero_actions"] = []
         validated = state.validate_manifest(data)
         self.assertEqual(validated["paper_id"], "10.0000-synthetic.t03")
         self.assertEqual(validated["stages"]["translation"]["status"], "COMPLETE")
@@ -126,32 +128,21 @@ class SyntheticAcceptanceScenarios(unittest.TestCase):
             "status": "COMPLETE",
             "git_path": "weekly_reviews/2026/2026-W34/weekly_review.md",
         }
-        data["pending_zotero_actions"].append(
-            {"action": "attach", "source_id": "SRC-S1", "reason": "SI unavailable"}
-        )
         state.validate_manifest(data)
 
-        # SI later arrives: affected stages are explicitly reopened, then closed.
         data["stages"]["translation"]["needs_update"] = True
         data["stages"]["translation"]["update_reason"] = ["New SI SRC-S1 available"]
         data["stages"]["deep_reading"]["needs_update"] = True
         data["stages"]["deep_reading"]["update_reason"] = ["New SI affects methods/results audit"]
         state.validate_manifest(data)
 
-        data["pending_zotero_actions"] = []
         data["stages"]["search"]["status"] = "COMPLETE"
         for stage_name in ("translation", "deep_reading"):
             data["stages"][stage_name]["status"] = "COMPLETE"
             data["stages"][stage_name]["needs_update"] = False
             data["stages"][stage_name]["update_reason"] = []
-        data["outputs"]["A"] = {
-            "status": "COMPLETE",
-            "zotero_attachment_key": "AKEYT04",
-        }
-        data["outputs"]["B"] = {
-            "status": "COMPLETE",
-            "zotero_attachment_key": "BKEYT04",
-        }
+        data["outputs"]["A"] = {"status": "COMPLETE", "zotero_attachment_key": None}
+        data["outputs"]["B"] = {"status": "COMPLETE", "zotero_attachment_key": None}
         state.validate_manifest(data)
 
     def test_search_only_is_valid_without_translation_or_deep_reading(self) -> None:
@@ -192,17 +183,18 @@ class SyntheticAcceptanceScenarios(unittest.TestCase):
             path = self._write_manifest(Path(tmp), data)
             self._assert_manifest_checks_pass(path)
 
-    def test_zotero_downgrade_uses_provisional_and_pending_actions(self) -> None:
+    def test_zotero_pending_does_not_downgrade_academically_complete_search(self) -> None:
         data = state.initial_manifest("2026-W34")
-        data["paper_id"] = "10.0000-zotero.down"
-        data["stages"]["search"]["status"] = "PROVISIONAL"
+        data["paper_id"] = "10.0000-zotero.pending"
+        data["stages"]["topic"]["status"] = "COMPLETE"
+        data["stages"]["search"]["status"] = "COMPLETE"
         data["pending_zotero_actions"] = [
             {"action": "find_or_create_parent", "paper_id": data["paper_id"]},
             {"action": "attach", "source_id": "SRC-M1"},
         ]
         validated = state.validate_manifest(data)
         self.assertEqual(len(validated["pending_zotero_actions"]), 2)
-        self.assertEqual(validated["stages"]["search"]["status"], "PROVISIONAL")
+        self.assertEqual(validated["stages"]["search"]["status"], "COMPLETE")
 
     def test_new_si_marks_only_affected_stages_for_update(self) -> None:
         data = self._fully_complete_manifest()
