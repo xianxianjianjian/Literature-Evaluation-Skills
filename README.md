@@ -1,6 +1,6 @@
 # Literature Evaluation Skills
 
-一套面向长期使用的每周学术文献检索、专业翻译与系统精读 Skills 系统。项目把可复用的业务协议、长期知识状态和每周工作流状态保存在 Git 中，把论文原文、补充材料及大体积研究产物交给 Zotero 管理。
+一套面向长期使用的每周学术文献检索、专业翻译与系统精读 Skills 系统。项目把可复用业务协议、长期知识状态和每周工作流状态保存在 Git 中，把论文原文、补充材料及大体积研究产物交给 Zotero 管理。
 
 ## 四 Skill 架构
 
@@ -36,97 +36,61 @@ Git 不长期重复保存 A/B。Zotero 暂时不可用时，待挂接产物可�
 
 ## 当前开发阶段
 
-当前开发分支为 **Phase 5 — V1 Orchestration / Rule-Layer Completion**。
+当前开发分支为 **Phase 6 — V1 Hardening / Release Preparation**。
 
-### Phase 1 — Foundation
+Phase 1–5 已累计完成四个 Skill 的 V1 规则层：Foundation → Literature Search → Paper Translation → Paper Deep Reading → Weekly Orchestration。Phase 6 不再扩展新的学术功能，重点是检查并补齐：
 
-已建立：
+- Skill rules ↔ shared contracts；
+- Skill rules ↔ knowledge schemas；
+- Skill rules ↔ workflow manifest；
+- Skill rules ↔ helper scripts；
+- deterministic tests / regression protection；
+- release 前的 capability boundary 与 branch hygiene。
 
-- Evidence / Identifier / Source Identity / Zotero / State / Data Format shared contracts；
-- Research Profile、Submission Profile、Journal/Terminology/Reading/Selection knowledge schemas；
-- workflow/history/terminology/validation/Zotero/mirror-PDF 基础脚本接口；
-- 四个 Skill 的职责边界。
+当前已完成的 hardening 包括：
 
-### Phase 2 — Literature Search
+- `workflow_state.py` 升级为 V1 manifest helper，支持 `paper_id`、全阶段 `needs_update`、A/B/C 状态、`blocking_issues`、`pending_zotero_actions`、source-check date，以及两个固定 `WAITING_USER` Gate 的语义校验；
+- `validate_deliverables.py` 升级为 V1 结构验证器，检查 19 个 specialist references、A PDF、B DOCX Base Schema、C 必填字段/评论字数/Canonical Abstract 一致性及关键 manifest 完成关系；
+- `mirror_pdf.py` 升级为 V1 确定性 layout/QC helper，并明确 `Strict Mirror → Adaptive Mirror → Readable Extension` 与 render-first QA；
+- 增加 `tests/test_core.py` 和 GitHub Actions `V1 Smoke Tests`；
+- 增加 `docs/v1-hardening-audit.md` 与 `docs/branch-strategy.md`。
 
-已完成：
+## Branch 关系
 
-- Topic Planning + Topic Gate；
-- Journal Mapping；
-- Search Question Profile、Concept Blocks、Database Routing、Recency Roles；
-- Round 1 / Round 2 screening；
-- EX-01–EX-13；
-- GREEN / AMBER / RED Quality Gate；
-- 25/20/15/15/10/10/5 七维评分；
-- Method Transfer Checklist；
-- Retraction/Correction/Version/SI/Data/Code/Preregistration Integrity Check；
-- Primary + Strong Alternatives + Paper Gate；
-- selected-paper/source/Zotero handoff。
+本仓库的 Phase 分支是**累积式里程碑**，不是互相独立的五套实现：
 
-### Phase 3 — Paper Translation
+```text
+main
+  ↓
+phase-1-foundation
+  ↓
+phase-2-search
+  ↓
+phase-3-translation
+  ↓
+phase-4-deep-reading
+  ↓
+phase-5-orchestration
+  ↓
+phase-6-v1-hardening
+```
 
-已完成：
-
-- Context-sensitive terminology；
-- TE1–TE7 evidence-source types 与 HIGH/MEDIUM/LOW confidence 分离；
-- Abstract 两遍翻译 + Alignment + 唯一 Canonical Abstract；
-- Page/Section/Paragraph Translation Units 与 ledger；
-- Main + SI coverage 与 Source Gap；
-- Figure/Table 数据锁定；
-- `Strict Mirror → Adaptive Mirror → Readable Extension`；
-- Coverage / Semantic / Numeric / Layout QC；
-- A 与 Zotero/PROVISIONAL handoff 规则。
-
-### Phase 4 — Paper Deep Reading
-
-已完成：
-
-- Search Intake / Translation Intake / Full Research Audit；
-- Publication Identity、Source Package、Paper Structure Inventory、A0–A3；
-- Introduction argument chain、Research Gap、RQ/Aim/Hypothesis、Hypothesis Matrix；
-- Study Architecture、Sample Ledger、Measurement Chain；
-- Participant / Researcher 双流程；
-- Acquisition / Preprocessing 分离与 Reproducibility Gap；
-- Analysis Question Tree、Result Matrix、非显著结果、Correction、统计一致性复核；
-- Figure/Table visual audit；
-- Author Discussion / Evaluator Critique 分离与 ED0–ED3；
-- Innovation / three-layer Limitations / Redesign / Transfer Value；
-- Dynamic Coverage + Source→Notebook closure；
-- B/C 与最终 QC。
-
-### Phase 5 — Weekly Orchestration
-
-已完成规则层：
-
-- `FULL_WEEKLY / SEARCH_ONLY / TRANSLATION_ONLY / DEEP_READING_ONLY / RESUME / UPDATE_EXISTING` 路由；
-- 两个固定人工 Gate；
-- Paper Gate 后普通后续工作的授权边界；
-- dependency-aware handoff；
-- `BLOCKED / PROVISIONAL / COMPLETE` 传播规则；
-- source change + `needs_update` 更新链；
-- artifact identity/reuse；
-- Zotero outage downgrade；
-- A/B/C、knowledge、archive 的 V1 全局完成条件。
+因此最终通过验收后，通常只需要把最新的已接受累积分支合入 `main`，无需逐个再次合并 Phase 1→5。详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)。
 
 ## 真实验收状态
 
-规则层继续开发期间，真实 Mullins et al. (2025), DOI `10.1111/jsr.14281` 端到端测试已主动暂停。
+真实 Mullins et al. (2025), DOI `10.1111/jsr.14281` 端到端测试已主动暂停，但测试现场保留在 `weekly_reviews/2026/2026-W34/`。
 
-该验收已经完成 Topic → Search → Screening → Paper Selection，并保留在 `weekly_reviews/2026/2026-W34/`。当前环境无法取得用于逐页镜像的 Main PDF 二进制，因此真实 manifest 仍准确保留 `Translation = BLOCKED` 和 `A = BLOCKED`；没有为了开发进度伪造完成状态。
+该验收已经完成 Topic → Search → Screening → Paper Selection。当前环境无法取得用于逐页镜像的 Main PDF 二进制，因此 manifest 仍准确保留 `Translation = BLOCKED` 和 `A = BLOCKED`；没有为了开发进度伪造完成状态。
 
-未来取得 Main PDF 后，应直接从该 manifest 恢复 Translation，而不是重新执行已经完成的 Topic/Paper Gates。
+未来取得 Main PDF 后，应直接从该 manifest 恢复，不重新执行已经通过的 Topic/Paper Gates。
 
-## 当前含义
+## 当前尚未关闭的 V1 集成点
 
-**四个 Skill 的 V1 规则层现已全部写齐。**
-
-这不等于整个系统已经通过生产验收。后续仍需要：
-
-- 对脚本接口做 Phase 5 集成补强；
-- 恢复并完成真实 A/B/C 测试；
-- 执行 T01–T04 与 Search-only / Translation-only / Deep-Reading-only / Resume / Zotero downgrade / new-SI update 验收；
-- 根据测试结果修复规则或实现缺口；
-- 最终决定分支合并与 main 封板。
+- Zotero Desktop Local API 只读；`create / attach` 仍需要经过可验证的 Connector/plugin write route，不能假装成功。
+- `mirror_pdf.py` 是确定性布局/QC辅助器，不是出版社级全自动重排引擎；真正 A 仍必须 render → inspect → iterate → re-render。
+- 自动测试已加入仓库，但 GitHub Actions 的实际运行状态需在 release 前确认。
+- T01–T04、Search-only、Translation-only、Deep-Reading-only、Resume、Zotero downgrade、new-SI update 等真实验收仍待统一执行。
 
 ## V1 / V2 边界
 
@@ -135,7 +99,8 @@ Git 不长期重复保存 A/B。Zotero 暂时不可用时，待挂接产物可�
 ## 基础验证
 
 ```bash
-python -m compileall scripts
+python -m compileall scripts tests
+python -m unittest discover -s tests -v
 python scripts/validate_deliverables.py --repo-root .
 python scripts/workflow_state.py --help
 ```
