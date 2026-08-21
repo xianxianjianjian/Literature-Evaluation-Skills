@@ -5,10 +5,10 @@
   "paper_id": null,
   "stages": {
     "topic": {
-      "status": "WAITING_USER"
+      "status": "COMPLETE"
     },
     "search": {
-      "status": "NOT_STARTED"
+      "status": "IN_PROGRESS"
     },
     "translation": {
       "status": "NOT_STARTED",
