@@ -1,8 +1,8 @@
 # Topic Selection
 
 - Week: `2026-W34`
-- Status: `WAITING_USER`
-- Purpose: real Phase 2 acceptance test; no formal literature search begins before topic confirmation.
+- Status: `COMPLETE`
+- Purpose: real Phase 2 acceptance test; formal literature search begins only after topic confirmation.
 - Context reviewed: current project discussion on CountingSheep PSG, cross-night sleep EEG reliability, macro/micro sleep metrics, channel/reliability questions, and adjacent sleep-EEG methods. `knowledge/research_profile.md` is still intentionally unconfirmed and is not modified here.
 
 ## Candidates
@@ -78,6 +78,6 @@
 
 ## User-confirmed topic
 
-- Selected candidate: `null`
-- Confirmed topic: `null`
-- Confirmation date: `null`
+- Selected candidate: `TOPIC-01`
+- Confirmed topic: `Cross-night test–retest reliability of macro- and micro-level PSG sleep EEG metrics`
+- Confirmation date: `2026-08-21`
