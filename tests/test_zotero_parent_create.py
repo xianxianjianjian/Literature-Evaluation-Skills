@@ -54,6 +54,17 @@ class ZoteroParentCreateTests(unittest.TestCase):
             timeout=1.0,
         )
 
+    def _target(self) -> dict:
+        return {
+            "library_id": 1,
+            "library_name": "My Library",
+            "library_editable": True,
+            "files_editable": True,
+            "editable": True,
+            "collection_id": 7,
+            "collection_name": "Literature Evaluation",
+        }
+
     def test_metadata_maps_to_saveitems_payload(self) -> None:
         metadata = {
             "itemType": "journalArticle",
@@ -99,6 +110,48 @@ class ZoteroParentCreateTests(unittest.TestCase):
                 }
             )
 
+    def test_selected_target_uses_writable_resolution_payload(self) -> None:
+        raw = {
+            "libraryID": 1,
+            "libraryName": "My Library",
+            "libraryEditable": True,
+            "filesEditable": True,
+            "editable": True,
+            "id": 7,
+            "name": "Literature Evaluation",
+        }
+        with patch.object(zotero, "connector_post_json", return_value=raw) as post:
+            target = zotero.selected_target_payload(
+                connector_base_url="http://127.0.0.1:23119",
+                timeout=1.0,
+                ensure_writable=True,
+            )
+        self.assertEqual(target, self._target())
+        post.assert_called_once_with(
+            "http://127.0.0.1:23119",
+            zotero.SELECTED_TARGET_ROUTE,
+            {"switchToReadableLibrary": True},
+            timeout=1.0,
+        )
+
+    def test_selected_target_rejects_noneditable_resolution(self) -> None:
+        raw = {
+            "libraryID": 2,
+            "libraryName": "Read Only",
+            "libraryEditable": False,
+            "filesEditable": False,
+            "editable": False,
+            "id": None,
+            "name": "Read Only",
+        }
+        with patch.object(zotero, "connector_post_json", return_value=raw):
+            with self.assertRaises(zotero.ZoteroBridgeError):
+                zotero.selected_target_payload(
+                    connector_base_url="http://127.0.0.1:23119",
+                    timeout=1.0,
+                    ensure_writable=True,
+                )
+
     def test_without_yes_only_previews_and_never_probes_or_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             metadata = self._metadata_file(Path(tmp))
@@ -106,6 +159,7 @@ class ZoteroParentCreateTests(unittest.TestCase):
             with (
                 patch.object(zotero, "probe_api") as probe_api,
                 patch.object(zotero, "probe_connector") as probe_connector,
+                patch.object(zotero, "selected_target_payload") as selected_target,
                 patch.object(zotero, "request_http") as request_http,
                 redirect_stdout(stream),
             ):
@@ -114,9 +168,10 @@ class ZoteroParentCreateTests(unittest.TestCase):
             self.assertEqual(code, 3)
             self.assertEqual(payload["status"], zotero.CONFIRMATION_REQUIRED)
             self.assertEqual(payload["would_post_to"], zotero.CREATE_ROUTE)
-            self.assertIn("No Zotero write was performed", payload["note"])
+            self.assertIn("No Zotero write", payload["note"])
             probe_api.assert_not_called()
             probe_connector.assert_not_called()
+            selected_target.assert_not_called()
             request_http.assert_not_called()
 
     def test_duplicate_precheck_refuses_write(self) -> None:
@@ -135,6 +190,7 @@ class ZoteroParentCreateTests(unittest.TestCase):
             with (
                 patch.object(zotero, "probe_api", return_value=(True, {}, None)),
                 patch.object(zotero, "probe_connector", return_value=(True, "Zotero is running", None)),
+                patch.object(zotero, "selected_target_payload", return_value=self._target()),
                 patch.object(zotero, "find_parent_matches", return_value=[duplicate]),
                 patch.object(zotero, "request_http") as request_http,
                 redirect_stdout(stream),
@@ -143,6 +199,7 @@ class ZoteroParentCreateTests(unittest.TestCase):
             payload = json.loads(stream.getvalue())
             self.assertEqual(code, 6)
             self.assertEqual(payload["status"], "DUPLICATE_PARENT_FOUND")
+            self.assertEqual(payload["selected_target"], self._target())
             self.assertEqual(payload["matches"][0]["key"], "DUPL0001")
             request_http.assert_not_called()
 
@@ -162,6 +219,7 @@ class ZoteroParentCreateTests(unittest.TestCase):
             with (
                 patch.object(zotero, "probe_api", return_value=(True, {}, None)),
                 patch.object(zotero, "probe_connector", return_value=(True, "Zotero is running", None)),
+                patch.object(zotero, "selected_target_payload", return_value=self._target()),
                 patch.object(zotero, "find_parent_matches", return_value=[]),
                 patch.object(zotero, "request_http", return_value=(201, "", {})) as request_http,
                 patch.object(zotero, "verify_created_parent", return_value=[created]),
@@ -172,6 +230,7 @@ class ZoteroParentCreateTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(payload["status"], "CREATED_AND_VERIFIED")
             self.assertEqual(payload["item_key"], "NEWP0001")
+            self.assertEqual(payload["selected_target"], self._target())
             request_http.assert_called_once()
             call = request_http.call_args
             self.assertTrue(call.args[0].endswith(zotero.CREATE_ROUTE))
@@ -186,6 +245,7 @@ class ZoteroParentCreateTests(unittest.TestCase):
             with (
                 patch.object(zotero, "probe_api", return_value=(True, {}, None)),
                 patch.object(zotero, "probe_connector", return_value=(True, "Zotero is running", None)),
+                patch.object(zotero, "selected_target_payload", return_value=self._target()),
                 patch.object(zotero, "find_parent_matches", return_value=[]),
                 patch.object(zotero, "request_http", return_value=(201, "", {})),
                 patch.object(zotero, "verify_created_parent", return_value=[]),
@@ -195,6 +255,7 @@ class ZoteroParentCreateTests(unittest.TestCase):
             payload = json.loads(stream.getvalue())
             self.assertEqual(code, 5)
             self.assertEqual(payload["status"], "WRITE_SUCCEEDED_BUT_NOT_VERIFIED")
+            self.assertEqual(payload["selected_target"], self._target())
             self.assertIn("Do not mark Zotero ingest COMPLETE", payload["note"])
 
     def test_ambiguous_postwrite_matches_do_not_claim_completion(self) -> None:
@@ -208,6 +269,7 @@ class ZoteroParentCreateTests(unittest.TestCase):
             with (
                 patch.object(zotero, "probe_api", return_value=(True, {}, None)),
                 patch.object(zotero, "probe_connector", return_value=(True, "Zotero is running", None)),
+                patch.object(zotero, "selected_target_payload", return_value=self._target()),
                 patch.object(zotero, "find_parent_matches", return_value=[]),
                 patch.object(zotero, "request_http", return_value=(201, "", {})),
                 patch.object(zotero, "verify_created_parent", return_value=matches),
