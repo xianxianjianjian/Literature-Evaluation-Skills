@@ -23,6 +23,7 @@ from urllib.request import Request, urlopen
 DEFAULT_API_BASE_URL = "http://127.0.0.1:23119/api"
 DEFAULT_TIMEOUT = 3.0
 DEFAULT_APP_NAME = "Literature Evaluation Skills"
+DEFAULT_USER_AGENT = "Literature-Evaluation-Skills/1.0"
 MAX_HELPER_UPLOAD_BYTES = 256 * 1024 * 1024
 LIBRARY_PREFIX_PATTERN = re.compile(r"^(?:users/0|groups/\d+)$")
 
@@ -56,7 +57,10 @@ def http_result(
     headers: dict[str, str] | None = None,
     timeout: float = DEFAULT_TIMEOUT,
 ) -> tuple[int, bytes, dict[str, str]]:
-    request = Request(url, data=data, headers=headers or {}, method=method)
+    request_headers = {"User-Agent": DEFAULT_USER_AGENT}
+    if headers:
+        request_headers.update(headers)
+    request = Request(url, data=data, headers=request_headers, method=method)
     try:
         with urlopen(request, timeout=timeout) as response:
             status = int(getattr(response, "status", response.getcode()))
@@ -93,13 +97,21 @@ def unauthenticated_json(
     path: str,
     *,
     timeout: float = DEFAULT_TIMEOUT,
+    server_id: str | None = None,
 ) -> dict[str, Any]:
     url = api_base_url.rstrip("/") + "/" + path.lstrip("/")
+    headers = {"Accept": "application/json", "Zotero-API-Version": "3"}
+    if server_id:
+        headers["Zotero-Server-ID"] = server_id
     status, body, _ = http_result(
         url,
-        headers={"Accept": "application/json", "Zotero-API-Version": "3"},
+        headers=headers,
         timeout=timeout,
     )
+    if status == 412 and server_id:
+        raise LocalAPIError(
+            "Zotero-Server-ID changed during verification; discard cached identity and retry."
+        )
     if status != 200:
         raise LocalAPIError(
             f"Local API GET {path} returned HTTP {status}: {decode_body(body)[:300]}"
@@ -239,11 +251,17 @@ class LocalWriteClient:
             )
             last_status, last_body = status, body
             if status in expected_statuses:
+                if not self.remembered:
+                    self.api_key = None
                 return status, body, response_headers
             if status == 401 and attempt == 0:
                 self.api_key = None
                 self.remembered = False
                 continue
+            if status == 412:
+                raise LocalAPIError(
+                    "Zotero-Server-ID or write precondition no longer matches; refresh local identity before retrying."
+                )
             raise LocalAPIError(
                 f"Authorized Local API {method} {path} returned HTTP {status}: "
                 f"{decode_body(body)[:300]}"
@@ -438,12 +456,14 @@ def read_item(
     item_key: str,
     *,
     timeout: float = DEFAULT_TIMEOUT,
+    server_id: str | None = None,
 ) -> dict[str, Any]:
     prefix = normalize_library_prefix(library_prefix)
     return unauthenticated_json(
         api_base_url,
         f"/{prefix}/items/{item_key.strip()}",
         timeout=timeout,
+        server_id=server_id,
     )
 
 
@@ -455,12 +475,14 @@ def verify_attachment(
     parent_key: str,
     descriptor: dict[str, Any],
     timeout: float = DEFAULT_TIMEOUT,
+    server_id: str | None = None,
 ) -> dict[str, Any]:
     item = read_item(
         api_base_url,
         library_prefix,
         attachment_key,
         timeout=timeout,
+        server_id=server_id,
     )
     data = item.get("data")
     if not isinstance(data, dict):
@@ -507,5 +529,6 @@ def upload_file_to_attachment(
         parent_key=parent_key,
         descriptor=descriptor,
         timeout=client.timeout,
+        server_id=client.server_id,
     )
     return descriptor, verified
