@@ -84,13 +84,11 @@ Required regression coverage includes:
 - [x] strict archive completion requiring Zotero keys/no pending actions;
 - [x] Mullins blocked trace remains un-fabricated.
 
-Scope-freeze CI evidence observed before this checklist-only update:
+Scope-freeze CI evidence observed before this bookkeeping update:
 
 - [x] Python 3.11 green after V1 scope-freeze changes.
 - [x] Python 3.12 green after V1 scope-freeze changes.
 - [x] foundation validator green after V1 scope-freeze changes.
-
-The checklist commit itself must still receive one final exact-head CI pass before merge.
 
 ## 7. Real-paper validation backlog — not a V1 release blocker
 
@@ -131,11 +129,13 @@ Manual Zotero import/attachment followed by verification is an acceptable V1 ope
 - [x] active V1 rules no longer require A/B Zotero attachment key for academic completion/history.
 - [x] README describes the usable V1 rather than an unfinished Phase roadmap.
 - [x] release meaning is explicitly approved: V1 is a complete usable academic Skill system; Zotero Local API refinements are deferred optimizations.
-- [ ] final checklist-only HEAD CI green.
+- [x] checklist-only audit HEAD passed Python 3.11/3.12 and foundation validation before this bookkeeping checkbox update.
+
+The commit that marks this checklist complete must receive one final exact-head CI pass before merge; that CI result is recorded in the PR/release audit rather than generating another self-referential checklist commit.
 
 ## 10. Release verdict model
 
-After the last Section 9 item passes, the repository may be described as:
+After final exact-head CI passes, the repository may be described as:
 
 > **Literature Evaluation Skills V1 — usable academic workflow release**
 
