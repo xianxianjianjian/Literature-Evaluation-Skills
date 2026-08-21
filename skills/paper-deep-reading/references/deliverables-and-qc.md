@@ -93,12 +93,16 @@ C must not introduce a critique or factual claim that B cannot support. Internal
 
 ## Knowledge updates
 
-Only after Deep Reading is genuinely complete or explicitly accepted as a usable provisional archive:
+Append a paper to `knowledge/reading_history.csv` **only after Deep Reading genuinely reaches `COMPLETE`**. A `PROVISIONAL` archive may remain useful and C may be usable, but it must not be recorded as a completed long-term reading.
+
+After Deep Reading is complete:
 
 - append the completed paper to `knowledge/reading_history.csv` according to the project's completion policy;
-- update Zotero A/B attachment keys when verified;
+- update verified Zotero A/B attachment keys;
 - record C path;
 - propose, but do not automatically apply, changes to `knowledge/research_profile.md`.
+
+While Deep Reading is `PROVISIONAL`, preserve the state and unresolved gap in the workflow manifest/C/pending actions and upgrade the history only after the completion gate is actually satisfied.
 
 A single paper must never silently redefine the long-term research direction.
 
