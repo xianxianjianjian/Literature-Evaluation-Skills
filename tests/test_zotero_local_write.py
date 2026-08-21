@@ -55,7 +55,7 @@ class LocalAPIDiscoveryTests(unittest.TestCase):
 
 
 class LocalWriteClientTests(unittest.TestCase):
-    def test_request_reauthorizes_once_after_401(self) -> None:
+    def test_request_reauthorizes_once_after_401_and_discards_temporary_key(self) -> None:
         client = local.LocalWriteClient(
             api_base_url=local.DEFAULT_API_BASE_URL,
             server_id="SERVER123",
@@ -76,14 +76,33 @@ class LocalWriteClientTests(unittest.TestCase):
                 expected_statuses={200},
             )
         self.assertEqual(status, 200)
-        self.assertEqual(client.api_key, "NEW")
+        self.assertIsNone(client.api_key)
+        self.assertFalse(client.remembered)
         authorize.assert_called_once()
+
+    def test_remembered_key_persists_after_successful_write(self) -> None:
+        client = local.LocalWriteClient(
+            api_base_url=local.DEFAULT_API_BASE_URL,
+            server_id="SERVER123",
+            api_key="REMEMBERED",
+            remembered=True,
+        )
+        with patch.object(local, "http_result", return_value=(200, b"{}", {})):
+            client.request(
+                "/users/0/items",
+                method="POST",
+                data=b"[]",
+                expected_statuses={200},
+            )
+        self.assertEqual(client.api_key, "REMEMBERED")
+        self.assertTrue(client.remembered)
 
     def test_create_attachment_item_uses_parent_and_imported_file(self) -> None:
         client = local.LocalWriteClient(
             api_base_url=local.DEFAULT_API_BASE_URL,
             server_id="SERVER123",
             api_key="KEY",
+            remembered=True,
         )
         response = {
             "successful": {
@@ -112,6 +131,35 @@ class LocalWriteClientTests(unittest.TestCase):
         self.assertEqual(posted[0]["parentItem"], "PARENT01")
         self.assertEqual(posted[0]["linkMode"], "imported_file")
 
+    def test_server_bound_read_sends_expected_server_id(self) -> None:
+        item = {"data": {"key": "ATCH1234"}}
+        with patch.object(
+            local,
+            "http_result",
+            return_value=(200, json.dumps(item).encode(), {}),
+        ) as request:
+            result = local.read_item(
+                local.DEFAULT_API_BASE_URL,
+                "users/0",
+                "ATCH1234",
+                server_id="SERVER123",
+            )
+        self.assertEqual(result, item)
+        self.assertEqual(
+            request.call_args.kwargs["headers"]["Zotero-Server-ID"],
+            "SERVER123",
+        )
+
+    def test_server_id_mismatch_is_explicit(self) -> None:
+        with patch.object(local, "http_result", return_value=(412, b"mismatch", {})):
+            with self.assertRaises(local.LocalAPIError):
+                local.read_item(
+                    local.DEFAULT_API_BASE_URL,
+                    "users/0",
+                    "ATCH1234",
+                    server_id="SERVER123",
+                )
+
 
 class FileUploadTests(unittest.TestCase):
     def _file(self, root: Path) -> Path:
@@ -136,6 +184,7 @@ class FileUploadTests(unittest.TestCase):
             api_base_url=local.DEFAULT_API_BASE_URL,
             server_id="SERVER123",
             api_key="KEY",
+            remembered=True,
         )
         descriptor = {
             "md5": "abc",
@@ -210,6 +259,7 @@ class FileUploadTests(unittest.TestCase):
             api_base_url=local.DEFAULT_API_BASE_URL,
             server_id="SERVER123",
             api_key="KEY",
+            remembered=True,
         )
         with patch.object(client, "request", return_value=(204, b"", {})) as request:
             local.register_upload(client, "users/0", "ATCH1234", "UPLOAD1")
@@ -230,15 +280,17 @@ class FileUploadTests(unittest.TestCase):
                 "md5": "ABCD",
             }
         }
-        with patch.object(local, "read_item", return_value=item):
+        with patch.object(local, "read_item", return_value=item) as read:
             verified = local.verify_attachment(
                 local.DEFAULT_API_BASE_URL,
                 "users/0",
                 "ATCH1234",
                 parent_key="PARENT01",
                 descriptor=descriptor,
+                server_id="SERVER123",
             )
         self.assertEqual(verified, item)
+        self.assertEqual(read.call_args.kwargs["server_id"], "SERVER123")
 
     def test_upload_file_to_attachment_runs_three_phase_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -247,6 +299,7 @@ class FileUploadTests(unittest.TestCase):
                 api_base_url=local.DEFAULT_API_BASE_URL,
                 server_id="SERVER123",
                 api_key="KEY",
+                remembered=True,
             )
             auth = {
                 "url": "/api/local/uploads/UPLOAD1",
@@ -275,6 +328,7 @@ class FileUploadTests(unittest.TestCase):
             upload.assert_called_once()
             register.assert_called_once()
             verify.assert_called_once()
+            self.assertEqual(verify.call_args.kwargs["server_id"], "SERVER123")
 
 
 if __name__ == "__main__":
