@@ -1,10 +1,10 @@
 # V1 Hardening Audit
 
-This document tracks the post-Skill-rule audit performed after Phase 5. It distinguishes completed rule-layer work from executable helper coverage and must not be used to mark a scientific workflow complete.
+This document tracks the post-rule-layer audit after Phase 5. It distinguishes a structurally hardened release candidate from real-paper scientific acceptance. Passing this audit does not make an individual paper archive scientifically complete.
 
 ## Branch basis
 
-`phase-6-v1-hardening` is based on `phase-5-orchestration`, which already cumulatively contains Phases 1–5.
+`phase-6-v1-hardening` is based on the cumulative `phase-5-orchestration` line, which already contains Phases 1–5. Draft PR #1 (`phase-6-v1-hardening → main`) is an audit/CI container only and is not merge authorization.
 
 ## Audit dimensions
 
@@ -14,126 +14,159 @@ This document tracks the post-Skill-rule audit performed after Phase 5. It disti
 4. Skill rules ↔ helper scripts
 5. deterministic tests / regression protection
 6. honest capability boundaries
+7. release/copyright/branch hygiene
 
 ## Current findings
 
-### workflow_state.py — UPDATED
+### workflow_state.py — HARDENED
 
-Previous issue:
+Now provides V1 manifest normalization/validation, two-Gate `WAITING_USER` semantics, stable `paper_id`, A/B/C state, blockers, pending Zotero actions, source-check date, `needs_update`, resume summary, and backward-compatible additive normalization.
 
-- still described itself as Phase 1;
-- did not create/validate `blocking_issues` although the V1 router depends on it;
-- `needs_update` was not normalized across all stages;
-- no CLI support for paper identity, output state, blockers, pending Zotero actions, or source-change dates;
-- mechanically allowed `WAITING_USER` in non-Gate stages.
+Additional Phase 6 invariant: Search cannot be `PROVISIONAL/COMPLETE` without a selected `paper_id`, and Translation/Deep Reading/A/B/C cannot start before Minimal Intake establishes `paper_id`.
 
-Hardening result:
+### validate_deliverables.py — HARDENED
 
-- V1 manifest normalization and validation;
-- two-Gate `WAITING_USER` semantics;
-- `set-paper`, `set-output`, blocker, pending-Zotero and source-check commands;
-- resume-oriented `summary` command;
-- backward-compatible additive normalization for earlier manifests.
+Now verifies the complete V1 rule/reference inventory, A PDF signature, B DOCX package/Base Schema markers, C required sections, comment-only Chinese-character threshold, optional Canonical Abstract equality, and core manifest relationships.
 
-### validate_deliverables.py — UPDATED
+`--require-workflow-complete` adds an explicit release/final-archive gate requiring:
 
-Previous issue:
+- all four stages `COMPLETE`;
+- A/B/C `COMPLETE`;
+- stable `paper_id`;
+- verified A/B Zotero keys and C Git path;
+- no unresolved `needs_update`;
+- no blockers;
+- no pending Zotero actions;
+- a dated source-change check.
 
-- still validated only the Phase 1 foundation and basic file existence;
-- did not require the 19 specialist reference files;
-- did not structurally validate B or the required C fields;
-- did not compare C with `canonical_abstract.md`;
-- did not check key manifest completion relationships.
+These are deterministic structural checks only. They do not judge translation accuracy, statistical interpretation, methodological critique or visual quality.
 
-Hardening result:
+### terminology_registry.py — FROZEN V1 INTERFACES COMPLETE
 
-- full V1 repository/reference inventory checks;
-- A PDF signature check;
-- B DOCX package + Base Schema marker check;
-- C required-section and comment-body validation;
-- optional Canonical Abstract equality check;
-- basic manifest completion consistency checks.
+Implemented interfaces now cover:
 
-These are deterministic structural checks only. Visual PDF/DOCX QA and academic-quality judgments remain specialist responsibilities.
+- `lookup`
+- `add`
+- `update`
+- `context`
+- `status` (`update-status` retained as alias)
+- `export`
+- `list-ambiguous`
 
-### terminology_registry.py — PASS WITH LATER ENHANCEMENT POSSIBLE
+Context identity remains `English_Term + Discipline + Subfield + Context`. The helper never auto-selects a preferred translation. Changing `Preferred_Chinese` requires an explicit note and preserves the prior preferred wording in alternatives/history; supplied alternatives are merged rather than allowed to erase the old preferred wording. TE1–TE7 remains separate from HIGH/MEDIUM/LOW confidence.
 
-Current behavior correctly allows one English term to have different records by `English_Term + Discipline + Subfield + Context`, while rejecting the same contextual identity. TE1–TE7 is kept separate from HIGH/MEDIUM/LOW confidence in the shared policy.
+Dedicated CRUD for `terminology_evidence.jsonl` is still a possible later convenience, but the frozen V1 terminology-registry interface itself is now present.
 
-Possible later enhancement: dedicated terminology-evidence JSONL management/export commands. This is not currently treated as a release-blocking contradiction in the frozen V1 rule layer because evidence IDs and context are already persistable in the registry, but it remains a useful implementation improvement.
+### history_manager.py — HARDENED
 
-### history_manager.py — PASS
+Selection history remains week-scoped for duplicate prevention, while completed reading history remains globally deduplicated by stable identity.
 
-Selection history deduplicates within a week but allows the same paper to re-enter in later weeks. Completed reading history remains globally deduplicated by stable paper identity.
+`append-reading` now requires a workflow manifest and mechanically verifies:
 
-### mirror_pdf.py — UPDATED WITH HONEST V1 SCOPE
+- record week matches manifest week;
+- record `Paper_ID` matches active `paper_id`;
+- `deep_reading = COMPLETE`;
+- no unresolved Deep Reading `needs_update` or blocker;
+- B is `COMPLETE` with a verified Zotero attachment key.
 
-Previous issue:
+Thus a `PROVISIONAL` archive cannot silently enter `reading_history.csv` as completed work.
 
-- still labeled itself as a Phase 1/future-engine placeholder;
-- lacked explicit plan validation and render-QC state.
+### mirror_pdf.py — HARDENED WITH HONEST V1 SCOPE
 
-Hardening result:
+The helper validates source PDF/page-map structure, freezes `Strict Mirror → Adaptive Mirror → Readable Extension`, preserves 1.05–1.15 initial Chinese font scale and 8.5 pt safety floor, records per-page overflow/extension/render-inspection state, and does not permit layout QC to pass before visual inspection is accounted for.
 
-- now identifies itself as a V1 deterministic layout/QC helper;
-- validates source PDF signature and page-map structure;
-- freezes `Strict Mirror → Adaptive Mirror → Readable Extension`;
-- enforces 1.05–1.15 initial Chinese font scale and 8.5 pt safety floor;
-- records per-page strategy, overflow, extension-page and render-inspection state;
-- `LAYOUT_QC_PASSED` cannot be declared until all planned pages are marked inspected;
-- explicitly requires the human/tool loop `render → inspect → iterate → re-render`.
+It remains a deterministic layout/QC helper, not a publisher-grade automatic relayout engine. Real A still requires `render → inspect → iterate → re-render`.
 
-It still does **not** pretend to be a publisher-grade fully automatic relayout engine and does not translate content.
+### zotero_bridge.py — TRUTHFUL PARTIAL INTEGRATION
 
-### zotero_bridge.py — UPDATED, WRITE ADAPTER STILL AN EXPLICIT GAP
+Read-only Local API interfaces are implemented: `status / find / children / verify`. Connector readiness can be probed separately. `create / attach` remain declared workflow interfaces but return `WRITE_ROUTE_NOT_IMPLEMENTED_OR_VERIFIED` until a supported write adapter is actually implemented and tested. `pending` only prepares a manifest record and never pretends to write Zotero.
 
-Previous issue:
+Remaining production integration gap: verified parent creation and local-file attachment through an appropriate Connector/plugin write adapter.
 
-- safe read interfaces existed but the script still described itself as Phase 1;
-- `create` / `attach` returned old Phase 1 stub language;
-- Connector-server readiness was not exposed.
+### Search rule audit — PASS AFTER CAPABILITY SYNC
 
-Hardening result:
+Search retains:
 
-- Local API read interfaces remain `status / find / children / verify`;
-- Local API is explicitly labeled read-only;
-- `status` now distinguishes Local API availability from Connector-server availability;
-- `connector-status` probes `/connector/ping`;
-- `create` / `attach` remain declared but return `WRITE_ROUTE_NOT_IMPLEMENTED_OR_VERIFIED` rather than pretending success;
-- `pending` can prepare a `pending_zotero_actions` record without modifying Zotero.
+- 3–5 topic candidates and Topic Gate;
+- Journal Mapping;
+- Search Question Profile / concept blocks / unavailable-source logging;
+- role-based recency;
+- Round 1 targets and EX-01–EX-13;
+- Quality Gate before the fixed 7D score;
+- RED cannot win by score;
+- Method Transfer Checklist;
+- integrity wording that never claims truth/authenticity is proven;
+- saturation/stop rule;
+- Primary + Strong Alternatives and explicit #1-over-#2 rationale;
+- immutable Search-time history with later findings separated.
 
-Remaining V1 integration gap: a verified Connector/plugin adapter for bibliographic-parent creation and local-file attachment. The Local API itself cannot satisfy this because it is read-only. This gap must remain explicit until a real write route is implemented and tested.
+`zotero-ingest.md` was updated from stale Phase-2 wording to the current V1 Local-API/Connector capability boundary and public-source reuse policy.
 
-### Automated tests — ADDED, REMOTE RUN NOT YET VERIFIED
+### Translation rule audit — PASS AFTER STATE FIXES
 
-Added:
+Canonical Abstract, Translation Units, 100% accountable coverage, source-gap vocabulary, numeric/data lock, Main+SI handling, mirror layout and four-layer QC remain aligned.
 
-- `tests/test_core.py` with stdlib regression checks for workflow state, history dedupe, terminology context identity, C comment isolation, B DOCX Base Schema markers and mirror layout policy;
-- `.github/workflows/v1-smoke.yml` for Python 3.11/3.12 compile + unittest + repository validation.
+Two state inconsistencies were corrected:
 
-The current ChatGPT execution container cannot resolve `github.com`, so a direct `git clone` test run from that container is unavailable. The GitHub connector currently exposes no verified push-triggered workflow run for the latest branch commits. Therefore the repository must **not** yet claim that GitHub Actions passed. Confirm the actual Actions run before release/merge.
+- pending Zotero attachment cannot coexist with Translation `COMPLETE`; usable-but-unattached A remains `PROVISIONAL`;
+- later-arriving SI sets stage-level Translation/Deep Reading `needs_update` and triggers affected A/B/C regeneration/reverification rather than inventing output-level `needs_update` fields.
 
-### Branch hygiene — PASS SO FAR
+### Deep Reading rule audit — PASS AFTER HISTORY FIX
 
-`phase-6-v1-hardening` is ahead of `phase-5-orchestration` with no divergence. Current Phase 6 changes are limited to hardening scripts, tests, CI, README and documentation; the specialist academic rule files and suspended Mullins manifest were not rewritten by Phase 6.
+Introduction, Methods, Results, Discussion, Dynamic Coverage and Full Research Audit remain aligned with the frozen evidence model. In particular:
 
-## Remaining release work
+- no overall-N substitution for unknown model N;
+- important prespecified non-significant findings remain visible;
+- mandatory consistency checks are performed when information permits;
+- core figures/tables are visually inspected;
+- author interpretation and evaluator critique remain separated;
+- Dynamic Coverage cannot invent unavailable SI;
+- `reading_history.csv` is COMPLETE-only.
 
-Before merging to `main`:
+### Public-source/data-format boundary — HARDENED
 
-1. confirm smoke/unit tests actually run and pass in an environment with the full repository;
-2. decide whether the Zotero write adapter is required for V1 release or remains a documented `PROVISIONAL` integration boundary;
-3. optionally add terminology-evidence JSONL helper operations if they are judged necessary for V1 rather than a later enhancement;
-4. execute final repository hygiene/diff review;
-5. resume real T01–T04 / specialist-mode / resume / new-SI tests when suitable source packages are available;
-6. keep the real Mullins acceptance manifest factual (`Translation/A = BLOCKED`) until its source-PDF blocker is actually resolved.
+`shared/data-format-policy.md` now makes explicit that “online readable” does not automatically mean “safe to republish in a public Git repository.” Exact Original Abstract/source-text fields must come from a source with an acceptable reuse basis (for example user-supplied/owned material or an appropriately reusable source); otherwise the exact field remains a named gap/PROVISIONAL rather than being filled with copied or model-rewritten text presented as original.
+
+## Automated verification — VERIFIED GREEN
+
+Draft PR #1 provides the auditable CI surface. `V1 Smoke Tests` have been observed passing on Python 3.11 and Python 3.12 after the Phase 6 state/validator hardening.
+
+The workflow runs:
+
+```bash
+python -m compileall scripts tests
+python -m unittest discover -s tests -v
+python scripts/validate_deliverables.py --repo-root .
+```
+
+Regression coverage now includes core state/identity, terminology history/context/export, history completion gating, C comment isolation, B structure, mirror-layout policy, truthful Zotero capability, synthetic T01–T04, specialist-only modes, Resume, Zotero downgrade, new-SI update, and full-workflow completion semantics.
+
+Synthetic tests protect deterministic contracts only; they do not replace real-paper scientific/visual acceptance.
+
+## Branch and repository hygiene — PASS FOR CURRENT RELEASE CANDIDATE
+
+PR-level filename review contains only source code, Markdown/policies, CSV/JSONL/YAML state/schema files, tests/CI, and the intentionally preserved weekly Search test record. No paper PDF/DOCX binaries, A/B files, Zotero databases, credentials or secrets are part of the release candidate. `work/` and caches remain ignored.
+
+The real Mullins acceptance manifest remains factual: Search is provisional, Translation/A are blocked by unavailable Main PDF, and Deep Reading has not been falsely marked complete.
+
+## Remaining real-production gates
+
+Before describing the system as fully production-validated, still require real source packages for:
+
+- real T01–T04 scientific acceptance;
+- real A render/visual iteration;
+- real B evidence/source-anchor closure;
+- real weekly C production from an acceptable exact Abstract source;
+- real Zotero parent/Main/SI/A/B write + post-write verification through a supported adapter.
+
+These remaining gates are documented capability/acceptance gaps, not permission to fabricate success.
 
 ## Merge rule
 
-Do not merge the development chain to `main` until:
+Do not merge to `main` merely because CI is green. Before any merge:
 
-- V1 rule ↔ script consistency audit is closed or each remaining gap is explicitly accepted/documented;
-- automated smoke tests pass;
-- no temporary/copyrighted paper binaries or secrets are committed;
-- the suspended Mullins acceptance record remains factually unchanged;
-- a final branch diff confirms that V2 features have not leaked into V1.
+- re-check the latest PR HEAD CI;
+- perform the final `main...phase-6-v1-hardening` diff/hygiene scan;
+- confirm no consequential rule↔script contradiction remains;
+- decide explicitly whether `main` is being published as a **V1 rule-layer/release-candidate implementation** or only after the remaining real-production gates are closed;
+- obtain explicit release approval.
