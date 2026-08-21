@@ -2,13 +2,13 @@
   "schema_version": 1,
   "workflow_id": "2026-W34-weekly-literature-evaluation",
   "week": "2026-W34",
-  "paper_id": null,
+  "paper_id": "10.1111-jsr.14281",
   "stages": {
     "topic": {
       "status": "COMPLETE"
     },
     "search": {
-      "status": "WAITING_USER"
+      "status": "PROVISIONAL"
     },
     "translation": {
       "status": "NOT_STARTED",
@@ -35,8 +35,32 @@
       "git_path": null
     }
   },
-  "pending_zotero_actions": [],
+  "pending_zotero_actions": [
+    {
+      "action": "find_or_create_parent",
+      "paper_id": "10.1111-jsr.14281",
+      "doi": "10.1111/jsr.14281",
+      "expected_title": "The stability of slow-wave sleep and EEG oscillations across two consecutive nights of laboratory polysomnography in cognitively normal older adults",
+      "reason": "Current ChatGPT session cannot access the user's local Zotero Desktop instance."
+    },
+    {
+      "action": "attach",
+      "paper_id": "10.1111-jsr.14281",
+      "source_id": "SRC-M1",
+      "expected_attachment_name": "[ORIGINAL] Main Article",
+      "source": "Version of Record at Wiley; legally accessible full text also available via PMCID PMC11671611",
+      "reason": "Pending local Zotero access."
+    },
+    {
+      "action": "attach",
+      "paper_id": "10.1111-jsr.14281",
+      "source_id": "SRC-S1",
+      "expected_attachment_name": "[SUPPLEMENT] Figure S1 - Bland-Altman plots",
+      "source": "Wiley Supporting Information jsr14281-sup-0001-FigureS1.docx; PMC counterpart NIHMS2003008-supplement-SUP_INFO.docx",
+      "reason": "Pending local Zotero access."
+    }
+  ],
   "source_change": {
-    "last_checked": null
+    "last_checked": "2026-08-21"
   }
 }
