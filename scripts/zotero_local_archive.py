@@ -20,6 +20,14 @@ class ArchiveError(RuntimeError):
     """Raised when a durable Zotero archive operation cannot proceed safely."""
 
 
+def public_descriptor(descriptor: dict[str, Any]) -> dict[str, Any]:
+    """Return a JSON-safe descriptor without leaking opaque Python objects."""
+    return {
+        key: str(value) if isinstance(value, Path) else value
+        for key, value in descriptor.items()
+    }
+
+
 def server_bound_get(
     client: local.LocalWriteClient,
     path: str,
@@ -173,6 +181,7 @@ def attach_file(
 ) -> dict[str, Any]:
     """Attach one local file to an existing parent with idempotent resume semantics."""
     descriptor = local.file_descriptor(path)
+    public = public_descriptor(descriptor)
     read_parent(client, library_prefix, parent_key)
     children = read_children(client, library_prefix, parent_key)
     plan = plan_attachment(
@@ -186,14 +195,14 @@ def attach_file(
         return {
             "status": "ATTACHMENT_CONFLICT",
             "plan": plan,
-            "descriptor": descriptor,
+            "descriptor": public,
             "attachment_key": None,
         }
     if plan["action"] == "ALREADY_VERIFIED":
         return {
             "status": "ALREADY_ATTACHED_AND_VERIFIED",
             "plan": plan,
-            "descriptor": descriptor,
+            "descriptor": public,
             "attachment_key": plan["candidate"]["key"],
         }
 
@@ -209,7 +218,7 @@ def attach_file(
         )
 
     try:
-        descriptor, verified = local.upload_file_to_attachment(
+        _, verified = local.upload_file_to_attachment(
             client,
             library_prefix,
             attachment_key,
@@ -220,7 +229,7 @@ def attach_file(
         return {
             "status": "ATTACHMENT_FILE_UPLOAD_INCOMPLETE",
             "plan": plan,
-            "descriptor": descriptor,
+            "descriptor": public,
             "attachment_key": attachment_key,
             "reused_partial_child": reused,
             "error": str(exc),
@@ -229,7 +238,7 @@ def attach_file(
     return {
         "status": "ATTACHED_AND_VERIFIED",
         "plan": plan,
-        "descriptor": descriptor,
+        "descriptor": public,
         "attachment_key": attachment_key,
         "reused_partial_child": reused,
         "verified_item": verified,
