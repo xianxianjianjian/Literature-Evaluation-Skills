@@ -228,12 +228,16 @@ C is a second-stage synthesis of B and must not introduce unsupported critique o
 
 ## Knowledge updates
 
-Only after a paper has genuinely completed Deep Reading or has been explicitly accepted as a usable provisional archive:
+Append a paper to `knowledge/reading_history.csv` **only after Deep Reading genuinely reaches `COMPLETE`**.
 
-- append appropriate completion information to `knowledge/reading_history.csv`;
+After completion:
+
+- append the completed paper to `knowledge/reading_history.csv`;
 - record verified Zotero A/B attachment keys;
 - record C Git path;
 - propose updates to `knowledge/research_profile.md` but never apply a research-direction change without explicit user approval.
+
+A `PROVISIONAL` archive may remain usable and C may still be submitted when appropriate, but it must stay represented as provisional in the workflow manifest/C/pending actions until the completion gate is satisfied. Do not write a provisional reading into `reading_history.csv` as if it were completed.
 
 ## Completion states
 
