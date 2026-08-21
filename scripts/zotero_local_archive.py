@@ -28,6 +28,11 @@ def public_descriptor(descriptor: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def optional_text(value: Any) -> str:
+    """Normalize Zotero null/empty optional string fields to one representation."""
+    return "" if value is None else str(value)
+
+
 def server_bound_get(
     client: local.LocalWriteClient,
     path: str,
@@ -104,12 +109,12 @@ def attachment_identity(item: dict[str, Any]) -> dict[str, Any]:
     data = item_data(item)
     return {
         "key": item_key(item),
-        "title": str(data.get("title", "")),
+        "title": optional_text(data.get("title")),
         "item_type": data.get("itemType"),
-        "parent": str(data.get("parentItem", "")),
+        "parent": optional_text(data.get("parentItem")),
         "link_mode": data.get("linkMode"),
-        "filename": str(data.get("filename", "")),
-        "md5": str(data.get("md5", "")).casefold(),
+        "filename": optional_text(data.get("filename")),
+        "md5": optional_text(data.get("md5")).casefold(),
     }
 
 
@@ -126,7 +131,7 @@ def plan_attachment(
         attachment_identity(item)
         for item in children
         if item_data(item).get("itemType") == "attachment"
-        and str(item_data(item).get("title", "")).strip() == target_title
+        and optional_text(item_data(item).get("title")).strip() == target_title
     ]
     if not candidates:
         return {"action": "NEW", "candidate": None}
