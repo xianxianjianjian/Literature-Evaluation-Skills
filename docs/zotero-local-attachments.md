@@ -4,6 +4,16 @@ This document defines the durable local-file attachment adapter introduced on `p
 
 It extends the Phase-7 parent-create work. It does **not** change paper selection or academic-analysis rules.
 
+## Official protocol anchors
+
+Current implementation is based on Zotero's v3 documentation:
+
+- Local API: `https://www.zotero.org/support/dev/web_api/v3/local_api`
+- Write requests: `https://www.zotero.org/support/dev/web_api/v3/write_requests`
+- File uploads: `https://www.zotero.org/support/dev/web_api/v3/file_upload`
+
+The implementation intentionally follows documented behavior rather than relying only on mock assumptions.
+
 ## Why Phase 8 exists
 
 The literature-evaluation workflow needs to attach files to a Zotero parent over a long lifecycle:
@@ -40,7 +50,7 @@ The write flow calls:
 POST /api/local/authorize
 ```
 
-with the current `Zotero-Server-ID` and the application name.
+with the current `Zotero-Server-ID` and application name.
 
 Rules:
 
@@ -76,6 +86,29 @@ The normal durable flow is:
 
 The default library prefix is `users/0`. A group library may be addressed with `groups/<numeric-group-id>` only when that target is intentionally selected and writable.
 
+## Attachment child schema
+
+A new child follows the Zotero v3 imported-file attachment template shape rather than a hand-written minimal object. The helper sets:
+
+```text
+itemType = attachment
+parentItem = <parent key>
+linkMode = imported_file
+title = requested archive label
+accessDate = ""
+url = ""
+note = ""
+tags = []
+relations = {}
+contentType = detected MIME type
+charset = ""
+filename = local filename
+md5 = null
+mtime = null
+```
+
+`md5` and `mtime` are then updated atomically by Zotero's file-upload flow rather than edited directly by the helper.
+
 ## Preview versus real write
 
 Preview mode:
@@ -107,7 +140,7 @@ The adapter uses the requested Zotero child title as an archive slot and compare
 
 ### `NEW`
 
-No same-title attachment child exists. Create a new imported-file child and upload the file.
+No same-title attachment child exists. Create a new imported-file child from the v3 template shape and upload the file.
 
 ### `ALREADY_VERIFIED`
 
@@ -121,7 +154,12 @@ with its existing attachment key.
 
 ### `REUSE_PARTIAL`
 
-A single same-title imported-file child exists but has no filename and no MD5, consistent with an interrupted run after child creation but before file registration. Reuse that child key and continue the upload instead of creating a duplicate.
+A correctly created v3 attachment child may already contain the expected `filename` before file upload, while `md5` remains `null`/empty until registration completes. Therefore a single same-title imported-file child is treated as safely resumable when:
+
+- its MD5 is empty; and
+- its filename is either empty (legacy/interrupted shell) or exactly the expected local filename.
+
+Reuse that child key and continue upload instead of creating a duplicate.
 
 ### `CONFLICT`
 
@@ -129,20 +167,24 @@ Stop without overwrite when:
 
 - multiple same-title attachments exist;
 - the same-title child has an unexpected structural identity;
-- the same-title attachment points to a different filename/MD5.
+- the same-title child has a conflicting filename;
+- the same-title attachment has a non-empty MD5 that differs from the requested file.
 
 Return `ATTACHMENT_CONFLICT`; operator/user resolution is required before replacing or deleting anything.
 
 ## Full-upload contract
 
-For a child attachment item, the helper follows the Zotero v3 full-upload pattern:
+For a newly created or safely resumable attachment child, the helper follows the Zotero v3 full-upload pattern:
 
 1. `POST /items/<attachmentKey>/file` with `md5`, `filename`, `filesize`, `mtime` and `If-None-Match: *`;
-2. if the file is not already present, POST the bytes using the returned `url`, `prefix`, `suffix`, `contentType`, and `uploadKey`;
-3. register the returned `uploadKey` with another POST to `/items/<attachmentKey>/file`;
-4. read the attachment item back and verify metadata.
+2. if the response is `{ "exists": 1 }`, Zotero has already associated the matching file and no byte upload/registration is required;
+3. otherwise concatenate the returned `prefix` + file bytes + `suffix` and POST them to the returned upload URL with its returned `contentType`;
+4. require HTTP 201 for byte upload;
+5. register the returned `uploadKey` by POSTing to the attachment file endpoint again with `If-None-Match: *`;
+6. require HTTP 204 for registration;
+7. read the attachment item back and verify metadata.
 
-When Zotero reports the file already exists, the byte upload/registration portion can be skipped, but post-write/read verification is still required.
+This adapter does not overwrite an already registered different file. Existing-file replacement would require `If-Match` against the previous MD5 and is intentionally outside this V1 archive path because silent replacement is prohibited.
 
 ## Verification contract
 
@@ -167,13 +209,13 @@ ATTACHMENT_FILE_UPLOAD_INCOMPLETE
 
 and include the attachment key. The workflow should preserve that key as a recovery hint and leave the relevant archive action pending/PROVISIONAL.
 
-The next run may reuse a genuinely empty child. The adapter does not silently delete failed children, because deletion is a separate destructive operation and may require operator review.
+The next run may reuse the child only when its MD5 is still empty and its filename is empty or matches the expected file. The adapter does not silently delete failed children, because deletion is a separate destructive operation and may require operator review.
 
 ## File and privacy boundaries
 
 - Main/SI/A/B bytes are sent to the user's local Zotero endpoint; they are not committed to Git by this adapter.
 - Local API authorization secrets are not persisted.
-- The project helper currently applies a 256 MiB single-file safety limit. This is a project-side guardrail, not a statement of Zotero's official maximum upload size.
+- The project helper currently applies a 256 MiB single-file safety limit. This is a project-side guardrail, not Zotero's official maximum. Zotero's current local API documentation permits stored-file uploads below 4 GB.
 - Research files remain excluded by `.gitignore`.
 
 ## Current validation level
@@ -186,13 +228,14 @@ Automated tests cover:
 - authorization handling and temporary-key disposal;
 - one reauthorization attempt after 401;
 - Server-ID mismatch rejection;
-- attachment child schema;
+- v3 attachment-template fields;
 - MD5/filesize/mtime calculation;
 - upload authorization, byte upload, upload-key registration;
+- `exists=1` short circuit;
 - parent/filename/MD5 verification;
 - idempotent exact match;
-- interrupted-child reuse;
-- conflict refusal;
+- template-child interrupted upload recovery;
+- conflicting-filename/MD5 refusal;
 - incomplete-upload recovery metadata;
 - preview mode with no Zotero contact.
 
