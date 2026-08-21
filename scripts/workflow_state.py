@@ -38,7 +38,6 @@ class WorkflowStateError(ValueError):
 
 
 def validate_iso_date(value: str, field: str) -> None:
-    """Require canonical YYYY-MM-DD when a date is supplied."""
     try:
         parsed = date.fromisoformat(value)
     except ValueError as exc:
@@ -52,7 +51,6 @@ def _stage_record() -> dict[str, Any]:
 
 
 def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any]:
-    """Return a V1 manifest for one ISO week."""
     if not WEEK_PATTERN.fullmatch(week):
         raise WorkflowStateError(
             f"Invalid week {week!r}; expected ISO week such as 2026-W34."
@@ -75,7 +73,6 @@ def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any
 
 
 def normalize_manifest(data: object) -> dict[str, Any]:
-    """Fill additive V1 fields so earlier valid manifests remain resumable."""
     if not isinstance(data, dict):
         raise WorkflowStateError("Manifest root must be an object.")
     stages = data.get("stages")
@@ -90,7 +87,7 @@ def normalize_manifest(data: object) -> dict[str, Any]:
 
 
 def validate_manifest(data: object) -> dict[str, Any]:
-    """Validate V1 manifest shape, state enums, and Gate semantics."""
+    """Validate V1 shape plus only deterministic workflow-state invariants."""
     data = normalize_manifest(data)
     if data.get("schema_version") != 1:
         raise WorkflowStateError("Manifest schema_version must be 1.")
@@ -106,6 +103,7 @@ def validate_manifest(data: object) -> dict[str, Any]:
     paper_id = data.get("paper_id")
     if paper_id is not None and (not isinstance(paper_id, str) or not paper_id.strip()):
         raise WorkflowStateError("paper_id must be null or a non-empty string.")
+    has_paper = isinstance(paper_id, str) and bool(paper_id.strip())
 
     stages = data.get("stages")
     if not isinstance(stages, dict):
@@ -138,6 +136,16 @@ def validate_manifest(data: object) -> dict[str, Any]:
                 f"{name}.update_reason must be empty when needs_update is false."
             )
 
+    if stages["search"]["status"] in {"PROVISIONAL", "COMPLETE"} and not has_paper:
+        raise WorkflowStateError(
+            "Search PROVISIONAL/COMPLETE requires a selected paper_id; use WAITING_USER for the final-paper Gate."
+        )
+    for name in ("translation", "deep_reading"):
+        if stages[name]["status"] != "NOT_STARTED" and not has_paper:
+            raise WorkflowStateError(
+                f"Stage {name} cannot start before Minimal Intake establishes paper_id."
+            )
+
     outputs = data.get("outputs")
     if not isinstance(outputs, dict):
         raise WorkflowStateError("Manifest must contain an outputs object.")
@@ -150,6 +158,11 @@ def validate_manifest(data: object) -> dict[str, Any]:
             raise WorkflowStateError(
                 f"Invalid status for output {name}: {status!r}; outputs cannot WAITING_USER."
             )
+        if status != "NOT_STARTED" and not has_paper:
+            raise WorkflowStateError(
+                f"Output {name} cannot start before paper_id is established."
+            )
+
     for name in ("A", "B"):
         value = outputs[name].get("zotero_attachment_key")
         if value is not None and (not isinstance(value, str) or not value.strip()):
@@ -190,7 +203,6 @@ def validate_manifest(data: object) -> dict[str, Any]:
 
 
 def load_manifest(path: Path) -> dict[str, Any]:
-    """Load, normalize, and validate a JSON-compatible YAML manifest."""
     if not path.is_file():
         raise WorkflowStateError(f"Manifest does not exist: {path}")
     try:
@@ -203,7 +215,6 @@ def load_manifest(path: Path) -> dict[str, Any]:
 
 
 def write_manifest(path: Path, data: dict[str, Any], *, overwrite: bool = True) -> None:
-    """Validate and atomically write a manifest."""
     data = validate_manifest(data)
     if path.exists() and not overwrite:
         raise WorkflowStateError(
