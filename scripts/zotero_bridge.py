@@ -252,10 +252,7 @@ def command_connector_status(args: argparse.Namespace) -> int:
             "connector_available": ok,
             "connector_base_url": args.connector_base_url,
             "ping_reply": reply,
-            "write_adapter": {
-                "create": True,
-                "attach": False,
-            },
+            "write_adapter": {"create": True, "attach": False},
             "reason": None if ok else error,
         }
     )
@@ -337,7 +334,8 @@ def load_metadata(path: Path) -> dict[str, Any]:
     return value
 
 
-def normalized_creators(metadata: dict[str, Any]) -> list[dict[str, str]]:
+def normalized_creators(metadata: dict[str, Any]) -> list[dict[str, Any]]:
+    """Normalize personal/institutional creators to Zotero translator-item fields."""
     creators = metadata.get("creators")
     if creators is None:
         creators = metadata.get("authors", [])
@@ -345,7 +343,8 @@ def normalized_creators(metadata: dict[str, Any]) -> list[dict[str, str]]:
         return []
     if not isinstance(creators, list):
         raise ZoteroBridgeError("creators/authors must be a list of structured objects.")
-    normalized: list[dict[str, str]] = []
+
+    normalized: list[dict[str, Any]] = []
     for index, creator in enumerate(creators):
         if not isinstance(creator, dict):
             raise ZoteroBridgeError(
@@ -354,21 +353,34 @@ def normalized_creators(metadata: dict[str, Any]) -> list[dict[str, str]]:
             )
         first = str(creator.get("firstName", "")).strip()
         last = str(creator.get("lastName", "")).strip()
-        name = str(creator.get("name", "")).strip()
-        if name and not (first or last):
+        single_name = str(creator.get("name", "")).strip()
+        creator_type = str(creator.get("creatorType", "author")).strip() or "author"
+
+        if single_name and not (first or last):
             normalized.append(
-                {"name": name, "creatorType": str(creator.get("creatorType", "author"))}
+                {
+                    "lastName": single_name,
+                    "fieldMode": 1,
+                    "creatorType": creator_type,
+                }
             )
             continue
         if not last:
             raise ZoteroBridgeError(
                 f"creators/authors[{index}] requires lastName or a single-field name."
             )
-        record = {
+        record: dict[str, Any] = {
             "firstName": first,
             "lastName": last,
-            "creatorType": str(creator.get("creatorType", "author")),
+            "creatorType": creator_type,
         }
+        if creator.get("fieldMode") == 1:
+            if first:
+                raise ZoteroBridgeError(
+                    f"creators/authors[{index}] fieldMode=1 cannot include firstName."
+                )
+            record.pop("firstName", None)
+            record["fieldMode"] = 1
         normalized.append(record)
     return normalized
 
@@ -425,10 +437,7 @@ def build_connector_item(metadata: dict[str, Any]) -> tuple[dict[str, Any], str]
 
 def create_preview(metadata: dict[str, Any]) -> dict[str, Any]:
     item, source_uri = build_connector_item(metadata)
-    return {
-        "items": [item],
-        "uri": source_uri,
-    }
+    return {"items": [item], "uri": source_uri}
 
 
 def item_key(item: dict[str, Any]) -> str | None:
@@ -603,9 +612,7 @@ def command_pending_template(args: argparse.Namespace) -> int:
         {
             "schema_version": SCHEMA_VERSION,
             "pending_zotero_action": record,
-            "note": (
-                "This command only prepares a manifest record; it does not modify Zotero."
-            ),
+            "note": "This command only prepares a manifest record; it does not modify Zotero.",
         }
     )
     return 0
@@ -657,9 +664,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     create = subparsers.add_parser(
         "create",
-        help=(
-            "Create a bibliographic parent through /connector/saveItems and verify it via Local API."
-        ),
+        help="Create a bibliographic parent through /connector/saveItems and verify it via Local API.",
     )
     create.add_argument("--metadata", type=Path, required=True)
     create.add_argument(
