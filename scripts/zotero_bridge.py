@@ -2,10 +2,11 @@
 """Expose truthful V1 Zotero Desktop integration capabilities.
 
 Reads use Zotero Desktop's read-only Local API v3 under
-``http://127.0.0.1:23119/api``. Bibliographic-parent creation uses Zotero's
-Connector server ``/connector/saveItems`` route and is considered successful
-only after a post-write Local API identity check. Local-file attachment remains
-unsupported until a documented, tested attachment route is available.
+``http://127.0.0.1:23119/api``. Connector metadata routes are used to resolve
+the active save target. Bibliographic-parent creation uses Zotero's Connector
+``/connector/saveItems`` route and is considered successful only after a
+post-write Local API identity check. Local-file attachment remains unsupported
+until a durable, tested route exists for the full Main/SI/A/B lifecycle.
 
 This helper performs mechanical identity/archive operations only; it never
 makes paper-selection or academic judgments.
@@ -28,9 +29,10 @@ CAPABILITY_SET = "V1_ZOTERO_PARENT_WRITE_PARTIAL"
 DEFAULT_API_BASE_URL = "http://127.0.0.1:23119/api"
 DEFAULT_CONNECTOR_BASE_URL = "http://127.0.0.1:23119"
 DEFAULT_TIMEOUT = 3.0
-READ_INTERFACES = ["status", "find", "children", "verify"]
+READ_INTERFACES = ["status", "selected-target", "find", "children", "verify"]
 WRITE_INTERFACES = ["create", "attach"]
 CREATE_ROUTE = "/connector/saveItems"
+SELECTED_TARGET_ROUTE = "/connector/getSelectedCollection"
 ATTACH_UNSUPPORTED = "LOCAL_FILE_ATTACH_ROUTE_NOT_IMPLEMENTED_OR_VERIFIED"
 CONFIRMATION_REQUIRED = "WRITE_CONFIRMATION_REQUIRED"
 
@@ -122,6 +124,40 @@ def api_get(
         ) from exc
 
 
+def connector_post_json(
+    base_url: str,
+    path: str,
+    payload: dict[str, Any],
+    *,
+    timeout: float,
+) -> dict[str, Any]:
+    url = base_url.rstrip("/") + "/" + path.lstrip("/")
+    status, body, _ = request_http(
+        url,
+        method="POST",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Zotero-Connector-API-Version": "3",
+        },
+        timeout=timeout,
+    )
+    if status != 200:
+        raise ZoteroBridgeError(
+            f"Connector route {path} returned unexpected HTTP {status}: {body[:300]}"
+        )
+    try:
+        value = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise ZoteroBridgeError(
+            f"Connector route {path} returned invalid JSON."
+        ) from exc
+    if not isinstance(value, dict):
+        raise ZoteroBridgeError(f"Connector route {path} returned a non-object payload.")
+    return value
+
+
 def item_data(item: dict[str, Any]) -> dict[str, Any]:
     data = item.get("data")
     return data if isinstance(data, dict) else {}
@@ -132,6 +168,34 @@ def is_parent_bibliographic_item(item: dict[str, Any]) -> bool:
     if data.get("parentItem"):
         return False
     return data.get("itemType") not in {"attachment", "note", "annotation"}
+
+
+def selected_target_payload(
+    *,
+    connector_base_url: str,
+    timeout: float,
+    ensure_writable: bool,
+) -> dict[str, Any]:
+    raw = connector_post_json(
+        connector_base_url,
+        SELECTED_TARGET_ROUTE,
+        {"switchToReadableLibrary": bool(ensure_writable)},
+        timeout=timeout,
+    )
+    target = {
+        "library_id": raw.get("libraryID"),
+        "library_name": raw.get("libraryName"),
+        "library_editable": bool(raw.get("libraryEditable")),
+        "files_editable": bool(raw.get("filesEditable")),
+        "editable": bool(raw.get("editable")),
+        "collection_id": raw.get("id"),
+        "collection_name": raw.get("name"),
+    }
+    if ensure_writable and not target["editable"]:
+        raise ZoteroBridgeError(
+            "Connector did not resolve an editable save target for parent creation."
+        )
+    return target
 
 
 def status_payload(
@@ -158,6 +222,7 @@ def status_payload(
                     "implemented": True,
                     "enabled": create_enabled,
                     "route": CREATE_ROUTE,
+                    "target_resolution": SELECTED_TARGET_ROUTE,
                     "verification": "POST_WRITE_LOCAL_API_IDENTITY_CHECK",
                 },
                 "attach": {
@@ -257,6 +322,22 @@ def command_connector_status(args: argparse.Namespace) -> int:
         }
     )
     return 0 if ok else 2
+
+
+def command_selected_target(args: argparse.Namespace) -> int:
+    target = selected_target_payload(
+        connector_base_url=args.connector_base_url,
+        timeout=args.timeout,
+        ensure_writable=args.writable,
+    )
+    emit(
+        {
+            "schema_version": SCHEMA_VERSION,
+            "selected_target": target,
+            "writable_resolution_requested": args.writable,
+        }
+    )
+    return 0
 
 
 def command_find(args: argparse.Namespace) -> int:
@@ -488,7 +569,10 @@ def command_create(args: argparse.Namespace) -> int:
                 "status": CONFIRMATION_REQUIRED,
                 "would_post_to": CREATE_ROUTE,
                 "payload": payload,
-                "note": "No Zotero write was performed. Re-run with --yes after authorization.",
+                "note": (
+                    "No Zotero write or target-resolution request was performed. "
+                    "Use selected-target to inspect the destination, then re-run with --yes after authorization."
+                ),
             }
         )
         return 3
@@ -505,6 +589,12 @@ def command_create(args: argparse.Namespace) -> int:
             f"Refusing parent write because Connector server is unavailable: {connector_error}"
         )
 
+    save_target = selected_target_payload(
+        connector_base_url=args.connector_base_url,
+        timeout=args.timeout,
+        ensure_writable=True,
+    )
+
     duplicates = find_parent_matches(
         api_base_url=args.api_base_url,
         timeout=args.timeout,
@@ -517,6 +607,7 @@ def command_create(args: argparse.Namespace) -> int:
                 "schema_version": SCHEMA_VERSION,
                 "command": "create",
                 "status": "DUPLICATE_PARENT_FOUND",
+                "selected_target": save_target,
                 "matches": duplicates,
                 "note": "No Zotero write was performed.",
             }
@@ -554,6 +645,7 @@ def command_create(args: argparse.Namespace) -> int:
                 "command": "create",
                 "status": "CREATED_AND_VERIFIED",
                 "item_key": key,
+                "selected_target": save_target,
                 "identity": {"doi": doi or None, "title": title},
                 "match": matches[0],
             }
@@ -569,6 +661,7 @@ def command_create(args: argparse.Namespace) -> int:
                 if len(matches) > 1
                 else "WRITE_SUCCEEDED_BUT_NOT_VERIFIED"
             ),
+            "selected_target": save_target,
             "identity": {"doi": doi or None, "title": title},
             "matches": matches,
             "note": "Do not mark Zotero ingest COMPLETE until one parent identity is verified.",
@@ -591,7 +684,7 @@ def command_attach_unavailable(args: argparse.Namespace) -> int:
             },
             "next_action": (
                 "Record this operation in workflow_manifest.pending_zotero_actions. "
-                "Do not claim an attachment exists until a documented local-file route is implemented and verified."
+                "Do not claim an attachment exists until a durable local-file route is implemented and verified."
             ),
         }
     )
@@ -645,6 +738,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     connector.set_defaults(handler=command_connector_status)
 
+    selected = subparsers.add_parser(
+        "selected-target", help="Show the Connector library/collection save target."
+    )
+    selected.add_argument(
+        "--writable",
+        action="store_true",
+        help="Resolve/switch to the writable target the Connector would use for saving.",
+    )
+    selected.set_defaults(handler=command_selected_target)
+
     find = subparsers.add_parser("find", help="Find a bibliographic parent item.")
     identity = find.add_mutually_exclusive_group(required=True)
     identity.add_argument("--doi")
@@ -675,7 +778,7 @@ def build_parser() -> argparse.ArgumentParser:
     create.set_defaults(handler=command_create)
 
     attach = subparsers.add_parser(
-        "attach", help="Declared local-file attachment interface; not yet implemented."
+        "attach", help="Declared durable local-file attachment interface; not yet implemented."
     )
     attach.add_argument("--parent-key", required=True)
     attach.add_argument("--file", type=Path, required=True)
