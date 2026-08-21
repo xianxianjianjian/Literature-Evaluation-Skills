@@ -36,18 +36,32 @@ Git 不长期重复保存 A/B。Zotero 暂时不可用时，待挂接产物可�
 
 ## 当前开发阶段
 
-当前为 **Phase 1 — Repository Foundation**，只提供：
+当前开发分支进入 **Phase 2 — Literature Search**。
+
+Phase 1 已建立：
 
 - 共享证据、身份、Zotero、状态和数据格式协议；
 - 长期知识库 Schema；
 - 工作流状态与基础数据管理 CLI；
-- 四个 Skill 的职责和路由骨架。
+- 四个 Skill 的职责边界和总控路由骨架。
 
-当前脚本中的 PDF 重排、Zotero 写入以及完整学术流程均为受控接口或占位框架，不代表相应生产能力已经实现。
+Phase 2 当前已实现 `literature-search` 的规则层：
+
+- 主题规划与用户 Topic Gate；
+- Journal Mapping；
+- Search Question Profile、Concept Blocks、Database Routing 与时间角色；
+- 两轮筛选、固定排除码、Quality Gate、七维评分和 Method Transfer Checklist；
+- Retraction/Correction/Version/SI/Data/Code/Preregistration 等 Integrity Check；
+- Primary + Strong Alternatives 推荐逻辑；
+- 用户 Paper Gate 后的 selected-paper/source-manifest/Zotero handoff 规则。
+
+下一步是用真实周主题执行一次完整的 Topic → Search → Screening → Paper Selection → Zotero/PROVISIONAL handoff 验收。Translation 和 Deep Reading 的完整实现仍属于后续 Phase 3/4。
+
+当前 PDF 重排和 Zotero 写入接口仍有明确的能力边界；未实现的操作不得伪装成功。
 
 ## V1 / V2 边界
 
-V1 将按阶段完成 Search、Translation、Deep Reading 与总控集成。V2 才考虑在真实使用反馈支持下扩展更复杂的自动化；系统综述、PRISMA、Meta-analysis、多 Agent、Web dashboard 和自动重跑原始统计不属于 Phase 1。
+V1 按阶段完成 Search、Translation、Deep Reading 与总控集成。系统综述/PRISMA、Meta-analysis、批量候选下载、多 Agent、Web dashboard、自动影响因子数据库和自动重跑原始统计属于 V2 或明确排除项，不应混入当前阶段。
 
 ## 基础验证
 
