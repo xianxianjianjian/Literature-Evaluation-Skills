@@ -1,6 +1,6 @@
 ---
 name: literature-search
-description: Plan, search, screen, rank, integrity-check, and archive literature for a weekly evaluation, ending with a user-confirmed focal paper and verified or explicitly provisional Zotero handoff.
+description: Plan, search, screen, rank, integrity-check, and hand off literature for a weekly evaluation, ending with a user-confirmed focal paper and an auditable source package. Zotero is a preferred optional archive integration rather than a Search completion prerequisite.
 ---
 
 # Literature Search
@@ -22,7 +22,7 @@ research context
 → Primary + Strong Alternatives
 → user paper Gate
 → selected-paper identity/source package
-→ Zotero ingest or explicit provisional handoff
+→ archive handoff (Zotero when available, pending/manual otherwise)
 ```
 
 This Skill may run independently from Translation and Deep Reading.
@@ -49,7 +49,7 @@ Read the reference that owns each decision instead of duplicating its rules here
 - Search Question Profile, query blocks, database routing, recency, saturation → [`references/search-strategy.md`](references/search-strategy.md)
 - Round 1/2 screening, EX codes, Quality Gate, seven-dimensional score, method transfer → [`references/screening-and-ranking.md`](references/screening-and-ranking.md)
 - Retraction/correction/version/SI/data/code/prereg/conflict checks → [`references/integrity-check.md`](references/integrity-check.md)
-- Final-paper Zotero/source-package handoff → [`references/zotero-ingest.md`](references/zotero-ingest.md)
+- Final-paper source/Zotero handoff → [`references/zotero-ingest.md`](references/zotero-ingest.md)
 
 ## Supported entry modes
 
@@ -63,7 +63,7 @@ If the user supplies a confirmed topic, skip the topic-choice Gate and begin the
 
 ### Resume
 
-Read the manifest and existing `topic_selection.md`, `search_record.md`, `selected_paper.yaml`, and `source_manifest.json`. Resume from the first incomplete or update-required step; do not repeat a user Gate that has already been explicitly satisfied.
+Read the manifest and existing `topic_selection.md`, `search_record.md`, `selected_paper.yaml`, and `source_manifest.json`. Resume from the first incomplete or update-required academic dependency; do not repeat a user Gate that has already been explicitly satisfied. Zotero pending actions may be resumed separately after Search itself is complete.
 
 ## Required inputs
 
@@ -120,13 +120,22 @@ Present one Primary and normally about two Strong Alternatives when the literatu
 
 The user makes the final focal-paper decision. Before explicit confirmation, do not ingest a candidate as the selected focal archive and do not start Translation automatically.
 
-After confirmation, ordinary identity matching, legal-access Main/SI retrieval, normal Zotero parent/attachment actions, and selected-paper record creation are authorized. Stop only for duplicate ambiguity, DOI/title conflict, unresolved version conflict, or a true blocker.
+After confirmation, ordinary identity matching, legal-access Main/SI retrieval, normal Zotero parent/attachment actions where available, and selected-paper record creation are authorized. Stop only for duplicate ambiguity, DOI/title conflict, unresolved version conflict, or a true academic/source blocker.
 
-## Zotero and source package
+## Source package and archive handoff
 
-Only the final selected paper is formally ingested by default. Do not bulk-import the candidate pool.
+Only the final selected paper is formally handed off. Do not bulk-import the candidate pool.
 
-Use the Zotero ingest policy and current bridge capabilities. A successful request is not enough: verify parent/attachment identity. If write capability is unavailable, stage under `work/<paper_id>/handoff/`, record `pending_zotero_actions`, and mark the archive state `PROVISIONAL` rather than claiming success.
+The downstream academic requirement is an identified, usable source package—not a particular storage backend. Record Main/SI/version identity and known gaps in `selected_paper.yaml` / `source_manifest.json`.
+
+Zotero remains the preferred archive. When safe automatic or manual Zotero handling is available, verify parent/attachment identity. If Zotero is unavailable or automation is not live-validated:
+
+- continue Search completion when paper/source identity is otherwise sufficient;
+- stage files under `work/<paper_id>/handoff/` when a local runtime exists;
+- record concrete `pending_zotero_actions`;
+- never claim an attachment exists until verified.
+
+A **Zotero-only** pending action does not make Search `PROVISIONAL`. Search becomes `PROVISIONAL` only when a named source/SI/version/integrity gap affects the Search handoff itself.
 
 ## Outputs
 
@@ -149,7 +158,7 @@ Long-term decision history:
 
 Use only the shared state enum.
 
-Search may be `COMPLETE` only when:
+Search may be `COMPLETE` when:
 
 - topic confirmation is recorded or the topic was supplied directly;
 - search routes and screening decisions are auditable;
@@ -157,9 +166,12 @@ Search may be `COMPLETE` only when:
 - final paper confirmation is recorded;
 - selected paper identity/version has been checked;
 - `selected_paper.yaml` and `source_manifest.json` exist when a final paper is selected;
-- Zotero/source handoff is verified.
+- the source/package handoff is sufficient for the requested downstream scope;
+- unresolved archive actions, if any, are explicitly recorded rather than silently treated as success.
 
-Use `PROVISIONAL` when the academic selection is usable but a named source/SI/Zotero system gap remains. Use `BLOCKED` only when the missing dependency prevents defensible continuation.
+Zotero parent/attachment verification is an **archive-completion** condition, not a Search academic-completion condition.
+
+Use `PROVISIONAL` when the academic selection/handoff is usable but a named source, SI, version, integrity or evidence-package gap remains. Use `BLOCKED` only when the missing dependency prevents defensible continuation.
 
 ## Hard rules
 
@@ -172,3 +184,4 @@ Use `PROVISIONAL` when the academic selection is usable but a named source/SI/Zo
 - Do not bulk-download or bulk-ingest all candidates.
 - Keep external evidence distinct from the focal paper's own claims.
 - Preserve the chronology of Search-time decisions; later Deep Reading findings belong in a separate post-reading assessment or `needs_update` record.
+- Do not downgrade an otherwise complete Search solely because Zotero automation is unavailable.
