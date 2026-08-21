@@ -1,7 +1,7 @@
 # Search Record
 
 - Week: `2026-W34`
-- Search status: `WAITING_USER`
+- Search status: `PROVISIONAL`
 - Confirmed topic: `Cross-night test–retest reliability of macro- and micro-level PSG sleep EEG metrics`
 - Search date: `2026-08-21`
 - Workflow: targeted weekly search; not a systematic review / PRISMA search.
@@ -155,5 +155,22 @@ The search covered recent direct PSG reliability, multi-night home EEG, spindle-
 
 ## User-confirmed focal paper
 
-- Selected paper: `null`
-- Confirmation date: `null`
+- Selected paper: `Mullins et al. (2025), The stability of slow-wave sleep and EEG oscillations across two consecutive nights of laboratory polysomnography in cognitively normal older adults`
+- DOI: `10.1111/jsr.14281`
+- Confirmation date: `2026-08-21`
+- User decision: confirmed Primary recommendation.
+
+## Final Source Package Check
+
+- Publication identity: Journal of Sleep Research, 34(1), e14281; issue date February 2025; first published online 27 June 2024.
+- Authors: Anna E. Mullins, Shayna Pehel, Ankit Parekh, Korey Kam, Omonigho M. Bubu, Thomas M. Tolbert, David M. Rapoport, Indu Ayappa, Andrew W. Varga, Ricardo S. Osorio.
+- DOI: `10.1111/jsr.14281`; PMID `38937887`; PMCID `PMC11671611`.
+- Preferred source version: Wiley Version of Record for identity/citation; PMC author manuscript may be used as a legal-access working full-text source while preserving version distinction.
+- `SRC-S1`: Supporting Figure S1, Bland–Altman plots. Wiley filename `jsr14281-sup-0001-FigureS1.docx`; PMC counterpart `NIHMS2003008-supplement-SUP_INFO.docx`.
+- Conflict statement: no potential conflicts disclosed by the authors.
+- Data availability: data available from the corresponding author upon reasonable request.
+- Current integrity wording: current checks found no obvious retraction, expression of concern, correction, DOI conflict, or source-version conflict affecting focal use; this does not prove the underlying data are authentic.
+
+## Handoff Status
+
+The academic Search decision and Main/SI source package are complete. Zotero parent matching/creation and attachment cannot be executed from the current ChatGPT session because it cannot access the user's local Zotero Desktop instance. Those actions are recorded in `workflow_manifest.yaml` as `pending_zotero_actions`; therefore Search is `PROVISIONAL` rather than falsely marked `COMPLETE`.
