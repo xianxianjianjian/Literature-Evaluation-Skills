@@ -36,30 +36,32 @@ Git 不长期重复保存 A/B。Zotero 暂时不可用时，待挂接产物可�
 
 ## 当前开发阶段
 
-当前开发分支为 **Phase 6 — V1 Hardening / Release Preparation**。
+`phase-6-v1-hardening` 已封为 **V1 rule-layer / structural Release Candidate**：规则、状态、helper、合成验收、CI 与仓库 hygiene 已通过审核，但真实论文 Production validation 仍保持 OPEN。
 
-Phase 1–5 已累计完成四个 Skill 的 V1 规则层：Foundation → Literature Search → Paper Translation → Paper Deep Reading → Weekly Orchestration。Phase 6 不再扩展新的学术功能，重点是检查并补齐：
+当前隔离开发分支为 **Phase 7 — Zotero Write Adapter**。Phase 7 不改学术规则，只缩小 Zotero 生产集成缺口：
 
-- Skill rules ↔ shared contracts；
-- Skill rules ↔ knowledge schemas；
-- Skill rules ↔ workflow manifest；
-- Skill rules ↔ helper scripts；
-- deterministic tests / regression protection；
-- release 前的 capability boundary 与 branch hygiene。
+- bibliographic parent create：使用官方 Zotero Connector `/connector/saveItems`；
+- create 前先查重，写后必须通过只读 Local API 做 DOI/标题身份回查；
+- 没有 `--yes` 时 `create` 只预览，不执行写入；
+- local-file attach（Main/SI/A/B → 已有 parent）仍未实现，继续明确记录为 pending/provisional；
+- 不会因为 Connector 在线或 HTTP 201 就把整个 Zotero 档案标记 COMPLETE。
 
-当前已完成的 hardening 包括：
+详见 [`docs/zotero-write-adapter.md`](docs/zotero-write-adapter.md)。
 
-- `workflow_state.py` 升级为 V1 manifest helper，支持 `paper_id`、全阶段 `needs_update`、A/B/C 状态、`blocking_issues`、`pending_zotero_actions`、source-check date，以及两个固定 `WAITING_USER` Gate 的语义校验；
-- `history_manager.py` 保留 Selection 同周去重/跨周允许，并在写入 `reading_history.csv` 前机械验证 `Deep Reading = COMPLETE`、无未解决更新/阻塞且 B 已完成挂接；
-- `validate_deliverables.py` 升级为 V1 结构验证器，检查 19 个 specialist references、A PDF、B DOCX Base Schema、C 必填字段/评论字数/Canonical Abstract 一致性及关键 manifest 完成关系；
-- `mirror_pdf.py` 升级为 V1 确定性 layout/QC helper，并明确 `Strict Mirror → Adaptive Mirror → Readable Extension` 与 render-first QA；
-- `zotero_bridge.py` 明确区分 Local API 只读能力、Connector server 可用性和尚未验证的写适配器，不会伪造 `create/attach` 成功；
-- 增加 `tests/test_core.py`、`tests/test_acceptance_scenarios.py` 和 GitHub Actions `V1 Smoke Tests`；
-- 增加 branch、CI、hardening 和 release checklist 文档。
+## 已完成的 V1 hardening
+
+- `workflow_state.py`：V1 manifest、`paper_id`、`needs_update`、A/B/C、blockers、pending Zotero、source-check date、两个固定 Gate；
+- `history_manager.py`：Selection 同周去重/跨周允许；`reading_history.csv` 仅允许真实 `Deep Reading = COMPLETE`；
+- `terminology_registry.py`：`lookup / add / update / context / status / export`，上下文术语身份与历史保留；
+- `validate_deliverables.py`：19 个 specialist references、A/B/C 结构、Canonical Abstract、comment 字数和 full-workflow closure；
+- `mirror_pdf.py`：`Strict Mirror → Adaptive Mirror → Readable Extension` 与 render-first QA；
+- GitHub Actions：Python 3.11 / 3.12 smoke tests；
+- synthetic T01–T04、specialist-only、Resume、Zotero downgrade、new-SI update；
+- real Mullins 2025 blocked/provisional trace 的 CI 防回退保护。
 
 ## Branch 关系
 
-本仓库的 Phase 分支是**累积式里程碑**，不是互相独立的多套实现：
+Phase 分支是**累积式里程碑**，不是互相独立的实现：
 
 ```text
 main
@@ -74,16 +76,18 @@ phase-4-deep-reading
   ↓
 phase-5-orchestration
   ↓
-phase-6-v1-hardening
+phase-6-v1-hardening        ← sealed rule-layer RC
+  ↓
+phase-7-zotero-write-adapter ← isolated integration work
 ```
 
-因此最终通过验收后，通常只需要把最新的已接受累积分支合入 `main`，无需逐个再次合并 Phase 1→5。详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)。
+`main` 仍保持初始提交，等待明确的 release 决策。不要逐个重新 merge Phase 1–5；最终只合入被接受的最新累积线。
 
 ## 自动验证状态
 
-Draft PR #1 (`phase-6-v1-hardening → main`) 作为 release-candidate 审核/CI 容器，不代表已授权合并。
+Draft PR #1 (`phase-6-v1-hardening → main`) 是 Phase 6 RC 的审核/CI 容器，不代表已授权合并。
 
-`V1 Smoke Tests` 已在 Python 3.11 和 3.12 上实际通过，包括：
+Phase 6 exact-head `V1 Smoke Tests` 已在 Python 3.11 和 3.12 实际通过：
 
 ```bash
 python -m compileall scripts tests
@@ -91,23 +95,31 @@ python -m unittest discover -s tests -v
 python scripts/validate_deliverables.py --repo-root .
 ```
 
-无版权合成验收场景已经覆盖 T01–T04 的状态/布局合同，以及 Search-only、Translation-only、Deep-Reading-only、Resume、Zotero downgrade 和 new-SI `needs_update`。这些测试只证明结构与 helper 行为，不替代真实论文科学验收。
+Phase 7 使用独立 PR/CI 验证 Zotero parent-create adapter；mock 测试不能代替未来在用户本地 Zotero Desktop 上的 live write verification。
 
 ## 真实验收状态
 
 真实 Mullins et al. (2025), DOI `10.1111/jsr.14281` 端到端测试已主动暂停，但测试现场保留在 `weekly_reviews/2026/2026-W34/`。
 
-该验收已经完成 Topic → Search → Screening → Paper Selection。当前环境无法取得用于逐页镜像的 Main PDF 二进制，因此 manifest 仍准确保留 `Translation = BLOCKED` 和 `A = BLOCKED`；没有为了开发进度伪造完成状态。
+已完成 Topic → Search → Screening → Paper Selection。当前环境无法取得用于逐页镜像的 Main PDF，因此 manifest 仍准确保持：
 
-未来取得 Main PDF 后，应直接从该 manifest 恢复，不重新执行已经通过的 Topic/Paper Gates。
+```text
+Search = PROVISIONAL
+Translation = BLOCKED
+A = BLOCKED
+Deep Reading = NOT_STARTED
+```
 
-## 当前尚未关闭的 V1 集成点
+未来取得 Main PDF 后，应从该 manifest 继续，不重复已经满足的用户 Gate。
 
-- **真实论文科学验收**：真实 T01–T04、A 的视觉镜像 QA、B 的证据闭环和真实 weekly C 仍待完整源包执行。
-- **Zotero 写入适配器**：Zotero Desktop Local API 只读；`create / attach` 仍需在目标运行环境中通过受支持且可验证的 Connector/plugin write route 实现并验证，不能假装成功。
-- **Mirror PDF 能力边界**：`mirror_pdf.py` 是确定性布局/QC辅助器，不是出版社级全自动重排引擎；真正 A 仍必须 render → inspect → iterate → re-render。
+## 当前尚未关闭的 Production gates
 
-详见 [`docs/v1-release-checklist.md`](docs/v1-release-checklist.md)。
+- 真实 T01–T04 学术验收；
+- A 的真实 render → inspect → iterate → re-render；
+- B 的真实 evidence/source-anchor closure；
+- C 的真实 Canonical Abstract/comment/reviewer 验收；
+- Zotero local-file attachment adapter 及 Main/SI/A/B post-write verification；
+- Phase 7 parent-create adapter 的真实本地 Zotero live verification。
 
 ## V1 / V2 边界
 
@@ -120,4 +132,5 @@ python -m compileall scripts tests
 python -m unittest discover -s tests -v
 python scripts/validate_deliverables.py --repo-root .
 python scripts/workflow_state.py --help
+python scripts/zotero_bridge.py --help
 ```
