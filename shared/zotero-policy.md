@@ -1,6 +1,6 @@
 # Zotero Policy
 
-一个正式书目 parent item 等于一篇论文的长期研究档案中心。普通 Search 候选不应全部塞入 Zotero；只有用户最终确认精读的论文才正式入库。
+Zotero 是本项目**首选的长期研究档案中心**，但不是 V1 学术工作流能够运行和完成的前置依赖。普通 Search 候选不应全部塞入 Zotero；只有用户最终确认精读的论文才进入正式归档流程。
 
 ## 推荐附件名称
 
@@ -11,84 +11,102 @@
 [B] 文献研究笔记·完整精读版
 ```
 
-Main、SI、A 和 B 由 Zotero 长期管理。Git 保存 Skills、knowledge、Search 历史、C 和工作流状态，不长期重复保存 A/B。
+长期目标仍是由 Zotero 管理 Main、SI、A 和 B；Git 保存 Skills、knowledge、Search 历史、C 和工作流状态，不长期重复保存 A/B。
+
+## V1 核心原则：归档不能卡死学术工作
+
+只要 Main/SI 等源证据本身已经可用，Zotero 不可访问、自动写入失败、Local API 尚未完成本机验证或用户选择手动挂接，都**不得单独阻止**：
+
+- Search 学术阶段完成；
+- Translation/A 完成；
+- Deep Reading/B/C 完成；
+- completed reading 写入 `knowledge/reading_history.csv`。
+
+这些情况必须改为单独记录归档待办：
+
+```text
+pending_zotero_actions
+```
+
+并在可用的本地运行时暂存到：
+
+```text
+work/<paper_id>/handoff/
+```
+
+阶段 `PROVISIONAL/BLOCKED` 应由真正影响学术完整性的来源、SI、版本、证据或产物问题触发，而不是仅因为 Zotero 自动化不可用。
+
+## Academic completion 与 Archive completion
+
+### Academic completion
+
+A/B/C 本身及其 QC、证据链、来源身份和必需知识记录通过即可形成学术完成状态。A/B 的 `zotero_attachment_key` 可以暂时为 `null`，但必须有真实文件/工作产物和明确的 pending archive record。
+
+### Archive completion
+
+若用户要求“完整 Zotero 归档”，则额外要求：
+
+- 所需 parent 可观察且身份匹配；
+- Main/SI/A/B 中适用的 attachment 实际存在；
+- attachment key 已验证；
+- 版本关系没有静默混淆；
+- 相应 `pending_zotero_actions` 已清除。
+
+不得因为学术工作已经完成就声称 Zotero 归档完成。
 
 ## Parent 与附件规则
 
 - 先通过 DOI 等正式身份字段匹配 parent，防止明显重复。
 - 不同版本不得静默覆盖；版本关系写入 source manifest。
-- 每个附件记录其 parent item key、attachment key、来源类型与校验状态。
+- 每个已验证附件记录 parent item key、attachment key、来源类型与校验状态。
 - Zotero 写入必须验证真实返回结果；请求已发送、HTTP 2xx、Connector/Local API 在线都不等于归档成功。
-- 同名附件不得静默覆盖。完全相同的 title + filename + MD5 可幂等复用；断点留下的空 attachment child 可继续上传；同名但不同文件必须停为冲突。
+- 同名附件不得静默覆盖。完全相同的 title + filename + MD5 可幂等复用；同名但不同文件必须停为冲突。
+- 手动在 Zotero 中完成 parent/attachment 并随后验证，也属于 V1 可接受的操作路径；V1 不强制所有归档动作必须自动化。
 
-## V1 写入能力边界
+## 当前自动化能力：可选增强，不是 release blocker
 
-### Zotero 10+ Local API
+仓库保留 Zotero 自动化 helper 作为可选集成和后续优化基础。
 
-Zotero 10+ 的 Local API v3 支持本地写入与完整文件上传。V1 的 durable existing-parent attachment 路径使用该能力，而不是依赖短生命周期 Connector session。
+### Parent create
 
-写入安全合同：
+现有 `scripts/zotero_bridge.py create` 使用 Zotero Connector `/connector/saveItems`，执行前查重，写后要求身份回查。该路径可继续使用，但其 group-library/selected-target 统一问题属于后续优化，不阻止 V1 核心 Skill 发布。
 
-1. 先从 Local API discovery 响应取得 `Zotero-Server-ID`；
-2. 写入通过 `/api/local/authorize` 请求 Zotero Desktop 本机授权；
-3. Local API key 只保存在当前进程内，不打印、不写入 Git、manifest、日志或配置文件；
-4. 临时授权 key 按单次写入处理；用户在 Zotero 中选择长期允许时，进程内可复用对应授权；
-5. 写入和写后验证绑定同一 `Zotero-Server-ID`，数据库身份变化必须停止而不是继续写；
-6. attachment 只有在 parent、filename 与 MD5 均回查一致后才可记为已验证。
+### Zotero 10+ Local API attachment
 
-`scripts/zotero_bridge.py attach` 的默认行为是预览；只有显式 `--yes` 才会请求本机授权并执行写入。
+`scripts/zotero_bridge.py attach` 和 Local API helper 已实现 Zotero 10+ existing-parent durable attachment 的协议/mock/CI 版本，包括本机授权、Server-ID、full upload、MD5/parent/filename 回查、幂等与冲突保护。
 
-### Bibliographic parent create
+但真实用户桌面端 live validation 仍属于后续集成验收。V1 运行时可以：
 
-Phase 7 已验证的 parent-create 路径继续保留：`scripts/zotero_bridge.py create` 使用官方 Connector `/connector/saveItems`，执行前查重并解析保存目标，执行后通过 Local API 按 DOI/标题回查。只有唯一匹配时才记录 `CREATED_AND_VERIFIED` 和 parent item key。
-
-### Durable local-file attach
-
-Phase 8 为 Zotero 10+ 实现 existing-parent attachment：
-
-```text
-existing parent
-→ create/reuse attachment child
-→ request full-upload authorization
-→ upload file bytes
-→ register uploadKey
-→ server-bound read-after-write verification
-→ ATTACHED_AND_VERIFIED
-```
-
-支持 Main/SI/A/B 后续独立挂接，因此不要求 parent 与附件处于同一 Connector session。
-
-默认 library prefix 是 `users/0`。只有明确知道目标 group library 且拥有相应编辑/文件权限时，才使用 `groups/<numeric-group-id>`。
-
-当前 helper 自设单文件 256 MiB 安全上限；这是项目侧限制，不应表述为 Zotero 的官方最大文件大小。
+1. 自动写入并验证（环境支持时）；
+2. 自动写入失败后转 pending；
+3. 由用户/操作方手动挂接后再验证；
+4. 暂时保留 handoff 文件，不影响学术流程完成。
 
 ## 完成语义
 
 不得折叠以下层级：
 
 ```text
-Local API/Connector reachable
+academic artifact COMPLETE
+≠ Zotero reachable
 ≠ write authorization granted
-≠ item/attachment child created
-≠ file bytes registered
+≠ item/attachment created
 ≠ attachment identity verified
 ≠ full Zotero archive COMPLETE
 ```
 
-`ATTACHED_AND_VERIFIED` 或 `ALREADY_ATTACHED_AND_VERIFIED` 才能提供可用于 manifest/source record 的已验证 attachment key。
+`ATTACHED_AND_VERIFIED` 或 `ALREADY_ATTACHED_AND_VERIFIED` 才能提供可用于 archive-complete 判定的已验证 attachment key。
 
-如果写入过程中 child 已创建但文件上传未完成，返回 `ATTACHMENT_FILE_UPLOAD_INCOMPLETE` 并保留 child key 作为恢复线索；不得标记 COMPLETE。
+如果写入过程中 child 已创建但文件上传未完成，应保留恢复线索并继续作为 pending archive action；不得假装归档成功，但也不得因此抹掉已经通过 QC 的 A/B 学术完成状态。
 
-## Zotero 不可用或当前运行时不满足写入条件时
+## 恢复与后续优化
 
-待挂接文件可暂存于：
+恢复会话时优先处理真正影响学术证据链的 blocker。Zotero pending actions 可以在学术工作完成后单独批量清理。
 
-```text
-work/<paper_id>/handoff/
-```
+以下属于后续可优化项而不是 V1 release blocker：
 
-当周 `workflow_manifest.yaml.pending_zotero_actions` 必须记录待执行动作、目标 parent、文件、期望附件名和失败原因。恢复后逐项验证并清除，禁止 silent failure。
-
-如果运行的是不具备 Zotero 10+ Local API 写能力的环境，或用户拒绝本机授权，attachments 保持 pending/PROVISIONAL；不得自动退回到未验证的写接口。
-
-父条目创建成功不等于论文档案完整：Main/SI/A/B 的 attachment key 仍需分别验证。
+- parent create 全面迁移到 Local API；
+- user/group library 统一路由；
+- 真实 Zotero Desktop live write acceptance；
+- collection 自动定位；
+- 更完善的归档 reconciliation/repair 工具。
