@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -17,9 +18,20 @@ import zotero_local_write as local
 
 class AttachmentPlanningTests(unittest.TestCase):
     def _descriptor(self) -> dict:
-        return {"filename": "paper.pdf", "md5": "abcd"}
+        return {
+            "filename": "paper.pdf",
+            "md5": "abcd",
+            "content_type": "application/pdf",
+        }
 
-    def _child(self, *, key="ATCH0001", filename="", md5="", title="[A] Translation") -> dict:
+    def _child(
+        self,
+        *,
+        key="ATCH0001",
+        filename="paper.pdf",
+        md5=None,
+        title="[A] Translation",
+    ) -> dict:
         return {
             "key": key,
             "data": {
@@ -49,14 +61,32 @@ class AttachmentPlanningTests(unittest.TestCase):
         self.assertEqual(plan["action"], "ALREADY_VERIFIED")
         self.assertEqual(plan["candidate"]["key"], "ATCH0001")
 
-    def test_empty_same_title_child_is_reused_after_interruption(self) -> None:
+    def test_template_child_with_filename_and_null_md5_is_reused(self) -> None:
         plan = archive.plan_attachment(
-            [self._child()],
+            [self._child(filename="paper.pdf", md5=None)],
             parent_key="PARENT01",
             title="[A] Translation",
             descriptor=self._descriptor(),
         )
         self.assertEqual(plan["action"], "REUSE_PARTIAL")
+
+    def test_legacy_empty_child_is_also_reused(self) -> None:
+        plan = archive.plan_attachment(
+            [self._child(filename="", md5=None)],
+            parent_key="PARENT01",
+            title="[A] Translation",
+            descriptor=self._descriptor(),
+        )
+        self.assertEqual(plan["action"], "REUSE_PARTIAL")
+
+    def test_null_md5_with_different_filename_is_conflict(self) -> None:
+        plan = archive.plan_attachment(
+            [self._child(filename="other.pdf", md5=None)],
+            parent_key="PARENT01",
+            title="[A] Translation",
+            descriptor=self._descriptor(),
+        )
+        self.assertEqual(plan["action"], "CONFLICT")
 
     def test_same_title_different_file_is_conflict(self) -> None:
         plan = archive.plan_attachment(
@@ -77,6 +107,43 @@ class AttachmentPlanningTests(unittest.TestCase):
         )
         self.assertEqual(plan["action"], "CONFLICT")
         self.assertEqual(plan["reason"], "MULTIPLE_SAME_TITLE_ATTACHMENTS")
+
+
+class AttachmentTemplateTests(unittest.TestCase):
+    def test_new_child_uses_v3_imported_file_template_fields(self) -> None:
+        client = local.LocalWriteClient(
+            api_base_url=local.DEFAULT_API_BASE_URL,
+            server_id="SERVER123",
+            api_key="KEY",
+            remembered=True,
+        )
+        descriptor = {
+            "filename": "paper.pdf",
+            "content_type": "application/pdf",
+        }
+        with patch.object(local, "create_item", return_value="ATCH1234") as create:
+            key = archive.create_attachment_child(
+                client,
+                "users/0",
+                parent_key="PARENT01",
+                title="[ORIGINAL] Main Article",
+                descriptor=descriptor,
+            )
+        self.assertEqual(key, "ATCH1234")
+        item = create.call_args.args[2]
+        self.assertEqual(item["itemType"], "attachment")
+        self.assertEqual(item["linkMode"], "imported_file")
+        self.assertEqual(item["parentItem"], "PARENT01")
+        self.assertEqual(item["contentType"], "application/pdf")
+        self.assertEqual(item["filename"], "paper.pdf")
+        self.assertEqual(item["charset"], "")
+        self.assertEqual(item["accessDate"], "")
+        self.assertEqual(item["url"], "")
+        self.assertEqual(item["note"], "")
+        self.assertIsNone(item["md5"])
+        self.assertIsNone(item["mtime"])
+        self.assertEqual(item["tags"], [])
+        self.assertEqual(item["relations"], {})
 
 
 class DurableAttachmentTests(unittest.TestCase):
@@ -102,8 +169,10 @@ class DurableAttachmentTests(unittest.TestCase):
                 "parentItem": "PARENT01",
                 "linkMode": "imported_file",
                 "title": "[ORIGINAL] Main Article",
-                "filename": "",
+                "contentType": "application/pdf",
+                "filename": "paper.pdf",
                 "md5": None,
+                "mtime": None,
             },
         }
 
@@ -114,7 +183,7 @@ class DurableAttachmentTests(unittest.TestCase):
             with (
                 patch.object(archive, "read_parent", return_value={"data": {"itemType": "journalArticle"}}),
                 patch.object(archive, "read_children", return_value=[]),
-                patch.object(local, "create_attachment_item", return_value="ATCH0001") as create,
+                patch.object(archive, "create_attachment_child", return_value="ATCH0001") as create,
                 patch.object(local, "upload_file_to_attachment", return_value=(local.file_descriptor(path), verified)) as upload,
             ):
                 result = archive.attach_file(
@@ -136,7 +205,7 @@ class DurableAttachmentTests(unittest.TestCase):
             with (
                 patch.object(archive, "read_parent", return_value={}),
                 patch.object(archive, "read_children", return_value=[self._partial_child()]),
-                patch.object(local, "create_attachment_item") as create,
+                patch.object(archive, "create_attachment_child") as create,
                 patch.object(
                     local,
                     "upload_file_to_attachment",
@@ -166,7 +235,7 @@ class DurableAttachmentTests(unittest.TestCase):
             with (
                 patch.object(archive, "read_parent", return_value={}),
                 patch.object(archive, "read_children", return_value=[existing]),
-                patch.object(local, "create_attachment_item") as create,
+                patch.object(archive, "create_attachment_child") as create,
                 patch.object(local, "upload_file_to_attachment") as upload,
             ):
                 result = archive.attach_file(
@@ -190,7 +259,7 @@ class DurableAttachmentTests(unittest.TestCase):
             with (
                 patch.object(archive, "read_parent", return_value={}),
                 patch.object(archive, "read_children", return_value=[existing]),
-                patch.object(local, "create_attachment_item") as create,
+                patch.object(archive, "create_attachment_child") as create,
                 patch.object(local, "upload_file_to_attachment") as upload,
             ):
                 result = archive.attach_file(
@@ -210,7 +279,7 @@ class DurableAttachmentTests(unittest.TestCase):
             with (
                 patch.object(archive, "read_parent", return_value={}),
                 patch.object(archive, "read_children", return_value=[]),
-                patch.object(local, "create_attachment_item", return_value="ATCHFAIL"),
+                patch.object(archive, "create_attachment_child", return_value="ATCHFAIL"),
                 patch.object(
                     local,
                     "upload_file_to_attachment",
