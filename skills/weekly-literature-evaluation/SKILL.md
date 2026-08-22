@@ -25,9 +25,10 @@ Before changing weekly workflow state, read:
 - [`../../shared/source-identity-policy.md`](../../shared/source-identity-policy.md)
 - [`../../shared/zotero-policy.md`](../../shared/zotero-policy.md)
 - [`../../shared/identifier-policy.md`](../../shared/identifier-policy.md)
+- [`../../shared/workspace-contract.md`](../../shared/workspace-contract.md)
 - [`references/workflow-routing.md`](references/workflow-routing.md)
 
-Use `weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the single workflow source of truth.
+Resolve and initialize `<data-root>` through the workspace contract before any write. Use `<data-root>/weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the single workflow source of truth.
 
 ## Intent classification
 
@@ -183,7 +184,7 @@ Preferred Zotero child labels:
 - `[A] 中文全文翻译镜像版`
 - `[B] 文献研究笔记·完整精读版`
 
-If Zotero is unavailable, use `work/<paper_id>/handoff/` when a local runtime exists and preserve `pending_zotero_actions`. Manual Zotero handoff followed by verification is acceptable. Never claim an attachment was created until verified.
+If Zotero is unavailable, use `<data-root>/work/<paper_id>/handoff/` when a local runtime exists and preserve `pending_zotero_actions`. Manual Zotero handoff followed by verification is acceptable. Never claim an attachment was created until verified.
 
 ## A/B/C contract
 
@@ -197,12 +198,12 @@ The router verifies required state/paths and reports archive status, but does no
 
 The router may coordinate updates to:
 
-- `knowledge/selection_log.csv`
-- `knowledge/reading_history.csv`
+- `<data-root>/knowledge/selection_log.csv`
+- `<data-root>/knowledge/reading_history.csv`
 - terminology registries through the Translation workflow
 - weekly manifest and C path
 
-`knowledge/research_profile.md` may only change after explicit user approval. Specialist Skills may propose an update, but the router must not silently accept it.
+`<data-root>/knowledge/research_profile.md` may only change after explicit user approval. Specialist Skills may propose an update, but the router must not silently accept it.
 
 A completed Deep Reading can enter `reading_history.csv` even if Zotero keys are not yet available; archive key fields may remain empty until later reconciliation.
 

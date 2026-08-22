@@ -145,7 +145,7 @@ Every `A3` must appear prominently in B and in C when it affects the weekly eval
 
 ## Readiness and completeness
 
-Use two separate concepts:
+Use separate concepts for academic evidence and archive transport.
 
 ### Readiness for Deep Reading
 
@@ -153,19 +153,23 @@ Use two separate concepts:
 - `READY_WITH_GAPS`
 - `BLOCKED`
 
-### Final archive completeness
+### Academic completeness
 
 - `COMPLETE`
 - `PROVISIONAL`
 
-A paper may be readable with gaps but still remain `PROVISIONAL` because consequential SI, source identity, or attachment verification is missing.
+A paper may be readable with gaps but remain academically `PROVISIONAL` only when a consequential Main/SI/source-version/evidence/content gap affects the requested research archive. Missing Zotero parent or attachment verification does **not** by itself make Deep Reading academically provisional.
+
+### Zotero archive closure
+
+Track Zotero parent/attachment verification separately as `COMPLETE` or pending according to the shared Zotero policy. Archive pending may coexist with academically `COMPLETE` Deep Reading.
 
 ## Audit artifacts
 
 Maintain when the working environment supports them:
 
-- `work/<paper_id>/audit_log.jsonl`
-- `work/<paper_id>/claim_evidence_map.csv`
+- `<data-root>/work/<paper_id>/audit_log.jsonl`
+- `<data-root>/work/<paper_id>/claim_evidence_map.csv`
 
 Suggested audit log fields:
 

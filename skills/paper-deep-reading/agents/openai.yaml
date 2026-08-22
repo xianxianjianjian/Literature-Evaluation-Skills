@@ -1,0 +1,6 @@
+interface:
+  display_name: "Paper Deep Reading"
+  short_description: "Audit and reconstruct papers with traceable evidence"
+  default_prompt: "Use $paper-deep-reading to audit and deeply read this academic paper."
+policy:
+  allow_implicit_invocation: true

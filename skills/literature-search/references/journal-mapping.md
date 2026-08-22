@@ -30,7 +30,7 @@ Impact factor or other citation metrics may be contextual information, but must 
 
 ## Registry
 
-Stable observations may be recorded in `knowledge/journal_registry.csv` with status:
+Stable observations may be recorded in `<data-root>/knowledge/journal_registry.csv` with status:
 
 - `ACTIVE`;
 - `CAUTION`;

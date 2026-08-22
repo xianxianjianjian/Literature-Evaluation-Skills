@@ -3,7 +3,7 @@
 当周唯一工作流事实来源是：
 
 ```text
-weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml
+<data-root>/weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml
 ```
 
 不得再维护第二份全局 `status.yaml`。每个状态变化必须写回该 manifest，恢复流程必须先读取它和现有产物。

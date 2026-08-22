@@ -17,25 +17,29 @@ from dataclasses import dataclass
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from runtime_paths import resolve_data_root
 from workflow_state import WorkflowStateError, load_manifest
 
-REQUIRED_DIRECTORIES = [
+PLUGIN_REQUIRED_DIRECTORIES = [
     "skills/weekly-literature-evaluation/references",
     "skills/literature-search/references",
     "skills/paper-translation/references",
     "skills/paper-deep-reading/references",
     "shared",
-    "knowledge",
     "scripts",
-    "weekly_reviews",
+    "assets/workspace-template/knowledge",
+    "assets/workspace-template/weekly_reviews",
 ]
-REQUIRED_FILES = [
+PLUGIN_REQUIRED_FILES = [
     "README.md",
     ".gitignore",
+    ".codex-plugin/plugin.json",
     "docs/v1-scope-freeze.md",
     "skills/weekly-literature-evaluation/SKILL.md",
+    "skills/weekly-literature-evaluation/agents/openai.yaml",
     "skills/weekly-literature-evaluation/references/workflow-routing.md",
     "skills/literature-search/SKILL.md",
+    "skills/literature-search/agents/openai.yaml",
     "skills/literature-search/references/topic-planning.md",
     "skills/literature-search/references/journal-mapping.md",
     "skills/literature-search/references/search-strategy.md",
@@ -43,6 +47,7 @@ REQUIRED_FILES = [
     "skills/literature-search/references/integrity-check.md",
     "skills/literature-search/references/zotero-ingest.md",
     "skills/paper-translation/SKILL.md",
+    "skills/paper-translation/agents/openai.yaml",
     "skills/paper-translation/references/terminology-policy.md",
     "skills/paper-translation/references/abstract-translation.md",
     "skills/paper-translation/references/fulltext-translation.md",
@@ -50,6 +55,7 @@ REQUIRED_FILES = [
     "skills/paper-translation/references/mirror-layout.md",
     "skills/paper-translation/references/translation-qc.md",
     "skills/paper-deep-reading/SKILL.md",
+    "skills/paper-deep-reading/agents/openai.yaml",
     "skills/paper-deep-reading/references/source-audit.md",
     "skills/paper-deep-reading/references/introduction-reconstruction.md",
     "skills/paper-deep-reading/references/methods-reconstruction.md",
@@ -63,6 +69,23 @@ REQUIRED_FILES = [
     "shared/zotero-policy.md",
     "shared/state-contract.md",
     "shared/data-format-policy.md",
+    "shared/workspace-contract.md",
+    "scripts/zotero_bridge.py",
+    "scripts/terminology_registry.py",
+    "scripts/history_manager.py",
+    "scripts/workflow_state.py",
+    "scripts/validate_deliverables.py",
+    "scripts/mirror_pdf.py",
+    "scripts/runtime_paths.py",
+    "scripts/init_workspace.py",
+    "scripts/build_plugin_bundle.py",
+]
+WORKSPACE_REQUIRED_DIRECTORIES = [
+    "knowledge",
+    "weekly_reviews",
+    "work",
+]
+WORKSPACE_REQUIRED_FILES = [
     "knowledge/research_profile.md",
     "knowledge/submission_profile.yaml",
     "knowledge/journal_registry.csv",
@@ -70,12 +93,6 @@ REQUIRED_FILES = [
     "knowledge/terminology_evidence.jsonl",
     "knowledge/reading_history.csv",
     "knowledge/selection_log.csv",
-    "scripts/zotero_bridge.py",
-    "scripts/terminology_registry.py",
-    "scripts/history_manager.py",
-    "scripts/workflow_state.py",
-    "scripts/validate_deliverables.py",
-    "scripts/mirror_pdf.py",
 ]
 CSV_HEADERS = {
     "journal_registry.csv": "Journal,Field,Scope,Publisher,Peer_Reviewed,Priority,Strength,Caution,Status,Verified_Date".split(","),
@@ -120,22 +137,38 @@ class Check:
     detail: str
 
 
-def load_profile(root: Path) -> dict:
+def load_profile(data_root: Path) -> dict:
     return json.loads(
-        (root / "knowledge" / "submission_profile.yaml").read_text(encoding="utf-8")
+        (data_root / "knowledge" / "submission_profile.yaml").read_text(encoding="utf-8")
     )
 
 
-def check_foundation(root: Path) -> list[Check]:
+def check_foundation(
+    plugin_root: Path,
+    data_root: Path | None = None,
+    *,
+    require_workspace_marker: bool = False,
+) -> list[Check]:
+    """Validate immutable plugin resources and a separate writable data root."""
+    data_root = plugin_root if data_root is None else data_root
     checks: list[Check] = []
-    for relative in REQUIRED_DIRECTORIES:
-        exists = (root / relative).is_dir()
-        checks.append(Check(f"directory:{relative}", exists, "present" if exists else "missing"))
-    for relative in REQUIRED_FILES:
-        exists = (root / relative).is_file()
-        checks.append(Check(f"file:{relative}", exists, "present" if exists else "missing"))
+    for relative in PLUGIN_REQUIRED_DIRECTORIES:
+        exists = (plugin_root / relative).is_dir()
+        checks.append(Check(f"plugin-directory:{relative}", exists, "present" if exists else "missing"))
+    for relative in PLUGIN_REQUIRED_FILES:
+        exists = (plugin_root / relative).is_file()
+        checks.append(Check(f"plugin-file:{relative}", exists, "present" if exists else "missing"))
+    for relative in WORKSPACE_REQUIRED_DIRECTORIES:
+        exists = (data_root / relative).is_dir()
+        checks.append(Check(f"workspace-directory:{relative}", exists, "present" if exists else "missing"))
+    for relative in WORKSPACE_REQUIRED_FILES:
+        exists = (data_root / relative).is_file()
+        checks.append(Check(f"workspace-file:{relative}", exists, "present" if exists else "missing"))
+    if require_workspace_marker:
+        marker = data_root / "workspace.json"
+        checks.append(Check("workspace-file:workspace.json", marker.is_file(), "present" if marker.is_file() else "missing"))
     try:
-        profile = load_profile(root)
+        profile = load_profile(data_root)
         weekly = profile.get("weekly_review", {})
         valid = (
             profile.get("schema_version") == 1
@@ -149,7 +182,7 @@ def check_foundation(root: Path) -> list[Check]:
     except (OSError, json.JSONDecodeError, TypeError) as exc:
         checks.append(Check("submission_profile", False, str(exc)))
     for name, expected in CSV_HEADERS.items():
-        path = root / "knowledge" / name
+        path = data_root / "knowledge" / name
         if not path.is_file():
             continue
         try:
@@ -332,7 +365,7 @@ def check_c(root: Path, path: Path | None, required: bool, canonical_abstract: P
     if not path.is_file() or path.stat().st_size == 0:
         return [Check("artifact:C", False, f"missing or empty: {path}")]
     if path.suffix.lower() not in {".md", ".markdown"}:
-        return [Check("artifact:C", False, "C must be Markdown in weekly_reviews/")]
+        return [Check("artifact:C", False, "C must be Markdown in <data-root>/weekly_reviews/")]
     try:
         markdown = path.read_text(encoding="utf-8")
         profile = load_profile(root)["weekly_review"]
@@ -366,7 +399,21 @@ def check_c(root: Path, path: Path | None, required: bool, canonical_abstract: P
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Legacy compatibility: use one root for plugin resources and writable data.",
+    )
+    parser.add_argument(
+        "--plugin-root",
+        type=Path,
+        help="Installed plugin root. Defaults to the parent of this script.",
+    )
+    parser.add_argument(
+        "--workspace-root",
+        type=Path,
+        help="Writable data root. Defaults to env override or .literature-evaluation/.",
+    )
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--a-path", type=Path)
     parser.add_argument("--b-path", type=Path)
@@ -395,7 +442,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    root = args.repo_root.resolve()
+    if args.repo_root is not None and (
+        args.plugin_root is not None or args.workspace_root is not None
+    ):
+        print("[FAIL] roots: --repo-root cannot be combined with --plugin-root or --workspace-root")
+        return 1
+    legacy_mode = args.repo_root is not None
+    if legacy_mode:
+        plugin_root = args.repo_root.resolve()
+        data_root = plugin_root
+    else:
+        plugin_root = (
+            args.plugin_root.resolve()
+            if args.plugin_root is not None
+            else Path(__file__).resolve().parents[1]
+        )
+        data_root = resolve_data_root(args.workspace_root)
     requires_manifest = (
         args.require_academic_complete
         or args.require_archive_complete
@@ -404,7 +466,11 @@ def main(argv: list[str] | None = None) -> int:
     if requires_manifest and args.manifest is None:
         print("[FAIL] workflow: completion checks require --manifest")
         return 1
-    checks = check_foundation(root)
+    checks = check_foundation(
+        plugin_root,
+        data_root,
+        require_workspace_marker=not legacy_mode,
+    )
     if args.manifest:
         checks.extend(
             check_manifest(
@@ -416,7 +482,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     checks.append(check_pdf(args.a_path, args.require_a))
     checks.append(check_docx_b(args.b_path, args.require_b))
-    checks.extend(check_c(root, args.c_path, args.require_c, args.canonical_abstract))
+    checks.extend(check_c(data_root, args.c_path, args.require_c, args.canonical_abstract))
     for check in checks:
         print(f"[{'PASS' if check.passed else 'FAIL'}] {check.name}: {check.detail}")
     failures = sum(not check.passed for check in checks)

@@ -1,4 +1,6 @@
-work/
+work/*
+!work/.gitkeep
+dist/
 __pycache__/
 *.pyc
 *.pyo

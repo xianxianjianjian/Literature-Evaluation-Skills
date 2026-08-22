@@ -6,9 +6,9 @@ Topic planning is a distinct pre-search stage. Do not begin formal literature re
 
 Before proposing topics, read when available:
 
-- `knowledge/research_profile.md`;
-- `knowledge/reading_history.csv`;
-- recent `knowledge/selection_log.csv` entries;
+- `<data-root>/knowledge/research_profile.md`;
+- `<data-root>/knowledge/reading_history.csv`;
+- recent `<data-root>/knowledge/selection_log.csv` entries;
 - prior weekly `topic_selection.md`, `search_record.md`, and Open Questions / Next Reading Direction;
 - explicit constraints in the current request.
 
@@ -45,7 +45,7 @@ For each candidate record:
 
 The user retains final topic authority. Before confirmation:
 
-- write/update `weekly_reviews/YYYY/YYYY-Wxx/topic_selection.md`;
+- write/update `<data-root>/weekly_reviews/YYYY/YYYY-Wxx/topic_selection.md`;
 - set the manifest topic stage to `WAITING_USER`;
 - do not treat a suggested topic as selected;
 - do not start formal database searching.

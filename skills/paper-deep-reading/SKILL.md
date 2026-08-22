@@ -35,8 +35,9 @@ Before substantive work, read:
 - [`../../shared/zotero-policy.md`](../../shared/zotero-policy.md)
 - [`../../shared/state-contract.md`](../../shared/state-contract.md)
 - [`../../shared/data-format-policy.md`](../../shared/data-format-policy.md)
+- [`../../shared/workspace-contract.md`](../../shared/workspace-contract.md)
 
-When running in weekly context, use `weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the workflow source of truth.
+Resolve and initialize `<data-root>` through the workspace contract before any write. When running in weekly context, use `<data-root>/weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the workflow source of truth.
 
 ## Reference routing
 
@@ -228,15 +229,15 @@ C is a second-stage synthesis of B and must not introduce unsupported critique o
 
 ## Knowledge updates
 
-Append a paper to `knowledge/reading_history.csv` **after Deep Reading genuinely reaches academic `COMPLETE`**.
+Append a paper to `<data-root>/knowledge/reading_history.csv` **after Deep Reading genuinely reaches academic `COMPLETE`**.
 
 After completion:
 
-- append the completed paper to `knowledge/reading_history.csv` even if Zotero attachment fields are temporarily empty;
+- append the completed paper to `<data-root>/knowledge/reading_history.csv` even if Zotero attachment fields are temporarily empty;
 - record verified Zotero A/B attachment keys when they exist;
 - record C Git path;
 - keep unresolved archive work in `pending_zotero_actions`;
-- propose updates to `knowledge/research_profile.md` but never apply a research-direction change without explicit user approval.
+- propose updates to `<data-root>/knowledge/research_profile.md` but never apply a research-direction change without explicit user approval.
 
 A `PROVISIONAL` Deep Reading caused by a real source/evidence gap must not enter completed reading history. A Zotero-only pending action does not make an otherwise complete Deep Reading provisional.
 
@@ -244,7 +245,7 @@ A `PROVISIONAL` Deep Reading caused by a real source/evidence gap must not enter
 
 Preferred B label remains `[B] 文献研究笔记·完整精读版`. Verify the parent/attachment when written automatically or manually.
 
-If Zotero is unavailable, stage B under `work/<paper_id>/handoff/` when possible, record a pending action, and continue to close the academic Deep Reading workflow. Archive completion is reported separately.
+If Zotero is unavailable, stage B under `<data-root>/work/<paper_id>/handoff/` when possible, record a pending action, and continue to close the academic Deep Reading workflow. Archive completion is reported separately.
 
 ## Completion states
 

@@ -10,7 +10,7 @@ Prefer parent matching in this order:
 2. exact/near-exact title plus author/year context;
 3. other stable bibliographic fields when DOI is absent.
 
-Use `scripts/zotero_bridge.py find` and `children` for safe checks when Zotero Desktop is available.
+Use `<plugin-root>/scripts/zotero_bridge.py find` and `children` for safe checks when Zotero Desktop is available.
 
 Stop for user/operator resolution when there is:
 
@@ -53,11 +53,11 @@ The repository retains Zotero automation as an optional enhancement.
 
 ### Parent create
 
-`scripts/zotero_bridge.py create` currently uses the verified Connector `/connector/saveItems` route with duplicate checks and post-write identity verification. Its group-library/target-unification limitations are documented future optimizations, not Search release blockers.
+`<plugin-root>/scripts/zotero_bridge.py create` currently uses the verified Connector `/connector/saveItems` route with duplicate checks and post-write identity verification. Its group-library/target-unification limitations are documented future optimizations, not Search release blockers.
 
 ### Zotero 10+ durable attachment
 
-`scripts/zotero_bridge.py attach` contains a Zotero 10+ Local API existing-parent attachment implementation with preview/`--yes`, Server-ID binding, local authorization, upload verification, MD5/parent/filename checks, idempotency and conflict refusal.
+`<plugin-root>/scripts/zotero_bridge.py attach` contains a Zotero 10+ Local API existing-parent attachment implementation with preview/`--yes`, Server-ID binding, local authorization, upload verification, MD5/parent/filename checks, idempotency and conflict refusal.
 
 This path is protocol/mock/CI tested but still requires real desktop live validation before it should be called universally production-validated.
 
@@ -74,7 +74,7 @@ None of these modes changes the academic selection result.
 When Zotero Desktop, write authorization, compatible Local API, or automatic routing is unavailable:
 
 1. retain any already verified parent/attachment keys;
-2. stage acquired Main/SI/A/B under `work/<paper_id>/handoff/` when a local runtime exists;
+2. stage acquired Main/SI/A/B under `<data-root>/work/<paper_id>/handoff/` when a local runtime exists;
 3. append concrete unresolved records to `workflow_manifest.yaml.pending_zotero_actions`;
 4. record expected source IDs and attachment labels;
 5. continue downstream academic work if the actual source evidence is available;
@@ -98,7 +98,7 @@ Report these separately. Never say “saved to Zotero” unless verified, but ne
 
 ## 7. `selected_paper.yaml`
 
-Store under `work/<paper_id>/selected_paper.yaml` and include at least:
+Store under `<data-root>/work/<paper_id>/selected_paper.yaml` and include at least:
 
 - `schema_version`;
 - `paper_id`;
@@ -121,7 +121,7 @@ Unknown source fields must remain `null`; do not infer them from common publishi
 
 ## 8. `source_manifest.json`
 
-Create/update `work/<paper_id>/source_manifest.json`. Each source record should preserve:
+Create/update `<data-root>/work/<paper_id>/source_manifest.json`. Each source record should preserve:
 
 - stable source id such as `SRC-M1` / `SRC-S1`;
 - source type;
@@ -138,6 +138,6 @@ Main, each Supplement, and correction material should be separate source records
 
 ## 9. Selection history
 
-After final confirmation, append the selected paper decision to `knowledge/selection_log.csv`. Do not write to `reading_history.csv` until Deep Reading genuinely reaches academic completion.
+After final confirmation, append the selected paper decision to `<data-root>/knowledge/selection_log.csv`. Do not write to `<data-root>/knowledge/reading_history.csv` until Deep Reading genuinely reaches academic completion.
 
 Do not bulk-import all search candidates into Zotero.

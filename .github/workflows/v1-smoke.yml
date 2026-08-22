@@ -2,9 +2,6 @@ name: V1 Smoke Tests
 
 on:
   push:
-    branches:
-      - phase-6-v1-hardening
-      - main
   pull_request:
 
 permissions:
@@ -31,5 +28,21 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
 
-      - name: Validate V1 repository foundation
+      - name: Validate plugin metadata
+        run: python scripts/validate_plugin_package.py --plugin-root .
+
+      - name: Validate legacy repository compatibility
         run: python scripts/validate_deliverables.py --repo-root .
+
+      - name: Build and validate plugin bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_root="$(mktemp -d)"
+          python scripts/init_workspace.py --workspace-root "$temp_root/data"
+          python scripts/build_plugin_bundle.py --output "$temp_root/bundle"
+          python "$temp_root/bundle/plugins/literature-evaluation/scripts/validate_plugin_package.py" \
+            --plugin-root "$temp_root/bundle/plugins/literature-evaluation"
+          python "$temp_root/bundle/plugins/literature-evaluation/scripts/validate_deliverables.py" \
+            --plugin-root "$temp_root/bundle/plugins/literature-evaluation" \
+            --workspace-root "$temp_root/data"

@@ -21,8 +21,9 @@ Before substantive work, read:
 - [`../../shared/zotero-policy.md`](../../shared/zotero-policy.md)
 - [`../../shared/state-contract.md`](../../shared/state-contract.md)
 - [`../../shared/data-format-policy.md`](../../shared/data-format-policy.md)
+- [`../../shared/workspace-contract.md`](../../shared/workspace-contract.md)
 
-When running in weekly context, use `weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the workflow source of truth.
+Resolve and initialize `<data-root>` through the workspace contract before any write. When running in weekly context, use `<data-root>/weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the workflow source of truth.
 
 ## Reference routing
 
@@ -108,7 +109,7 @@ Zotero remains the preferred long-term location for A. When a write-capable rout
 If Zotero is unavailable, automation is not live-validated, or the user chooses manual archive handling:
 
 - keep the verified A file;
-- stage under `work/<paper_id>/handoff/` when a local runtime exists;
+- stage under `<data-root>/work/<paper_id>/handoff/` when a local runtime exists;
 - record `pending_zotero_actions`;
 - allow Translation/A to remain `COMPLETE` once their own translation/QC gate passes;
 - report archive closure separately.
