@@ -18,10 +18,10 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Literature Evaluation",
-    "shortDescription": "Search, translate, and deeply evaluate academic papers",
+    "shortDescription": "Evaluate academic literature",
     "longDescription": "Run a complete weekly literature-evaluation workflow or invoke literature search, academic translation, and deep reading independently. The plugin keeps source identity, evidence, workflow state, and research archives traceable while storing user data outside the installed plugin.",
     "developerName": "JYW23.26",
-    "category": "Research",
+    "category": "Education & Research",
     "capabilities": [
       "Interactive",
       "Read",
