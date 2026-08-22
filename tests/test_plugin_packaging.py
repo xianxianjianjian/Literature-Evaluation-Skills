@@ -18,6 +18,7 @@ import build_plugin_bundle as bundle
 import init_workspace as workspace
 import runtime_paths
 import validate_deliverables as validator
+import validate_plugin_package as plugin_validator
 
 
 class RuntimePathTests(unittest.TestCase):
@@ -45,6 +46,30 @@ class RuntimePathTests(unittest.TestCase):
             self.assertEqual(
                 runtime_paths.resolve_data_root(environ={}, cwd=default),
                 (default / ".literature-evaluation").resolve(),
+            )
+
+    def test_existing_workspace_is_discovered_from_nested_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            data = project / ".literature-evaluation"
+            nested = project / "analysis" / "scripts"
+            nested.mkdir(parents=True)
+            data.mkdir(parents=True)
+            (data / "workspace.json").write_text("{}\n", encoding="utf-8")
+            self.assertEqual(
+                runtime_paths.resolve_data_root(environ={}, cwd=nested),
+                data.resolve(),
+            )
+
+    def test_git_project_root_is_used_before_nested_cwd_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            nested = project / "analysis" / "scripts"
+            nested.mkdir(parents=True)
+            (project / ".git").mkdir()
+            self.assertEqual(
+                runtime_paths.resolve_data_root(environ={}, cwd=nested),
+                (project / ".literature-evaluation").resolve(),
             )
 
 
@@ -115,6 +140,18 @@ class WorkspaceInitializationTests(unittest.TestCase):
                     migrate_from=legacy,
                 )
 
+    def test_migration_rejects_overlapping_source_and_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            legacy = root / "legacy"
+            (legacy / "knowledge").mkdir(parents=True)
+            with self.assertRaises(workspace.WorkspaceInitError):
+                workspace.initialize_workspace(
+                    legacy / ".literature-evaluation",
+                    template_root=self.template,
+                    migrate_from=legacy,
+                )
+
     def test_dry_run_makes_no_changes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             data_root = Path(tmp) / "data"
@@ -125,6 +162,16 @@ class WorkspaceInitializationTests(unittest.TestCase):
             )
             self.assertGreater(created, 0)
             self.assertFalse(data_root.exists())
+
+
+class PluginMetadataTests(unittest.TestCase):
+    def test_repository_plugin_metadata_is_valid(self) -> None:
+        self.assertEqual(plugin_validator.validate_package(ROOT), [])
+        manifest = json.loads(
+            (ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(manifest["interface"]["category"], "Education & Research")
+        self.assertLessEqual(len(manifest["interface"]["shortDescription"]), 30)
 
 
 class PluginBundleTests(unittest.TestCase):
@@ -142,6 +189,10 @@ class PluginBundleTests(unittest.TestCase):
             self.assertEqual(
                 marketplace["plugins"][0]["source"]["path"],
                 "./plugins/literature-evaluation",
+            )
+            self.assertEqual(
+                marketplace["plugins"][0]["category"],
+                "Education & Research",
             )
 
             expected = {
@@ -165,6 +216,7 @@ class PluginBundleTests(unittest.TestCase):
                 for relative in shared_links:
                     self.assertTrue((skill_root / relative).resolve().is_file(), relative)
 
+            self.assertEqual(plugin_validator.validate_package(plugin), [])
             data_root = root / "data"
             workspace.initialize_workspace(
                 data_root,
@@ -187,6 +239,16 @@ class PluginBundleTests(unittest.TestCase):
             output.mkdir()
             with self.assertRaises(bundle.BundleError):
                 bundle.build_bundle(ROOT, output)
+
+    def test_bundle_refuses_output_inside_source_tree(self) -> None:
+        with self.assertRaises(bundle.BundleError):
+            bundle.build_bundle(ROOT, ROOT / "dist-test-inside-source")
+
+    def test_archive_must_be_outside_bundle_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "bundle"
+            with self.assertRaises(bundle.BundleError):
+                bundle.validate_archive_path(output, output / "bundle.zip")
 
     def test_legacy_repo_root_validator_interface_remains_supported(self) -> None:
         with redirect_stdout(StringIO()):
