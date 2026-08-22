@@ -17,6 +17,14 @@ class WorkspaceInitError(ValueError):
     """Raised when initialization would overwrite or ambiguously merge data."""
 
 
+def _is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
 def collect_files(root: Path) -> dict[Path, Path]:
     """Return relative-to-source file mappings for an existing tree."""
     if not root.is_dir():
@@ -60,12 +68,26 @@ def initialize_workspace(
     dry_run: bool = False,
 ) -> tuple[int, int, int]:
     """Create missing files after a complete conflict preflight."""
-    data_root = data_root.resolve()
-    template_root = template_root.resolve()
+    data_root = data_root.expanduser().resolve()
+    template_root = template_root.expanduser().resolve()
+    if not template_root.is_dir():
+        raise WorkspaceInitError(f"Template root does not exist: {template_root}")
+
+    if _is_within(data_root, template_root) or _is_within(template_root, data_root):
+        raise WorkspaceInitError(
+            "Workspace and template roots must not contain one another."
+        )
+
     if migrate_from is not None:
-        migrate_from = migrate_from.resolve()
-        if migrate_from == data_root:
-            raise WorkspaceInitError("Legacy root and destination data root must differ.")
+        migrate_from = migrate_from.expanduser().resolve()
+        if (
+            data_root == migrate_from
+            or _is_within(data_root, migrate_from)
+            or _is_within(migrate_from, data_root)
+        ):
+            raise WorkspaceInitError(
+                "Legacy root and destination data root must be separate, non-overlapping trees."
+            )
 
     desired = desired_files(template_root, migrate_from)
     conflicts: list[Path] = []
@@ -106,7 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--workspace-root",
         type=Path,
-        help="Writable data root. Defaults to env override or .literature-evaluation/.",
+        help="Writable data root. Defaults to env override or the discovered project workspace.",
     )
     parser.add_argument(
         "--migrate-from",
