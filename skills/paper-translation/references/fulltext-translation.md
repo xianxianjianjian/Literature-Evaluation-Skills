@@ -12,7 +12,7 @@ Example:
 
 `SRC-M1 | p.4 | Methods 2.2 | P03`
 
-Track them in `work/<paper_id>/translation_ledger.jsonl` so coverage can be checked and missing units cannot disappear silently.
+Track them in `<data-root>/work/<paper_id>/translation_ledger.jsonl` so coverage can be checked and missing units cannot disappear silently.
 
 Each ledger record should support at least:
 
@@ -85,6 +85,6 @@ If a passage remains unreliable, do not guess. Use an explicit source-gap label 
 
 ## Translation issues
 
-Translation-specific issues use `TRI-xxx` and belong in `work/<paper_id>/translation_issues.jsonl`. They are distinct from research-audit issues `AUD-xxx`.
+Translation-specific issues use `TRI-xxx` and belong in `<data-root>/work/<paper_id>/translation_issues.jsonl`. They are distinct from research-audit issues `AUD-xxx`.
 
 Examples include unreadable source text, uncertain table alignment, ambiguous abbreviation expansion, version wording differences, or a layout-induced continuation decision.

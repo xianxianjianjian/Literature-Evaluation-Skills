@@ -1,0 +1,6 @@
+interface:
+  display_name: "Literature Search"
+  short_description: "Plan, screen, rank, and hand off research literature"
+  default_prompt: "Use $literature-search to find and screen papers for this research topic."
+policy:
+  allow_implicit_invocation: true

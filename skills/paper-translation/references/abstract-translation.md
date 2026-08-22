@@ -22,7 +22,7 @@ Explicitly verify when present:
 
 ## Canonical Abstract
 
-Write exactly one approved Chinese version to `work/<paper_id>/canonical_abstract.md`.
+Write exactly one approved Chinese version to `<data-root>/work/<paper_id>/canonical_abstract.md`.
 
 A, B and C must reuse this version exactly rather than independently retranslate or paraphrase it. Later changes require an explicit update to the canonical file and downstream `needs_update` routing.
 

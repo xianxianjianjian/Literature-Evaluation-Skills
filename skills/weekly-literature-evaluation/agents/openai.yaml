@@ -1,0 +1,6 @@
+interface:
+  display_name: "Weekly Literature Evaluation"
+  short_description: "Coordinate the complete weekly evaluation workflow"
+  default_prompt: "Use $weekly-literature-evaluation to coordinate this week's literature evaluation."
+policy:
+  allow_implicit_invocation: true

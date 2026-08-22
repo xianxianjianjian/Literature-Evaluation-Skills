@@ -6,7 +6,7 @@ The weekly orchestrator is a thin coordination layer. It never replaces the spec
 
 In weekly context, always read:
 
-`weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml`
+`<data-root>/weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml`
 
 before routing.
 
@@ -217,7 +217,7 @@ Always name the reason.
 If Zotero is unavailable or automatic writing is not suitable:
 
 - continue all safe academic work;
-- stage A/B or source files under `work/<paper_id>/handoff/` when a local runtime exists;
+- stage A/B or source files under `<data-root>/work/<paper_id>/handoff/` when a local runtime exists;
 - append explicit `pending_zotero_actions` to the manifest;
 - preserve expected attachment labels;
 - permit manual Zotero import/attachment later;

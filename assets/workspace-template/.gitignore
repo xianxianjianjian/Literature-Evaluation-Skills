@@ -1,0 +1,7 @@
+work/
+*.pdf
+*.docx
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db

@@ -37,8 +37,9 @@ Before substantive work, read:
 - [`../../shared/zotero-policy.md`](../../shared/zotero-policy.md)
 - [`../../shared/state-contract.md`](../../shared/state-contract.md)
 - [`../../shared/data-format-policy.md`](../../shared/data-format-policy.md)
+- [`../../shared/workspace-contract.md`](../../shared/workspace-contract.md)
 
-Use `weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the workflow source of truth when running in weekly context.
+Resolve and initialize `<data-root>` through the workspace contract before any write. Use `<data-root>/weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the workflow source of truth when running in weekly context.
 
 ## Reference routing
 
@@ -70,8 +71,8 @@ Read the manifest and existing `topic_selection.md`, `search_record.md`, `select
 Use:
 
 - current user request and constraints;
-- confirmed `knowledge/research_profile.md` when relevant;
-- recent `knowledge/reading_history.csv` and `selection_log.csv`;
+- confirmed `<data-root>/knowledge/research_profile.md` when relevant;
+- recent `<data-root>/knowledge/reading_history.csv` and `<data-root>/knowledge/selection_log.csv`;
 - target week in weekly mode;
 - already supplied paper/topic identity when using a direct entry mode.
 
@@ -131,7 +132,7 @@ The downstream academic requirement is an identified, usable source package—no
 Zotero remains the preferred archive. When safe automatic or manual Zotero handling is available, verify parent/attachment identity. If Zotero is unavailable or automation is not live-validated:
 
 - continue Search completion when paper/source identity is otherwise sufficient;
-- stage files under `work/<paper_id>/handoff/` when a local runtime exists;
+- stage files under `<data-root>/work/<paper_id>/handoff/` when a local runtime exists;
 - record concrete `pending_zotero_actions`;
 - never claim an attachment exists until verified.
 
@@ -141,18 +142,18 @@ A **Zotero-only** pending action does not make Search `PROVISIONAL`. Search beco
 
 Weekly decision records:
 
-- `weekly_reviews/YYYY/YYYY-Wxx/topic_selection.md`
-- `weekly_reviews/YYYY/YYYY-Wxx/search_record.md`
+- `<data-root>/weekly_reviews/YYYY/YYYY-Wxx/topic_selection.md`
+- `<data-root>/weekly_reviews/YYYY/YYYY-Wxx/search_record.md`
 
 Selected-paper working records:
 
-- `work/<paper_id>/selected_paper.yaml`
-- `work/<paper_id>/source_manifest.json`
+- `<data-root>/work/<paper_id>/selected_paper.yaml`
+- `<data-root>/work/<paper_id>/source_manifest.json`
 
 Long-term decision history:
 
-- append the selected paper to `knowledge/selection_log.csv`;
-- do **not** write `knowledge/reading_history.csv` until Deep Reading is actually complete.
+- append the selected paper to `<data-root>/knowledge/selection_log.csv`;
+- do **not** write `<data-root>/knowledge/reading_history.csv` until Deep Reading is actually complete.
 
 ## Completion states
 

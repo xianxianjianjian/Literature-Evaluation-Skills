@@ -20,7 +20,7 @@ Zotero 是本项目**首选的长期研究档案中心**，但不是 V1 学术�
 - Search 学术阶段完成；
 - Translation/A 完成；
 - Deep Reading/B/C 完成；
-- completed reading 写入 `knowledge/reading_history.csv`。
+- completed reading 写入 `<data-root>/knowledge/reading_history.csv`。
 
 这些情况必须改为单独记录归档待办：
 
@@ -31,7 +31,7 @@ pending_zotero_actions
 并在可用的本地运行时暂存到：
 
 ```text
-work/<paper_id>/handoff/
+<data-root>/work/<paper_id>/handoff/
 ```
 
 阶段 `PROVISIONAL/BLOCKED` 应由真正影响学术完整性的来源、SI、版本、证据或产物问题触发，而不是仅因为 Zotero 自动化不可用。
@@ -69,11 +69,11 @@ A/B/C 本身及其 QC、证据链、来源身份和必需知识记录通过即�
 
 ### Parent create
 
-现有 `scripts/zotero_bridge.py create` 使用 Zotero Connector `/connector/saveItems`，执行前查重，写后要求身份回查。该路径可继续使用，但其 group-library/selected-target 统一问题属于后续优化，不阻止 V1 核心 Skill 发布。
+现有 `<plugin-root>/scripts/zotero_bridge.py create` 使用 Zotero Connector `/connector/saveItems`，执行前查重，写后要求身份回查。该路径可继续使用，但其 group-library/selected-target 统一问题属于后续优化，不阻止 V1 核心 Skill 发布。
 
 ### Zotero 10+ Local API attachment
 
-`scripts/zotero_bridge.py attach` 和 Local API helper 已实现 Zotero 10+ existing-parent durable attachment 的协议/mock/CI 版本，包括本机授权、Server-ID、full upload、MD5/parent/filename 回查、幂等与冲突保护。
+`<plugin-root>/scripts/zotero_bridge.py attach` 和 Local API helper 已实现 Zotero 10+ existing-parent durable attachment 的协议/mock/CI 版本，包括本机授权、Server-ID、full upload、MD5/parent/filename 回查、幂等与冲突保护。
 
 但真实用户桌面端 live validation 仍属于后续集成验收。V1 运行时可以：
 

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Paper Translation"
+  short_description: "Translate academic papers into auditable Chinese artifacts"
+  default_prompt: "Use $paper-translation to translate this paper into Chinese with full source fidelity."
+policy:
+  allow_implicit_invocation: true

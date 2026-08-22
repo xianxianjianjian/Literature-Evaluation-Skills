@@ -33,3 +33,14 @@ jobs:
 
       - name: Validate V1 repository foundation
         run: python scripts/validate_deliverables.py --repo-root .
+
+      - name: Build and validate plugin bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_root="$(mktemp -d)"
+          python scripts/init_workspace.py --workspace-root "$temp_root/data"
+          python scripts/build_plugin_bundle.py --output "$temp_root/bundle"
+          python "$temp_root/bundle/plugins/literature-evaluation/scripts/validate_deliverables.py" \
+            --plugin-root "$temp_root/bundle/plugins/literature-evaluation" \
+            --workspace-root "$temp_root/data"

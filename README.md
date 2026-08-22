@@ -1,4 +1,4 @@
-# Literature Evaluation Skills V1
+# Literature Evaluation Plugin
 
 一套面向长期科研使用的**文献检索 → 全文评译 → 系统精读 → 每周评译提交**工作流。
 
@@ -20,6 +20,61 @@ weekly-literature-evaluation
 - **`paper-deep-reading`**：Full Research Audit、Introduction/Methods/Results/Discussion 重建、统计路线、假设闭环、批判性评译，以及 B/C。
 
 三个专业 Skill 可以独立运行。
+
+安装后四个可发现入口为：
+
+- `literature-evaluation:weekly-literature-evaluation`
+- `literature-evaluation:literature-search`
+- `literature-evaluation:paper-translation`
+- `literature-evaluation:paper-deep-reading`
+
+## 整包安装
+
+仓库根目录本身是 `literature-evaluation` 插件源码。构建脚本会生成一个本地 marketplace 安装包，不在 Git 中维护第二份插件源码：
+
+```bash
+python scripts/build_plugin_bundle.py \
+  --output dist/literature-evaluation-local \
+  --archive dist/literature-evaluation-local.zip
+```
+
+使用生成目录的绝对路径安装：
+
+```bash
+codex plugin marketplace add <bundle-root>
+codex plugin add literature-evaluation@literature-evaluation-local
+```
+
+安装或升级后请重启 Codex，并在新任务中测试四个入口。当前机器如果已经通过 Skill installer 分别安装过同名的四个独立 Skill，不要自动删除；应先确认插件版正常工作，再单独移除旧副本，避免重复发现或路由冲突。
+
+## 工作区数据
+
+插件安装目录只保存只读规则、共享合同、脚本和模板。用户数据默认写入当前工作区：
+
+```text
+.literature-evaluation/
+|-- workspace.json
+|-- knowledge/
+|-- weekly_reviews/
+`-- work/
+```
+
+首次写入前初始化：
+
+```bash
+python <plugin-root>/scripts/init_workspace.py
+```
+
+数据根解析顺序为显式 `--workspace-root`、`LITERATURE_EVALUATION_HOME`、当前工作区 `.literature-evaluation/`。从旧版仓库目录迁移时，先预演再执行：
+
+```bash
+python <plugin-root>/scripts/init_workspace.py \
+  --workspace-root <data-root> \
+  --migrate-from <legacy-root> \
+  --dry-run
+```
+
+去掉 `--dry-run` 才会复制。初始化不会覆盖已有文件；迁移遇到同名不同内容时会停止。
 
 ## 交付物
 
@@ -105,7 +160,7 @@ Git:    Skills / shared policies / knowledge / Search decisions / C / workflow s
 如果 Zotero 暂时不可写：
 
 1. 继续所有安全的学术工作；
-2. 在有本地运行环境时把待归档文件放到 `work/<paper_id>/handoff/`；
+2. 在有本地运行环境时把待归档文件放到 `<data-root>/work/<paper_id>/handoff/`；
 3. 在 manifest 记录 `pending_zotero_actions`；
 4. 可以之后手动挂接 Zotero，再做身份验证；
 5. 不得在未验证时声称“已经保存到 Zotero”。
@@ -124,7 +179,7 @@ Zotero archive: PENDING
 唯一周状态文件：
 
 ```text
-weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml
+<data-root>/weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml
 ```
 
 只允许：
@@ -146,13 +201,13 @@ COMPLETE
 
 长期维护：
 
-- `knowledge/research_profile.md`
-- `knowledge/submission_profile.yaml`
-- `knowledge/journal_registry.csv`
-- `knowledge/terminology_registry.csv`
-- `knowledge/terminology_evidence.jsonl`
-- `knowledge/reading_history.csv`
-- `knowledge/selection_log.csv`
+- `<data-root>/knowledge/research_profile.md`
+- `<data-root>/knowledge/submission_profile.yaml`
+- `<data-root>/knowledge/journal_registry.csv`
+- `<data-root>/knowledge/terminology_registry.csv`
+- `<data-root>/knowledge/terminology_evidence.jsonl`
+- `<data-root>/knowledge/reading_history.csv`
+- `<data-root>/knowledge/selection_log.csv`
 
 `research_profile.md` 不能因一篇论文自动改方向；任何长期研究方向变更都需要用户明确确认。
 
@@ -174,6 +229,14 @@ English Term + Discipline + Subfield + Context
 python -m compileall scripts tests
 python -m unittest discover -s tests -v
 python scripts/validate_deliverables.py --repo-root .
+```
+
+已安装插件与独立数据目录可分别验证：
+
+```bash
+python <plugin-root>/scripts/validate_deliverables.py \
+  --plugin-root <plugin-root> \
+  --workspace-root <data-root>
 ```
 
 完成级别可分别检查：

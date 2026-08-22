@@ -164,8 +164,8 @@ A paper may be readable with gaps but still remain `PROVISIONAL` because consequ
 
 Maintain when the working environment supports them:
 
-- `work/<paper_id>/audit_log.jsonl`
-- `work/<paper_id>/claim_evidence_map.csv`
+- `<data-root>/work/<paper_id>/audit_log.jsonl`
+- `<data-root>/work/<paper_id>/claim_evidence_map.csv`
 
 Suggested audit log fields:
 

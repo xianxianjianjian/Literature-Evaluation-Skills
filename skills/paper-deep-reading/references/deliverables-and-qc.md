@@ -74,7 +74,7 @@ C must contain at least:
 - original Abstract;
 - exact canonical Chinese Abstract;
 - review/comment body;
-- reviewer name from `knowledge/submission_profile.yaml` when configured.
+- reviewer name from `<data-root>/knowledge/submission_profile.yaml` when configured.
 
 The configured minimum (default 500 Chinese characters) applies **only to the review/comment body**, not metadata, title, or Abstract sections.
 
@@ -93,15 +93,15 @@ C must not introduce a critique or factual claim that B cannot support. Internal
 
 ## Knowledge updates
 
-Append a paper to `knowledge/reading_history.csv` **only after Deep Reading genuinely reaches academic `COMPLETE`**. A source/evidence-provisional Deep Reading must not be recorded as completed.
+Append a paper to `<data-root>/knowledge/reading_history.csv` **only after Deep Reading genuinely reaches academic `COMPLETE`**. A source/evidence-provisional Deep Reading must not be recorded as completed.
 
 After academic Deep Reading is complete:
 
-- append the completed paper to `knowledge/reading_history.csv`;
+- append the completed paper to `<data-root>/knowledge/reading_history.csv`;
 - record Zotero parent/A/B attachment keys when already verified, otherwise leave those optional archive fields empty;
 - record C path;
 - keep unresolved Zotero operations in `pending_zotero_actions`;
-- propose, but do not automatically apply, changes to `knowledge/research_profile.md`.
+- propose, but do not automatically apply, changes to `<data-root>/knowledge/research_profile.md`.
 
 A Zotero-only pending action does not prevent the reading from entering completed history. A single paper must never silently redefine the long-term research direction.
 
@@ -111,7 +111,7 @@ Preferred Zotero attachment label:
 
 `[B] 文献研究笔记·完整精读版`
 
-When Zotero is writable, verify the parent item and attachment after writing. If Zotero is unavailable, stage under `work/<paper_id>/handoff/` and record a pending action. This archive pending state must not downgrade a B that already passed its academic/QC gate.
+When Zotero is writable, verify the parent item and attachment after writing. If Zotero is unavailable, stage under `<data-root>/work/<paper_id>/handoff/` and record a pending action. This archive pending state must not downgrade a B that already passed its academic/QC gate.
 
 ## Deep Reading Academic Completion Gate
 
