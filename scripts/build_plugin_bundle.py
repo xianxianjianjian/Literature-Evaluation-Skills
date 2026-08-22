@@ -12,6 +12,7 @@ from pathlib import Path
 PLUGIN_NAME = "literature-evaluation"
 PLUGIN_CATEGORY = "Education & Research"
 MARKETPLACE_NAME = "literature-evaluation-local"
+GENERATED_OUTPUT_DIRECTORY = "dist"
 PACKAGE_ENTRIES = (
     ".codex-plugin",
     ".gitignore",
@@ -44,6 +45,20 @@ def ignore_runtime_files(_directory: str, names: list[str]) -> set[str]:
     }
 
 
+def validate_output_path(plugin_root: Path, output: Path) -> None:
+    """Allow external outputs or the repository's ignored ``dist/`` tree only."""
+    plugin_root = plugin_root.resolve()
+    output = output.resolve()
+    if output == plugin_root:
+        raise BundleError("Bundle output cannot replace the plugin root.")
+    if _is_within(output, plugin_root):
+        relative = output.relative_to(plugin_root)
+        if not relative.parts or relative.parts[0] != GENERATED_OUTPUT_DIRECTORY:
+            raise BundleError(
+                "Bundle output inside the plugin source tree is allowed only under dist/."
+            )
+
+
 def validate_archive_path(output: Path, archive: Path) -> None:
     """Reject archive destinations that could be included in their own bundle."""
     output = output.resolve()
@@ -69,10 +84,7 @@ def build_bundle(plugin_root: Path, output: Path) -> Path:
         )
     if output.exists():
         raise BundleError(f"Output already exists; refusing to overwrite: {output}")
-    if _is_within(output, plugin_root):
-        raise BundleError(
-            "Bundle output must be outside the plugin source tree to avoid recursive packaging."
-        )
+    validate_output_path(plugin_root, output)
 
     plugin_target = output / "plugins" / PLUGIN_NAME
     marketplace_target = output / ".agents" / "plugins" / "marketplace.json"
