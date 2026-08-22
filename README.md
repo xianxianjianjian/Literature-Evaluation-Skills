@@ -32,15 +32,17 @@ weekly-literature-evaluation
 
 ## 构建本地 Plugin bundle
 
-仓库根目录本身是 `literature-evaluation` 插件源码。构建脚本生成本地 marketplace 安装包，不在 Git 中维护第二份 Skill 源码：
+仓库根目录本身是 `literature-evaluation` 插件源码。构建脚本生成本地 marketplace 安装包，不在 Git 中维护第二份 Skill 源码。
+
+最方便的仓库内生成方式是使用已经被 `.gitignore` 排除的 `dist/`：
 
 ```bash
 python scripts/build_plugin_bundle.py \
-  --output /absolute/path/to/literature-evaluation-local \
-  --archive /absolute/path/to/literature-evaluation-local.zip
+  --output dist/literature-evaluation-local \
+  --archive dist/literature-evaluation-local.zip
 ```
 
-`--output` 必须位于插件源码树之外；如果同时生成 ZIP，`--archive` 也必须位于 bundle 输出目录之外，避免递归打包。
+也可以把 `--output` 指向插件源码树之外的绝对路径。如果输出位于插件源码树内，只允许放在 `<plugin-root>/dist/` 下，不能写进 `skills/`、`shared/`、`scripts/`、`assets/` 等源码目录。ZIP 必须位于 bundle 输出目录之外；上例中的 sibling ZIP 是合法布局。
 
 将生成的 marketplace 加入 Codex：
 
@@ -48,7 +50,7 @@ python scripts/build_plugin_bundle.py \
 codex plugin marketplace add /absolute/path/to/literature-evaluation-local
 ```
 
-然后重启支持 Plugins 的 Codex/ChatGPT 客户端，在 Plugins Directory 中选择 `literature-evaluation-local` marketplace 并安装 `literature-evaluation`。不同客户端版本可能提供额外的安装子命令；以当前客户端 `codex plugin --help` 和 OpenAI Plugin 文档为准，不把未验证的快捷命令作为唯一安装路径。
+如果使用上面的 `dist/` 示例，请把 `<bundle-root>` 解析为 `dist/literature-evaluation-local` 的绝对路径。然后重启支持 Plugins 的 Codex/ChatGPT 客户端，在 Plugins Directory 中选择 `literature-evaluation-local` marketplace 并安装 `literature-evaluation`。不同客户端版本可能提供额外的安装子命令；以当前客户端 `codex plugin --help` 和 OpenAI Plugin 文档为准，不把未验证的快捷命令作为唯一安装路径。
 
 当前机器如果已经通过 Skill installer 分别安装过同名的四个独立 Skill，不要自动删除。应先确认插件版四个 namespaced Skill 均能发现和运行，再单独移除旧副本，避免重复发现或路由冲突。
 
@@ -282,7 +284,7 @@ python <plugin-root>/scripts/validate_deliverables.py \
   --workspace-root <data-root>
 ```
 
-`validate_plugin_package.py` 检查插件名、版本、Skill 路径、Research 类别、短描述、四个 Skill frontmatter、四个 `agents/openai.yaml` 以及必要共享资源；它是仓库内 structural validation，不能替代实际客户端中的 Plugin discovery/install 验收。
+`validate_plugin_package.py` 检查插件名、版本、Skill 路径、Research 类别、短描述、四个 Skill frontmatter、最终 `literature-evaluation:<skill>` namespaced 名称、四个 `agents/openai.yaml` 以及必要共享资源；它是仓库内 structural validation，不能替代实际客户端中的 Plugin discovery/install 验收。
 
 完成级别可分别检查：
 
