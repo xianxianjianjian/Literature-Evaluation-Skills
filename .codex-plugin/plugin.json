@@ -22,11 +22,6 @@
     "longDescription": "Run a complete weekly literature-evaluation workflow or invoke literature search, academic translation, and deep reading independently. The plugin keeps source identity, evidence, workflow state, and research archives traceable while storing user data outside the installed plugin.",
     "developerName": "JYW23.26",
     "category": "Education & Research",
-    "capabilities": [
-      "Interactive",
-      "Read",
-      "Write"
-    ],
     "websiteURL": "https://github.com/xianxianjianjian/Literature-Evaluation-Skills",
     "defaultPrompt": [
       "完成本周文献检索、翻译和深度评译",
