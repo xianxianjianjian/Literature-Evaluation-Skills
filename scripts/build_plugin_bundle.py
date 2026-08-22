@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 PLUGIN_NAME = "literature-evaluation"
+PLUGIN_CATEGORY = "Education & Research"
 MARKETPLACE_NAME = "literature-evaluation-local"
 PACKAGE_ENTRIES = (
     ".codex-plugin",
@@ -27,12 +28,30 @@ class BundleError(ValueError):
     """Raised when a safe, valid bundle cannot be produced."""
 
 
+def _is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
 def ignore_runtime_files(_directory: str, names: list[str]) -> set[str]:
     return {
         name
         for name in names
         if name == "__pycache__" or name.endswith((".pyc", ".pyo"))
     }
+
+
+def validate_archive_path(output: Path, archive: Path) -> None:
+    """Reject archive destinations that could be included in their own bundle."""
+    output = output.resolve()
+    archive = archive.resolve()
+    if archive.suffix.lower() != ".zip":
+        raise BundleError("--archive must end in .zip")
+    if _is_within(archive, output):
+        raise BundleError("Archive path must be outside the bundle output tree.")
 
 
 def build_bundle(plugin_root: Path, output: Path) -> Path:
@@ -44,15 +63,16 @@ def build_bundle(plugin_root: Path, output: Path) -> Path:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("name") != PLUGIN_NAME:
         raise BundleError(f"Manifest name must be {PLUGIN_NAME!r}.")
+    if manifest.get("interface", {}).get("category") != PLUGIN_CATEGORY:
+        raise BundleError(
+            f"Manifest category must be {PLUGIN_CATEGORY!r} for this plugin."
+        )
     if output.exists():
         raise BundleError(f"Output already exists; refusing to overwrite: {output}")
-    try:
-        output.relative_to(plugin_root)
-    except ValueError:
-        pass
-    else:
-        if output == plugin_root:
-            raise BundleError("Bundle output cannot replace the plugin root.")
+    if _is_within(output, plugin_root):
+        raise BundleError(
+            "Bundle output must be outside the plugin source tree to avoid recursive packaging."
+        )
 
     plugin_target = output / "plugins" / PLUGIN_NAME
     marketplace_target = output / ".agents" / "plugins" / "marketplace.json"
@@ -78,7 +98,7 @@ def build_bundle(plugin_root: Path, output: Path) -> Path:
                     "installation": "AVAILABLE",
                     "authentication": "ON_INSTALL",
                 },
-                "category": "Research",
+                "category": PLUGIN_CATEGORY,
             }
         ],
     }
@@ -101,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--archive",
         type=Path,
-        help="Optional .zip path. It must not already exist.",
+        help="Optional .zip path outside the bundle output tree. It must not already exist.",
     )
     return parser
 
@@ -110,22 +130,22 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         archive_path = None
+        output_path = args.output.resolve()
         if args.archive:
             archive_path = args.archive.resolve()
             if archive_path.exists():
                 raise BundleError(
                     f"Archive already exists; refusing to overwrite: {archive_path}"
                 )
-            if archive_path.suffix.lower() != ".zip":
-                raise BundleError("--archive must end in .zip")
-        plugin_target = build_bundle(args.plugin_root, args.output)
+            validate_archive_path(output_path, archive_path)
+        plugin_target = build_bundle(args.plugin_root, output_path)
         if archive_path:
             archive_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.make_archive(
                 str(archive_path.with_suffix("")),
                 "zip",
-                root_dir=args.output.resolve().parent,
-                base_dir=args.output.resolve().name,
+                root_dir=output_path.parent,
+                base_dir=output_path.name,
             )
     except (BundleError, OSError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
