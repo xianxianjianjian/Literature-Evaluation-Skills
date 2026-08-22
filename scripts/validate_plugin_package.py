@@ -16,6 +16,7 @@ from pathlib import Path
 PLUGIN_NAME = "literature-evaluation"
 PLUGIN_VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 PLUGIN_CATEGORY = "Education & Research"
+EXPECTED_CAPABILITIES = {"Interactive", "Read", "Write"}
 EXPECTED_SKILLS = {
     "weekly-literature-evaluation",
     "literature-search",
@@ -58,11 +59,16 @@ def validate_manifest(plugin_root: Path) -> list[str]:
         return errors
     if interface.get("category") != PLUGIN_CATEGORY:
         errors.append(f"plugin category must be {PLUGIN_CATEGORY!r}")
+    capabilities = interface.get("capabilities")
+    if not isinstance(capabilities, list) or set(capabilities) != EXPECTED_CAPABILITIES:
+        errors.append(
+            "interface.capabilities must declare Interactive, Read, and Write"
+        )
     short = interface.get("shortDescription")
     if not isinstance(short, str) or not short.strip():
         errors.append("interface.shortDescription must be a non-empty string")
     elif len(short.strip()) > 30:
-        errors.append("interface.shortDescription must be <= 30 characters")
+        errors.append("project policy requires interface.shortDescription <= 30 characters")
     prompts = interface.get("defaultPrompt")
     if isinstance(prompts, str):
         prompts = [prompts]
@@ -70,6 +76,8 @@ def validate_manifest(plugin_root: Path) -> list[str]:
         errors.append("interface.defaultPrompt must be a string or 1-3 strings")
     elif not all(isinstance(item, str) and item.strip() for item in prompts):
         errors.append("interface.defaultPrompt entries must be non-empty strings")
+    elif any(len(item) > 128 for item in prompts):
+        errors.append("interface.defaultPrompt entries must be <= 128 characters")
     return errors
 
 
