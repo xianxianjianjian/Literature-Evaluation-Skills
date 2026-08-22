@@ -15,9 +15,11 @@ Resolve the data root in this order:
 
 1. an explicit `--workspace-root <path>` supplied to a helper;
 2. `LITERATURE_EVALUATION_HOME` when it is non-empty;
-3. `.literature-evaluation/` below the current workspace.
+3. an already initialized `.literature-evaluation/workspace.json` discovered from the current directory upward;
+4. `.literature-evaluation/` below the containing Git project root when one can be identified;
+5. `.literature-evaluation/` below the current working directory.
 
-An explicit or environment-provided path is the data root itself. The default appends `.literature-evaluation` to the current working directory.
+An explicit or environment-provided path is the data root itself. The upward discovery rule prevents a project from accidentally creating multiple Literature Evaluation workspaces when Codex starts from different subdirectories.
 
 ## Initialization
 
@@ -29,7 +31,7 @@ python <plugin-root>/scripts/init_workspace.py [--workspace-root <data-root>]
 
 Initialization is idempotent and never overwrites an existing file. Use `--migrate-from <legacy-root>` to copy the legacy root-level `knowledge/`, `weekly_reviews/`, and `work/` trees. Use `--dry-run` first when migrating valuable records.
 
-If initialization or migration reports a content conflict, stop and ask the user to reconcile it. Do not choose one version automatically.
+The migration source and destination must be separate, non-overlapping directory trees. If initialization or migration reports a content conflict, stop and ask the user to reconcile it. Do not choose one version automatically.
 
 ## Writable layout
 
@@ -44,6 +46,8 @@ All operational paths are relative to `<data-root>`:
 ```
 
 `knowledge/` and `weekly_reviews/` are eligible for version control. `work/`, PDFs, DOCX files, and other large or local handoff artifacts are ignored by the template `.gitignore`.
+
+`knowledge/submission_profile.yaml` intentionally uses a JSON-compatible YAML representation so the V1 helper layer can remain standard-library-only. Treat it as a structured configuration file rather than free-form YAML unless a future version adds a dedicated YAML parser.
 
 ## Script invocation
 
