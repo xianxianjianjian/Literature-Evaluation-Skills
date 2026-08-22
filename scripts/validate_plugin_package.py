@@ -17,6 +17,7 @@ PLUGIN_NAME = "literature-evaluation"
 PLUGIN_VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 PLUGIN_CATEGORY = "Education & Research"
 EXPECTED_CAPABILITIES = {"Interactive", "Read", "Write"}
+MAX_NAMESPACED_SKILL_NAME = 64
 EXPECTED_SKILLS = {
     "weekly-literature-evaluation",
     "literature-search",
@@ -105,6 +106,11 @@ def validate_skills(plugin_root: Path) -> list[str]:
             f"expected skills {sorted(EXPECTED_SKILLS)}, found {sorted(actual)}"
         )
     for skill in sorted(EXPECTED_SKILLS):
+        namespaced = f"{PLUGIN_NAME}:{skill}"
+        if len(namespaced) > MAX_NAMESPACED_SKILL_NAME:
+            errors.append(
+                f"namespaced skill name exceeds {MAX_NAMESPACED_SKILL_NAME} characters: {namespaced}"
+            )
         skill_root = skills_root / skill
         skill_file = skill_root / "SKILL.md"
         agent_file = skill_root / "agents" / "openai.yaml"
