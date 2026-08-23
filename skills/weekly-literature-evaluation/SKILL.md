@@ -30,7 +30,7 @@ Before changing weekly workflow state, read:
 
 Resolve and initialize `<data-root>` through the workspace contract before any write. Use `<data-root>/weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the single workflow source of truth.
 
-Record Translation scope in `stages.translation.scope`. An unqualified request to translate the focal paper defaults to `FULL_MIRROR`; the router must preserve this value through Translation validation and resume.
+Record Translation scope and layout profile in the manifest. An unqualified translation defaults to `scope: FULL_MIRROR`, `layout_fidelity: EXACT_TEXT_FRAME`, `cjk_font_family: SimSun`, and `minimum_font_scale: 0.95`; preserve all four values through Translation validation and resume. Route `STRUCTURAL_MIRROR` only when the user explicitly requests it.
 
 ## Intent classification
 
@@ -190,7 +190,7 @@ If Zotero is unavailable, use `<data-root>/work/<paper_id>/handoff/` when a loca
 
 ## A/B/C contract
 
-- **A**: Chinese full-text mirror PDF, owned by Translation.
+- **A**: Chinese exact text-frame mirror PDF by default, owned by Translation. A user-requested structural mirror must be named and reported as structural.
 - **B**: complete research-note DOCX, owned by Deep Reading.
 - **C**: weekly evaluation submission, derived from B in weekly context.
 

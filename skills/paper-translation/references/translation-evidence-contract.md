@@ -1,75 +1,123 @@
 # Translation Evidence Contract
 
-Use the inventory, ledger and issue portions of this contract for every manifest translation scope before Translation/A is marked `COMPLETE`. `FULL_MIRROR` additionally requires the layout plan and page/object/table checks. The files below answer different questions and must not be replaced by a self-authored “QC passed” statement.
+Use inventory, ledger and issue evidence for every translation scope. `FULL_MIRROR` defaults to `EXACT_TEXT_FRAME` and activates the schema-v2 geometry/font contract below. These files answer different questions and cannot be replaced by a hand-written “QC passed” statement.
 
-## 1. `source_inventory.json` — what exists in the source package?
+## 1. `source_inventory.json`
 
-Required root fields:
+Exact mirror requires:
 
-- `schema_version: 1`;
-- `scope`: `FULL_MIRROR`, `MAIN_ONLY`, or `ABSTRACT_ONLY`;
-- `sources`: source ID, role (`MAIN`/`SI`), fixed-render page count and availability status;
-- `pages`: `source_id`, positive `source_page`, `unit_ids`, and `object_ids`;
-- `units`: `unit_id`, `source_id`, `source_page`, and scientific-content `kind`;
-- `objects`: every scientific figure/table with `object_id`, source locator, kind and label when present.
+- `schema_version: 2`, `scope: FULL_MIRROR`, `layout_fidelity: EXACT_TEXT_FRAME`;
+- `sources`: `source_id`, `role`, `page_count`, fixed `pdf_path` and availability;
+- `pages`: source/output page, all five PDF boxes, rotation, unit/object/frame IDs;
+- `units`: stable frame-level translation units;
+- `objects`: every scientific figure/table with page `bbox_pt` and label frames.
 
-For tables, also record:
+Each table additionally records topology and every cell:
 
 ```json
 {
+  "object_id": "TAB-S1",
+  "kind": "table",
+  "bbox_pt": [72, 220, 520, 460],
   "table_structure": {
     "rows": 8,
     "columns": 5,
     "header_rows": 2,
     "merged_cells": 3,
     "footnotes": 2
-  }
+  },
+  "cells": [
+    {
+      "row": 1,
+      "column": 1,
+      "row_span": 1,
+      "column_span": 2,
+      "bbox_pt": [72, 430, 250, 460],
+      "frame_id": "TF-S1-P003-T001-C001"
+    }
+  ]
 }
 ```
 
-Do not inventory only text paragraphs. Inspect PDF page renders and DOCX relationships/drawings so inline and floating SI images cannot disappear. Render DOCX SI once to a fixed paginated PDF before assigning page locators.
+Render DOCX SI once to fixed PDF before assigning page positions. Inspect rendered pages and DOCX drawing relationships so floating SI figures cannot disappear.
 
-## 2. `translation_ledger.jsonl` — what happened to every text unit?
+## 2. `text_frame_inventory.jsonl`
 
-Each line requires:
+Every source text frame, table cell and figure label requires:
 
-- `unit_id`, `source_id`, `source_page`, `section`, `unit_index`, `kind`;
-- `source_status`;
-- `translation_status`: `TRANSLATED` or `SOURCE_GAP`;
-- `output_pages`: positive A page numbers;
-- `issue_ids`.
+- `frame_id`, source page, `unit_id`, kind and reading order;
+- bottom-left PDF `bbox_pt` and rotation;
+- source font, font size, leading, weight, alignment and background;
+- `translation_action: TRANSLATE | RETAIN_SOURCE`;
+- an allowed `retain_reason` for retained frames;
+- `reviewed: true` after visual source-page inspection.
 
-`SOURCE_GAP` requires a `TRI-xxx` issue. A translated unit requires at least one output page. The ledger must cover exactly the units in the source inventory.
+Automatic extraction produces `reviewed: false` and `background: UNREVIEWED`. Those values must be corrected before plan creation. One exact ledger unit maps to exactly one source frame.
 
-## 3. `mirror_layout_plan.json` — where did each page and object go?
+## 3. `translation_ledger.jsonl`
 
-Generate the initial plan with `scripts/mirror_pdf.py`. For every output page record:
+Exact rows retain the ordinary provenance fields and additionally require:
 
-- `output_page_number`;
-- one or more `source_page_refs`;
-- `placed_object_ids`;
-- `table_placements`;
-- layout strategy and extension relationship;
-- `render_checked` plus a concrete comparison note.
+- exactly one `frame_id`;
+- `source_text` and `translated_text`;
+- actual `font_scale_used` from `0.95` through `1.00`;
+- `fit_status: FIT` for completion;
+- `untranslated_tokens`, each with token text and reason.
 
-For a native table, record output rows/columns/header rows and whether merged cells and footnotes were preserved. If a native grid cannot remain readable, use `source-image-with-translation-map` and confirm the Chinese header/footnote map is complete. Flattening cells into unrelated prose rows is not an allowed fallback.
+`OVERFLOW` is usable evidence but prevents `COMPLETE`. Do not claim overflow is solved by moving the frame, changing leading or adding a page.
 
-## 4. `translation_issues.jsonl` — what remains unresolved?
+## 4. `font_map.json`
 
-Each issue requires `issue_id`, `status` (`OPEN`/`RESOLVED`) and `completion_impact` (`NONE`/`PROVISIONAL`/`BLOCKED`). An open consequential issue prevents Translation/A `COMPLETE`.
+Required exact settings:
+
+```json
+{
+  "schema_version": 1,
+  "cjk_font_family": "SimSun",
+  "font_path": "C:\\Windows\\Fonts\\simsun.ttc",
+  "ttc_face_index": 0,
+  "fallback_allowed": false,
+  "regular_mode": "embedded-subset",
+  "bold_mode": "synthetic-stroke",
+  "italic_mode": "synthetic-shear",
+  "expected_pdf_font_name": "SimSun"
+}
+```
+
+The font file itself is not committed. If it is absent or cannot be embedded, use `BLOCKED`; never silently select another CJK font.
+
+## 5. `mirror_layout_plan.json`
+
+Schema v2 maps every source page to exactly one output page and records:
+
+- source/output page identity and all page boxes;
+- every reviewed frame and replacement region;
+- exact table-cell placements and scientific object IDs;
+- `layout_strategy_used: exact-text-frame`;
+- `extension_page: false`;
+- actual font scale and fit result after rendering.
+
+`render_checked` and render notes are diagnostic only. They are not completion evidence.
+
+## 6. `translation_issues.jsonl`
+
+Each issue requires `issue_id`, `status` and `completion_impact`. A SimSun absence is `BLOCKED`; an unresolved frame/background/overflow or untranslated label is normally `PROVISIONAL`.
 
 ## Independent completion check
 
-Run after A is rendered and visually compared:
-
 ```text
 python scripts/validate_translation_package.py \
-  --work-dir <data-root>/work/<paper_id> \
+  --work-dir <work-dir> \
   --a-path <A.pdf> \
   --scope FULL_MIRROR \
-  --report <data-root>/work/<paper_id>/translation_validation.json
+  --layout-fidelity EXACT_TEXT_FRAME \
+  --report <work-dir>/translation_validation.json
 ```
 
-The command recomputes inventory, ledger, source-page, object and table-topology coverage. Do not hand-write or edit `translation_validation.json`. Semantic fidelity and visual quality still require direct source/output comparison; the validator prevents those judgments from being made over an incomplete object/page set.
+The validator generates `layout_diff.json` itself and recomputes page boxes, rotations, one-to-one mapping, replacement frames, table cells, embedded/CJK SimSun use, 95%-100% glyph sizing, English-token accounting and same-renderer pixels outside replacement frames. Do not edit either validation report.
 
-Use the existing `source_manifest.json` identity fields for source-version control. Do not add per-unit, per-page or per-object hashes.
+Use the existing `source_manifest.json` for source identity. Do not add per-unit, per-page, per-object or font hashes.
+
+## Legacy and non-exact scopes
+
+Schema-v1 evidence remains readable as `LEGACY_STRUCTURAL`. It cannot be re-certified as `EXACT_TEXT_FRAME`. `MAIN_ONLY` and `ABSTRACT_ONLY` continue to use their existing content evidence without exact-layout files.

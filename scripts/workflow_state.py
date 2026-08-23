@@ -31,6 +31,14 @@ STAGE_NAMES = ("topic", "search", "translation", "deep_reading")
 OUTPUT_NAMES = ("A", "B", "C")
 GATE_STAGES = {"topic", "search"}
 TRANSLATION_SCOPES = {"FULL_MIRROR", "MAIN_ONLY", "ABSTRACT_ONLY"}
+LAYOUT_FIDELITIES = {
+    "EXACT_TEXT_FRAME",
+    "STRUCTURAL_MIRROR",
+    "LEGACY_STRUCTURAL",
+    "NONE",
+}
+DEFAULT_CJK_FONT_FAMILY = "SimSun"
+DEFAULT_MINIMUM_FONT_SCALE = 0.95
 WEEK_PATTERN = re.compile(r"^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$")
 
 
@@ -63,7 +71,13 @@ def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any
         "paper_id": None,
         "stages": {
             **{name: _stage_record() for name in STAGE_NAMES},
-            "translation": {**_stage_record(), "scope": "FULL_MIRROR"},
+            "translation": {
+                **_stage_record(),
+                "scope": "FULL_MIRROR",
+                "layout_fidelity": "EXACT_TEXT_FRAME",
+                "cjk_font_family": DEFAULT_CJK_FONT_FAMILY,
+                "minimum_font_scale": DEFAULT_MINIMUM_FONT_SCALE,
+            },
         },
         "outputs": {
             "A": {"status": "NOT_STARTED", "zotero_attachment_key": None},
@@ -89,6 +103,10 @@ def normalize_manifest(data: object) -> dict[str, Any]:
         translation = stages.get("translation")
         if isinstance(translation, dict):
             translation.setdefault("scope", None)
+            if "layout_fidelity" not in translation:
+                translation["layout_fidelity"] = "LEGACY_STRUCTURAL"
+                translation.setdefault("cjk_font_family", None)
+                translation.setdefault("minimum_font_scale", None)
     data.setdefault("blocking_issues", [])
     return data
 
@@ -153,6 +171,34 @@ def validate_manifest(data: object) -> dict[str, Any]:
         raise WorkflowStateError(
             "Translation COMPLETE requires stages.translation.scope."
         )
+    translation = stages["translation"]
+    layout_fidelity = translation.get("layout_fidelity")
+    if layout_fidelity not in LAYOUT_FIDELITIES:
+        raise WorkflowStateError(
+            "translation.layout_fidelity must be one of "
+            f"{', '.join(sorted(LAYOUT_FIDELITIES))}."
+        )
+    if translation_scope == "FULL_MIRROR" and layout_fidelity == "NONE":
+        raise WorkflowStateError(
+            "FULL_MIRROR cannot use translation.layout_fidelity=NONE."
+        )
+    if translation_scope != "FULL_MIRROR" and layout_fidelity not in {
+        "NONE",
+        "LEGACY_STRUCTURAL",
+    }:
+        raise WorkflowStateError(
+            "Only FULL_MIRROR can use an active mirror layout fidelity."
+        )
+    if layout_fidelity == "EXACT_TEXT_FRAME":
+        if translation.get("cjk_font_family") != DEFAULT_CJK_FONT_FAMILY:
+            raise WorkflowStateError(
+                "EXACT_TEXT_FRAME requires translation.cjk_font_family=SimSun."
+            )
+        scale = translation.get("minimum_font_scale")
+        if not isinstance(scale, (int, float)) or float(scale) != DEFAULT_MINIMUM_FONT_SCALE:
+            raise WorkflowStateError(
+                "EXACT_TEXT_FRAME requires translation.minimum_font_scale=0.95."
+            )
 
     if stages["search"]["status"] in {"PROVISIONAL", "COMPLETE"} and not has_paper:
         raise WorkflowStateError(
@@ -277,6 +323,29 @@ def command_set_stage(args: argparse.Namespace) -> None:
     data["stages"][args.stage]["status"] = args.status
     write_manifest(args.manifest, data)
     print(f"Set {args.stage} to {args.status}.")
+
+
+def command_set_translation_profile(args: argparse.Namespace) -> None:
+    data = load_manifest(args.manifest)
+    translation = data["stages"]["translation"]
+    translation["scope"] = args.scope
+    translation["layout_fidelity"] = args.layout_fidelity
+    if args.layout_fidelity == "EXACT_TEXT_FRAME":
+        translation["cjk_font_family"] = DEFAULT_CJK_FONT_FAMILY
+        translation["minimum_font_scale"] = DEFAULT_MINIMUM_FONT_SCALE
+    else:
+        translation["cjk_font_family"] = None
+        translation["minimum_font_scale"] = None
+    if args.layout_fidelity != "LEGACY_STRUCTURAL":
+        translation["needs_update"] = True
+        reason = "translation profile changed; regenerate and revalidate A"
+        if reason not in translation["update_reason"]:
+            translation["update_reason"].append(reason)
+    write_manifest(args.manifest, data)
+    print(
+        "Set translation profile to "
+        f"{args.scope}/{args.layout_fidelity}."
+    )
 
 
 def command_set_output(args: argparse.Namespace) -> None:
@@ -454,6 +523,19 @@ def build_parser() -> argparse.ArgumentParser:
     stage_parser.add_argument("--stage", choices=STAGE_NAMES, required=True)
     stage_parser.add_argument("--status", choices=sorted(ALLOWED_STATUSES), required=True)
     stage_parser.set_defaults(handler=command_set_stage)
+
+    translation_profile = subparsers.add_parser(
+        "set-translation-profile",
+        help="Set Translation scope and explicit mirror fidelity.",
+    )
+    translation_profile.add_argument("--manifest", type=Path, required=True)
+    translation_profile.add_argument(
+        "--scope", choices=sorted(TRANSLATION_SCOPES), required=True
+    )
+    translation_profile.add_argument(
+        "--layout-fidelity", choices=sorted(LAYOUT_FIDELITIES), required=True
+    )
+    translation_profile.set_defaults(handler=command_set_translation_profile)
 
     output = subparsers.add_parser("set-output", help="Set A/B/C status and verified locator.")
     output.add_argument("--manifest", type=Path, required=True)
