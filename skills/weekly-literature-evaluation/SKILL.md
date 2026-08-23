@@ -30,6 +30,8 @@ Before changing weekly workflow state, read:
 
 Resolve and initialize `<data-root>` through the workspace contract before any write. Use `<data-root>/weekly_reviews/YYYY/YYYY-Wxx/workflow_manifest.yaml` as the single workflow source of truth.
 
+Record Translation scope in `stages.translation.scope`. An unqualified request to translate the focal paper defaults to `FULL_MIRROR`; the router must preserve this value through Translation validation and resume.
+
 ## Intent classification
 
 Route the current request into one of these modes:

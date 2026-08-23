@@ -37,3 +37,7 @@ Publisher decorative elements, advertisements and non-scientific branding are lo
 ## Overflow and extension tracking
 
 Every detected overflow or extension decision should be traceable in the layout plan or translation issue log. An extension page must identify which source page/section it continues so reverse mapping remains possible.
+
+For `FULL_MIRROR`, generate and maintain `<data-root>/work/<paper_id>/mirror_layout_plan.json` through `scripts/mirror_pdf.py`. Every output page must contain `source_page_refs`; every scientific figure/table must appear in `placed_object_ids`; tables must have a topology-preserving `table_placements` record. A valid standalone PDF produced outside this plan is a reflow artifact, not a completed mirror.
+
+Visual QA means comparing the actual rendered source page with the actual rendered A page. Record a concrete render note for each page. Checking only clipping, file readability or page existence is insufficient.

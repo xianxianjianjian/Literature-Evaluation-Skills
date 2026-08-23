@@ -6,6 +6,8 @@ Scientific data and source relationships must be preserved when localizing visua
 
 Translate titles, headers, labels, footnotes and explanatory text. Lock numerical cells and significance markers to the source and perform cell-by-cell numeric checks.
 
+Preserve row/column topology, header levels, merged cells, footnotes and significance markers. If a readable native reconstruction is not feasible, retain the original table image and provide a complete Chinese header/footnote/label map. Do not flatten each source cell into an unrelated “Chinese row + original row” sequence.
+
 For wide or dense tables, prefer:
 
 - line wrapping;
@@ -46,6 +48,8 @@ and must not be presented as part of the author's original artwork.
 ## Supporting Information
 
 Main Article and SI are one evidence package but retain separate source identities (`SRC-M1`, `SRC-S1`, ...).
+
+Before translating, enumerate every scientific Main/SI figure and table in `source_inventory.json`, including objects found through DOCX drawing relationships rather than only paragraphs/tables exposed by a high-level API. Reconcile that inventory with `mirror_layout_plan.json` before completion.
 
 Rules:
 

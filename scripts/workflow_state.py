@@ -30,6 +30,7 @@ NON_GATE_STATUSES = ALLOWED_STATUSES - {"WAITING_USER"}
 STAGE_NAMES = ("topic", "search", "translation", "deep_reading")
 OUTPUT_NAMES = ("A", "B", "C")
 GATE_STAGES = {"topic", "search"}
+TRANSLATION_SCOPES = {"FULL_MIRROR", "MAIN_ONLY", "ABSTRACT_ONLY"}
 WEEK_PATTERN = re.compile(r"^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$")
 
 
@@ -60,7 +61,10 @@ def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any
         "workflow_id": workflow_id or f"{week}-weekly-literature-evaluation",
         "week": week,
         "paper_id": None,
-        "stages": {name: _stage_record() for name in STAGE_NAMES},
+        "stages": {
+            **{name: _stage_record() for name in STAGE_NAMES},
+            "translation": {**_stage_record(), "scope": "FULL_MIRROR"},
+        },
         "outputs": {
             "A": {"status": "NOT_STARTED", "zotero_attachment_key": None},
             "B": {"status": "NOT_STARTED", "zotero_attachment_key": None},
@@ -82,6 +86,9 @@ def normalize_manifest(data: object) -> dict[str, Any]:
             if isinstance(stage, dict):
                 stage.setdefault("needs_update", False)
                 stage.setdefault("update_reason", [])
+        translation = stages.get("translation")
+        if isinstance(translation, dict):
+            translation.setdefault("scope", None)
     data.setdefault("blocking_issues", [])
     return data
 
@@ -135,6 +142,17 @@ def validate_manifest(data: object) -> dict[str, Any]:
             raise WorkflowStateError(
                 f"{name}.update_reason must be empty when needs_update is false."
             )
+
+    translation_scope = stages["translation"].get("scope")
+    if translation_scope is not None and translation_scope not in TRANSLATION_SCOPES:
+        raise WorkflowStateError(
+            "translation.scope must be null or one of "
+            f"{', '.join(sorted(TRANSLATION_SCOPES))}."
+        )
+    if stages["translation"]["status"] == "COMPLETE" and translation_scope is None:
+        raise WorkflowStateError(
+            "Translation COMPLETE requires stages.translation.scope."
+        )
 
     if stages["search"]["status"] in {"PROVISIONAL", "COMPLETE"} and not has_paper:
         raise WorkflowStateError(

@@ -64,10 +64,28 @@ def load_page_map(path: Path) -> dict[str, Any]:
         if number in seen:
             raise MirrorPlanError(f"Duplicate page_number in page map: {number}")
         seen.add(number)
+        source_id = page.get("source_id", "SRC-M1")
+        source_page = page.get("source_page", number)
+        if not isinstance(source_id, str) or not source_id.strip():
+            raise MirrorPlanError(f"Page {number} source_id must be non-empty text.")
+        if not isinstance(source_page, int) or source_page <= 0:
+            raise MirrorPlanError(f"Page {number} source_page must be a positive integer.")
         for field in ("text_blocks", "figure_placeholders", "table_placeholders"):
             if field in page and not isinstance(page[field], list):
                 raise MirrorPlanError(f"Page {number} field {field} must be a list.")
+        if "table_placements" in page and not isinstance(page["table_placements"], list):
+            raise MirrorPlanError(f"Page {number} table_placements must be a list.")
     return data
+
+
+def _placeholder_ids(items: list[Any]) -> list[str]:
+    identifiers: list[str] = []
+    for item in items:
+        if isinstance(item, str) and item.strip():
+            identifiers.append(item.strip())
+        elif isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].strip():
+            identifiers.append(item["id"].strip())
+    return identifiers
 
 
 def create_plan(args: argparse.Namespace) -> dict[str, Any]:
@@ -79,13 +97,25 @@ def create_plan(args: argparse.Namespace) -> dict[str, Any]:
     page_map = load_page_map(args.page_map)
     pages = []
     for index, page in enumerate(page_map["pages"], start=1):
+        page_number = page.get("page_number", index)
+        figures = page.get("figure_placeholders", [])
+        tables = page.get("table_placeholders", [])
         pages.append(
             {
-                "page_number": page.get("page_number", index),
+                "page_number": page_number,
+                "output_page_number": page_number,
                 "source_page_label": page.get("source_page_label"),
+                "source_page_refs": [
+                    {
+                        "source_id": page.get("source_id", "SRC-M1"),
+                        "source_page": page.get("source_page", page_number),
+                    }
+                ],
                 "text_blocks": page.get("text_blocks", []),
-                "figure_placeholders": page.get("figure_placeholders", []),
-                "table_placeholders": page.get("table_placeholders", []),
+                "figure_placeholders": figures,
+                "table_placeholders": tables,
+                "placed_object_ids": _placeholder_ids(figures + tables),
+                "table_placements": page.get("table_placements", []),
                 "adaptive_font_sizing": {
                     "initial_scale": args.font_scale,
                     "minimum_font_pt": MINIMUM_FONT_PT,
@@ -94,6 +124,7 @@ def create_plan(args: argparse.Namespace) -> dict[str, Any]:
                 "layout_strategy_used": None,
                 "overflow_detected": None,
                 "extension_page": None,
+                "extension_of": None,
                 "render_checked": False,
                 "render_notes": [],
             }
@@ -156,6 +187,29 @@ def validate_plan_data(plan: object) -> dict[str, Any]:
         notes = page.get("render_notes")
         if not isinstance(notes, list) or not all(isinstance(note, str) for note in notes):
             raise MirrorPlanError(f"Page {number} render_notes must be a list of strings.")
+        output_number = page.get("output_page_number")
+        if not isinstance(output_number, int) or output_number <= 0:
+            raise MirrorPlanError(f"Page {number} output_page_number must be a positive integer.")
+        refs = page.get("source_page_refs")
+        if not isinstance(refs, list) or not refs:
+            raise MirrorPlanError(f"Page {number} source_page_refs must be a non-empty list.")
+        for ref in refs:
+            if (
+                not isinstance(ref, dict)
+                or not isinstance(ref.get("source_id"), str)
+                or not ref["source_id"].strip()
+                or not isinstance(ref.get("source_page"), int)
+                or ref["source_page"] <= 0
+            ):
+                raise MirrorPlanError(f"Page {number} has an invalid source_page_refs entry.")
+        placed = page.get("placed_object_ids")
+        if not isinstance(placed, list) or not all(
+            isinstance(item, str) and item.strip() for item in placed
+        ):
+            raise MirrorPlanError(f"Page {number} placed_object_ids must be a list of IDs.")
+        placements = page.get("table_placements")
+        if not isinstance(placements, list):
+            raise MirrorPlanError(f"Page {number} table_placements must be a list.")
     qc = plan.get("layout_qc")
     if not isinstance(qc, dict):
         raise MirrorPlanError("layout_qc object is required.")

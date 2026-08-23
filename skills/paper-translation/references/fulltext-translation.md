@@ -14,15 +14,15 @@ Example:
 
 Track them in `<data-root>/work/<paper_id>/translation_ledger.jsonl` so coverage can be checked and missing units cannot disappear silently.
 
-Each ledger record should support at least:
+Each ledger record must include:
 
-- source ID;
-- page;
-- section/subsection;
-- paragraph/unit index;
-- source status;
-- translation status;
+- `unit_id`, source ID and fixed-render source page;
+- section/subsection, scientific-content kind and positive unit index;
+- source status and translation status (`TRANSLATED` or `SOURCE_GAP`);
+- one or more output pages for translated units;
 - issue IDs when present.
+
+Build `source_inventory.json` first and require the ledger to cover exactly its translation units. See [`translation-evidence-contract.md`](translation-evidence-contract.md). A ledger produced from `doc.paragraphs` alone is invalid when the source also contains drawings, tables or floating objects.
 
 ## Coverage
 
