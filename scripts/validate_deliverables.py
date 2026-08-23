@@ -80,12 +80,16 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/workflow_state.py",
     "scripts/validate_deliverables.py",
     "scripts/mirror_pdf.py",
+    "scripts/exact_mirror.py",
+    "scripts/extract_text_frames.py",
+    "scripts/render_exact_mirror.py",
     "scripts/validate_translation_package.py",
     "scripts/sanitize_docx_metadata.py",
     "scripts/psychology_method_router.py",
     "scripts/runtime_paths.py",
     "scripts/init_workspace.py",
     "scripts/build_plugin_bundle.py",
+    "requirements-exact-mirror.txt",
 ]
 WORKSPACE_REQUIRED_DIRECTORIES = [
     "knowledge",
@@ -304,6 +308,7 @@ def check_translation_package(
     scope: str | None,
     required: bool,
     report_path: Path | None = None,
+    layout_fidelity: str | None = None,
 ) -> list[Check]:
     if work_dir is None:
         return [
@@ -317,13 +322,27 @@ def check_translation_package(
         return [Check("translation-package", False, "translation package validation requires --a-path")]
     if scope is None:
         return [Check("translation-package", False, "translation package validation requires translation scope")]
-    translated = translation_validator.validate_package(work_dir, a_path, scope)
+    translated, layout_diff, resolved_fidelity = translation_validator.validate_package_detailed(
+        work_dir, a_path, scope, layout_fidelity
+    )
     checks = [
         Check(f"translation:{item.code}", item.passed, item.detail)
         for item in translated
     ]
     if report_path is not None:
-        translation_validator.write_report(report_path, work_dir, a_path, scope, translated)
+        translation_validator.write_report(
+            report_path,
+            work_dir,
+            a_path,
+            scope,
+            translated,
+            resolved_fidelity,
+        )
+        if layout_diff is not None:
+            translation_validator.write_layout_diff(
+                work_dir / translation_validator.LAYOUT_DIFF_FILE,
+                layout_diff,
+            )
     elif required:
         checks.append(
             Check(
@@ -483,6 +502,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(translation_validator.SCOPES),
         help="Override translation scope when no workflow manifest supplies it.",
     )
+    parser.add_argument(
+        "--translation-layout-fidelity",
+        choices=sorted(translation_validator.LAYOUT_FIDELITIES),
+        help="Override translation layout fidelity when no workflow manifest supplies it.",
+    )
     parser.add_argument("--translation-report", type=Path)
     parser.add_argument("--require-a", action="store_true")
     parser.add_argument("--require-b", action="store_true")
@@ -555,6 +579,11 @@ def main(argv: list[str] | None = None) -> int:
     manifest_scope = (
         manifest_data["stages"]["translation"].get("scope") if manifest_data else None
     )
+    manifest_layout_fidelity = (
+        manifest_data["stages"]["translation"].get("layout_fidelity")
+        if manifest_data
+        else None
+    )
     if args.translation_scope and manifest_scope and args.translation_scope != manifest_scope:
         checks.append(
             Check(
@@ -564,6 +593,21 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     translation_scope = args.translation_scope or manifest_scope
+    if (
+        args.translation_layout_fidelity
+        and manifest_layout_fidelity
+        and args.translation_layout_fidelity != manifest_layout_fidelity
+    ):
+        checks.append(
+            Check(
+                "translation:layout-fidelity-conflict",
+                False,
+                "CLI layout fidelity differs from manifest layout fidelity",
+            )
+        )
+    translation_layout_fidelity = (
+        args.translation_layout_fidelity or manifest_layout_fidelity
+    )
     translation_complete = bool(
         manifest_data
         and (
@@ -579,6 +623,7 @@ def main(argv: list[str] | None = None) -> int:
             translation_scope,
             translation_complete or args.translation_work_dir is not None,
             args.translation_report,
+            translation_layout_fidelity,
         )
     )
     checks.append(check_docx_b(args.b_path, args.require_b))
