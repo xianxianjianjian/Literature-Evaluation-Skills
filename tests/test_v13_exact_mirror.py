@@ -19,11 +19,12 @@ import validate_translation_package as validator
 import workflow_state
 
 try:
-    from fontTools.ttLib import TTCollection
+    from fontTools.fontBuilder import FontBuilder
+    from fontTools.pens.ttGlyphPen import TTGlyphPen
     from pypdf import PdfReader, PdfWriter
     from reportlab.pdfgen import canvas
 except ImportError:
-    TTCollection = PdfReader = PdfWriter = canvas = None
+    FontBuilder = TTGlyphPen = PdfReader = PdfWriter = canvas = None
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -65,29 +66,58 @@ def _boxes(page: object) -> dict[str, list[float]]:
     return result
 
 
-def _test_simsun(root: Path) -> Path | None:
+def _test_simsun(root: Path, allow_installed: bool = True) -> Path | None:
     installed = Path(r"C:\Windows\Fonts\simsun.ttc")
-    if installed.is_file():
+    if allow_installed and installed.is_file():
         return installed
-    if TTCollection is None:
+    if FontBuilder is None or TTGlyphPen is None:
         return None
-    candidates = [
-        Path("/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc"),
-        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
-    ]
-    source = next((path for path in candidates if path.is_file()), None)
-    if source is None:
-        return None
-    collection = TTCollection(str(source))
-    font = collection.fonts[0]
-    for record in font["name"].names:
-        if record.nameID in {1, 4, 6}:
-            value = "SimSun"
-            record.string = value.encode(record.getEncoding(), errors="replace")
-    synthetic = TTCollection()
-    synthetic.fonts = [font]
+
+    # CI cannot redistribute Windows SimSun. Build a tiny TrueType test double
+    # whose family/resource name is SimSun and whose cmap covers this fixture.
+    # Production still requires C:\Windows\Fonts\simsun.ttc and never calls this.
+    codepoints = set(range(32, 127)) | {ord(char) for char in "中文正文速度表头分析"}
+    glyph_order = [".notdef"] + [f"uni{codepoint:04X}" for codepoint in sorted(codepoints)]
+    cmap = {codepoint: f"uni{codepoint:04X}" for codepoint in sorted(codepoints)}
+    glyphs = {}
+    metrics = {}
+    for glyph_name in glyph_order:
+        pen = TTGlyphPen(None)
+        if glyph_name != "uni0020":
+            pen.moveTo((80, 0))
+            pen.lineTo((80, 700))
+            pen.lineTo((720, 700))
+            pen.lineTo((720, 0))
+            pen.closePath()
+        glyphs[glyph_name] = pen.glyph()
+        metrics[glyph_name] = (800, 0)
+
+    builder = FontBuilder(1000, isTTF=True)
+    builder.setupGlyphOrder(glyph_order)
+    builder.setupCharacterMap(cmap)
+    builder.setupGlyf(glyphs)
+    builder.setupHorizontalMetrics(metrics)
+    builder.setupHorizontalHeader(ascent=800, descent=-200)
+    builder.setupOS2(
+        sTypoAscender=800,
+        sTypoDescender=-200,
+        usWinAscent=800,
+        usWinDescent=200,
+    )
+    builder.setupNameTable(
+        {
+            "familyName": "SimSun",
+            "styleName": "Regular",
+            "uniqueFontIdentifier": "Synthetic SimSun exact-mirror test fixture",
+            "fullName": "SimSun",
+            "psName": "SimSun",
+            "version": "Version 1.0",
+        }
+    )
+    builder.setupPost()
+    builder.setupMaxp()
     output = root / "simsun.ttc"
-    synthetic.save(str(output))
+    builder.save(str(output))
     return output
 
 
