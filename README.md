@@ -4,7 +4,7 @@
 
 V1 的核心目标不是生成普通摘要，而是形成可核验、可追溯、可恢复的研究档案：重要结论回到原文位置，作者解释与评译者分析分离，Main/SI 一体审计，Translation/Methods/Results/Discussion 都有明确完成与 QC 规则。
 
-当前插件版本：`1.1.0`。本次升级只改变安装、运行路径、工作区与打包方式，不修改 V1 已冻结的学术逻辑、两个 Gate、证据合同或 A/B/C 范围。
+当前插件版本：`1.2.0`。本次升级把全文镜像的源对象/页码证据链变成可执行门禁，并为心理学与认知神经科学论文增加有公开方法依据的研究设计路由；两个用户 Gate 和 A/B/C 产品边界保持不变。
 
 ## 四 Skill 架构
 
@@ -128,6 +128,30 @@ python <plugin-root>/scripts/init_workspace.py \
 - **C**：每周评译提交稿。
 
 C 中的评论正文默认至少 500 个有效中文字符；原文摘要与中文摘要不计入这 500 字。
+
+### A 的 v1.2.0 完成证据
+
+`FULL_MIRROR` 不再因 PDF 文件存在而自动通过。每个 paper work directory 必须包含互相核对的 `source_inventory.json`、`translation_ledger.jsonl`、`mirror_layout_plan.json` 和翻译 issue 记录。独立检查命令为：
+
+```bash
+python scripts/validate_translation_package.py \
+  --work-dir <data-root>/work/<paper_id> \
+  --a-path <A.pdf> \
+  --scope FULL_MIRROR \
+  --report <data-root>/work/<paper_id>/translation_validation.json
+```
+
+它会阻止漏 Main/SI 图表、源页未映射、ledger 缺字段、表格拓扑被扁平化或未完成渲染检查的 A 进入 `COMPLETE`。
+
+### B 的心理学方法路由与元数据
+
+心理学/行为科学/认知神经科学论文采用三遍阅读，并按实际设计选择 JARS、STROBE、CONSORT-SPI、JARS-Qual/MMARS、COBIDAS 或中介/SEM 时间性模块。报告完整性不等于研究质量，不生成机械总分。B 必须包含“研究设计与适用方法规范”，并在交付前运行：
+
+```bash
+python scripts/sanitize_docx_metadata.py --input <B.docx>
+```
+
+除非用户明确指定作者，DOCX 的作者、last-modified-by、keywords、comments/description 和 Word comments 必须清空，且 `docProps/core.xml` 不得出现生成工具标识。
 
 ## 最快开始方式
 
@@ -273,6 +297,14 @@ python scripts/validate_plugin_package.py --plugin-root .
 python scripts/validate_deliverables.py --repo-root .
 ```
 
+心理学方法路由可选辅助命令：
+
+```bash
+python scripts/psychology_method_router.py --profile <study-profile.json>
+```
+
+该命令只选择适用的阅读提示模块，不评分论文或替代学术判断。
+
 已安装插件与独立数据目录分别验证：
 
 ```bash
@@ -338,4 +370,4 @@ V1 核心于 2026-08-21 合并到 `main`；`v1.0.0` tag 固定核心发布点。
 
 长期分支仍以 `main` 为稳定主线。功能分支在验证和合并后可删除，历史由 Git commits/tags 保留。
 
-详见 [`docs/branch-strategy.md`](docs/branch-strategy.md) 和 [`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md)。
+详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)、[`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md) 和 [`docs/releases/v1.2.0.md`](docs/releases/v1.2.0.md)。
