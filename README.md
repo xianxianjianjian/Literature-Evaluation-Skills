@@ -4,7 +4,7 @@
 
 V1 的核心目标不是生成普通摘要，而是形成可核验、可追溯、可恢复的研究档案：重要结论回到原文位置，作者解释与评译者分析分离，Main/SI 一体审计，Translation/Methods/Results/Discussion 都有明确完成与 QC 规则。
 
-当前插件版本：`1.2.0`。本次升级把全文镜像的源对象/页码证据链变成可执行门禁，并为心理学与认知神经科学论文增加有公开方法依据的研究设计路由；两个用户 Gate 和 A/B/C 产品边界保持不变。
+当前插件版本：`1.3.0`。`FULL_MIRROR` 现在默认执行原位文本框替换：页面、分栏、图表和非文本区域保持不变，中文强制嵌入宋体 SimSun，字号只能在原字号的 100%–95% 内适配。旧自适应布局仅作为用户显式选择的结构镜像。
 
 ## 四 Skill 架构
 
@@ -123,25 +123,38 @@ python <plugin-root>/scripts/init_workspace.py \
 
 ## 交付物
 
-- **A**：中文全文翻译镜像版 PDF。
+- **A**：默认采用宋体原位文本框替换的中文全文镜像版 PDF。
 - **B**：完整文献研究笔记 DOCX。
 - **C**：每周评译提交稿。
 
 C 中的评论正文默认至少 500 个有效中文字符；原文摘要与中文摘要不计入这 500 字。
 
-### A 的 v1.2.0 完成证据
+### A 的 v1.3.0 原位镜像证据
 
-`FULL_MIRROR` 不再因 PDF 文件存在而自动通过。每个 paper work directory 必须包含互相核对的 `source_inventory.json`、`translation_ledger.jsonl`、`mirror_layout_plan.json` 和翻译 issue 记录。独立检查命令为：
+新的 `FULL_MIRROR` 默认写入 `layout_fidelity: EXACT_TEXT_FRAME`、`cjk_font_family: SimSun` 和 `minimum_font_scale: 0.95`。每个 work directory 必须包含 schema-v2 inventory、逐框 ledger、`text_frame_inventory.jsonl`、`font_map.json`、精确 layout plan 和 issue 记录。先创建字体映射并生成 A：
+
+```bash
+python scripts/mirror_pdf.py create-font-map \
+  --font-path C:\Windows\Fonts\simsun.ttc \
+  --output <data-root>/work/<paper_id>/font_map.json
+
+python scripts/render_exact_mirror.py \
+  --work-dir <data-root>/work/<paper_id> \
+  --output <A.pdf>
+```
+
+再执行独立检查：
 
 ```bash
 python scripts/validate_translation_package.py \
   --work-dir <data-root>/work/<paper_id> \
   --a-path <A.pdf> \
   --scope FULL_MIRROR \
+  --layout-fidelity EXACT_TEXT_FRAME \
   --report <data-root>/work/<paper_id>/translation_validation.json
 ```
 
-它会阻止漏 Main/SI 图表、源页未映射、ledger 缺字段、表格拓扑被扁平化或未完成渲染检查的 A 进入 `COMPLETE`。
+验证器会自动写入 `layout_diff.json`，并阻止页数/页面 Box 改变、文本框越界、非 SimSun 中文、字号低于95%、表格单元格破坏、图内标签遗漏和替换框外像素变化的 A 进入 `COMPLETE`。`render_checked=true` 不能代替这些测量。
 
 ### B 的心理学方法路由与元数据
 
@@ -370,4 +383,4 @@ V1 核心于 2026-08-21 合并到 `main`；`v1.0.0` tag 固定核心发布点。
 
 长期分支仍以 `main` 为稳定主线。功能分支在验证和合并后可删除，历史由 Git commits/tags 保留。
 
-详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)、[`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md) 和 [`docs/releases/v1.2.0.md`](docs/releases/v1.2.0.md)。
+详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)、[`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md)、[`docs/releases/v1.2.0.md`](docs/releases/v1.2.0.md) 和 [`docs/releases/v1.3.0.md`](docs/releases/v1.3.0.md)。
