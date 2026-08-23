@@ -13,6 +13,7 @@ Own the complete V1 Deep Reading stage:
 source/package intake
 → Full Research Audit
 → Paper Structure Inventory
+→ three-pass positioning/reconstruction/audit
 → Introduction reconstruction
 → Methods reconstruction
 → Results/statistical route reconstruction
@@ -46,6 +47,7 @@ Read the reference that owns each decision:
 - source identity, Main/SI package, three-level audit, consistency checks → [`references/source-audit.md`](references/source-audit.md)
 - theory, gap, RQ/Aim/Hypothesis, citation tracing → [`references/introduction-reconstruction.md`](references/introduction-reconstruction.md)
 - sample, measurement, participant/researcher flows, acquisition/preprocessing → [`references/methods-reconstruction.md`](references/methods-reconstruction.md)
+- psychology/cognitive-neuroscience design routing and statistical interpretation → [`references/psychology-methods-routing.md`](references/psychology-methods-routing.md)
 - analysis tree, Result Matrix, statistics and hypothesis closure → [`references/results-analysis.md`](references/results-analysis.md)
 - author interpretation, ED0–ED3, critique, innovation, limitations, redesign, transfer → [`references/discussion-and-critique.md`](references/discussion-and-critique.md)
 - paper-specific sections and Source→Notebook closure → [`references/dynamic-coverage.md`](references/dynamic-coverage.md)
@@ -81,6 +83,16 @@ Before analysis:
 6. create a Paper Structure Inventory before applying the notebook schema.
 
 Do not use A as a substitute for unavailable Main/SI evidence.
+
+## Three-pass deep reading
+
+For psychology, behavioral-science and cognitive-neuroscience papers, read [`references/psychology-methods-routing.md`](references/psychology-methods-routing.md) and complete all three passes:
+
+1. position the paper, its constructs/design/claims and applicable method modules;
+2. reconstruct Main/SI methods, figures, tables, measures and results;
+3. virtually reproduce the inferential logic, audit assumptions and alternative explanations, and design a specific improvement.
+
+Record the chosen modules, why they apply and any important non-applicable module in B. Reporting standards are completeness prompts, not numerical quality scores; reporting omissions and validity threats remain separate judgments.
 
 ## Evidence contract
 
@@ -165,6 +177,8 @@ Mandatory where relevant:
 
 Never substitute total N for an unreported model-specific N.
 
+Use design-specific psychology modules where applicable: JARS; CONSORT-SPI for randomized psychological interventions; STROBE for observational designs; JARS-Qual/MMARS for qualitative/mixed methods; COBIDAS for MRI/fMRI; and a dedicated temporal/alternative-model audit for mediation/SEM.
+
 ## Results analysis
 
 Build a Data Analysis Question Tree from hypotheses, the Methods plan, and actual Results.
@@ -179,6 +193,8 @@ Explain important findings in four layers:
 4. hypothesis consequence.
 
 Retain prespecified non-significant findings. Separate primary/secondary/exploratory/post-hoc and corrected/uncorrected results.
+
+Interpret consequential results through analysis-specific N, estimate/direction, uncertainty interval, effect size and scientific meaning, exact p value and multiplicity status when reported. Never base a conclusion only on whether p crosses a threshold. Assess sample-size justification against its stated goal, including power, precision, smallest effect of interest or feasibility.
 
 Close hypotheses only as:
 
@@ -219,7 +235,9 @@ Do not create headings for trivial details simply to make B longer.
 
 ### B
 
-Create `[B] 文献研究笔记·完整精读版` as a DOCX research archive when the environment supports document generation. Important conclusions must be traceable to source anchors/evidence IDs.
+Create `[B] 文献研究笔记·完整精读版` as a DOCX research archive when the environment supports document generation. Important conclusions must be traceable to source anchors/evidence IDs. Include a **研究设计与适用方法规范** subsection that identifies the applied method modules and separates reporting completeness from validity judgment.
+
+Before B is delivered, run `scripts/sanitize_docx_metadata.py`. Unless the user explicitly supplies an author name, author, last-modified-by, keywords and comments/description must be empty, Word comments removed, and generator identifiers absent from `docProps/core.xml` and other document properties.
 
 ### C
 

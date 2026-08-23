@@ -119,6 +119,10 @@ Where the study reports them, prioritize:
 
 Do not infer practical importance from statistical significance alone.
 
+Do not classify a finding only as “significant/non-significant.” Report the exact p value when available alongside estimate, interval, effect size, model-specific N, multiplicity status and scientific meaning. A p value is not the probability that the hypothesis is true and does not measure effect magnitude. Distinguish a near-zero estimate from an imprecise estimate with a wide interval.
+
+When sample size is consequential, record the authors' justification and its target: power, precision, smallest effect of interest, feasibility, resource constraint or another stated rationale. Evaluate whether that rationale supports the analysis rather than imposing one universal power rule.
+
 ## Mandatory consistency checks
 
 When enough information is available, recalculate consistency checks such as:
