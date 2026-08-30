@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Recover translated overlay text from an earlier mirror PDF without storing it in Git.
 
-This release-acceptance bridge is intentionally read-only with respect to the
-reference PDF. It subtracts the original source text layer from the reference
-PDF, assigns the remaining overlay glyphs to the already-reviewed exact source
-frames, and writes a frame-linked translation ledger. It never marks frames as
-reviewed and never changes source/background evidence.
+This release-acceptance bridge is read-only with respect to the reference PDF.
+It subtracts the unchanged source text layer, assigns remaining overlay glyphs
+to reviewed exact source frames, and writes a frame-linked translation ledger.
 """
 
 from __future__ import annotations
@@ -21,7 +19,7 @@ from typing import Any
 try:
     import pdfplumber
     from pdfplumber.utils import collate_line
-except ImportError:  # pragma: no cover - CLI dependency check
+except ImportError:  # pragma: no cover
     pdfplumber = None
     collate_line = None
 
@@ -78,7 +76,10 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(value, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _rounded(value: Any, quantum: float = 0.25) -> float:
@@ -96,8 +97,6 @@ def _char_signature(char: dict[str, Any]) -> tuple[str, float, float, float, flo
 
 
 def _overlay_chars(source_page: Any, reference_page: Any) -> list[dict[str, Any]]:
-    """Remove the unchanged original source text layer as a multiset."""
-
     source_counts = Counter(_char_signature(char) for char in source_page.chars)
     overlay: list[dict[str, Any]] = []
     for char in reference_page.chars:
@@ -109,12 +108,16 @@ def _overlay_chars(source_page: Any, reference_page: Any) -> list[dict[str, Any]
     return overlay
 
 
-def _frame_top_bbox(frame: dict[str, Any], page_height: float) -> tuple[float, float, float, float]:
+def _frame_top_bbox(
+    frame: dict[str, Any], page_height: float
+) -> tuple[float, float, float, float]:
     x0, y0, x1, y1 = [float(value) for value in frame["bbox_pt"]]
     return x0, page_height - y1, x1, page_height - y0
 
 
-def _contains_center(char: dict[str, Any], bbox: tuple[float, float, float, float]) -> bool:
+def _contains_center(
+    char: dict[str, Any], bbox: tuple[float, float, float, float]
+) -> bool:
     cx = (float(char["x0"]) + float(char["x1"])) / 2
     cy = (float(char["top"]) + float(char["bottom"])) / 2
     tolerance = 0.75
@@ -127,7 +130,9 @@ def _contains_center(char: dict[str, Any], bbox: tuple[float, float, float, floa
 def _reconstruct_text(chars: list[dict[str, Any]]) -> str:
     if not chars:
         return ""
-    chars = sorted(chars, key=lambda char: (float(char["top"]), float(char["x0"])))
+    chars = sorted(
+        chars, key=lambda char: (float(char["top"]), float(char["x0"]))
+    )
     bands: list[list[dict[str, Any]]] = []
     for char in chars:
         if not bands:
@@ -140,7 +145,6 @@ def _reconstruct_text(chars: list[dict[str, Any]]) -> str:
             bands.append([char])
         else:
             bands[-1].append(char)
-
     lines: list[str] = []
     for band in bands:
         ordered = sorted(band, key=lambda char: float(char["x0"]))
@@ -151,33 +155,50 @@ def _reconstruct_text(chars: list[dict[str, Any]]) -> str:
 
 
 def _retained_english_tokens(text: str) -> list[dict[str, str]]:
-    """Account every validator-relevant English word observed in the reviewed overlay."""
-
-    seen: set[str] = set()
-    tokens: list[dict[str, str]] = []
-    for word in re.findall(r"[A-Za-z]{3,}", text):
-        normalized = word.lower()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        tokens.append(
-            {
-                "text": word,
-                "reason": "RETAINED_IN_REVIEWED_REFERENCE_TRANSLATION",
-            }
-        )
-    return tokens
+    """Account validator-relevant English retained in the reviewed translation."""
+    words = sorted(
+        set(re.findall(r"[A-Za-z]{3,}(?:[-/][A-Za-z0-9]+)*", text))
+    )
+    return [
+        {
+            "text": word,
+            "reason": "RETAINED_IN_REVIEWED_REFERENCE_TRANSLATION",
+        }
+        for word in words
+    ]
 
 
-def _boxes_match(source_page: Any, reference_page: Any, tolerance: float = 0.05) -> bool:
+def _box_values(value: Any) -> list[float] | None:
+    """Normalize pypdf rectangles and pdfplumber tuple-style page boxes."""
+    if value is None:
+        return None
+    if all(hasattr(value, name) for name in ("left", "bottom", "right", "top")):
+        return [
+            float(value.left),
+            float(value.bottom),
+            float(value.right),
+            float(value.top),
+        ]
+    if isinstance(value, (tuple, list)) and len(value) == 4:
+        return [float(item) for item in value]
+    try:
+        items = list(value)
+    except (TypeError, ValueError):
+        return None
+    if len(items) != 4:
+        return None
+    return [float(item) for item in items]
+
+
+def _boxes_match(
+    source_page: Any, reference_page: Any, tolerance: float = 0.05
+) -> bool:
     for field in ("mediabox", "cropbox", "trimbox", "bleedbox", "artbox"):
-        left = getattr(source_page, field, None)
-        right = getattr(reference_page, field, None)
+        left = _box_values(getattr(source_page, field, None))
+        right = _box_values(getattr(reference_page, field, None))
         if left is None or right is None:
             continue
-        left_values = [float(left.left), float(left.bottom), float(left.right), float(left.top)]
-        right_values = [float(right.left), float(right.bottom), float(right.right), float(right.top)]
-        if any(abs(a - b) > tolerance for a, b in zip(left_values, right_values)):
+        if any(abs(a - b) > tolerance for a, b in zip(left, right)):
             return False
     return True
 
@@ -190,10 +211,16 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
     frame_rows = _load_jsonl(work_dir / "text_frame_inventory.jsonl")
     frames = {row.get("frame_id"): row for row in frame_rows}
     if None in frames or len(frames) != len(frame_rows):
-        raise OverlayRecoveryError("Text-frame inventory has missing or duplicate frame IDs.")
+        raise OverlayRecoveryError(
+            "Text-frame inventory has missing or duplicate frame IDs."
+        )
 
-    sources = {source["source_id"]: source for source in inventory.get("sources", [])}
-    pages = sorted(inventory.get("pages", []), key=lambda page: page["output_page"])
+    sources = {
+        source["source_id"]: source for source in inventory.get("sources", [])
+    }
+    pages = sorted(
+        inventory.get("pages", []), key=lambda page: page["output_page"]
+    )
     if not pages:
         raise OverlayRecoveryError("Source inventory has no pages.")
 
@@ -232,19 +259,25 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
                 )
 
             overlay = _overlay_chars(source_page, reference_page)
-            candidates: list[tuple[float, str, tuple[float, float, float, float]]] = []
+            candidates: list[
+                tuple[float, str, tuple[float, float, float, float]]
+            ] = []
             for frame_id in page_record["frame_ids"]:
                 frame = frames[frame_id]
                 if frame.get("translation_action") != "TRANSLATE":
                     continue
                 bbox = _frame_top_bbox(frame, float(reference_page.height))
-                area = max(1e-9, (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]))
+                area = max(
+                    1e-9, (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+                )
                 candidates.append((area, frame_id, bbox))
 
             owned: dict[str, list[dict[str, Any]]] = defaultdict(list)
             page_unowned: list[str] = []
             for char in overlay:
-                owners = [item for item in candidates if _contains_center(char, item[2])]
+                owners = [
+                    item for item in candidates if _contains_center(char, item[2])
+                ]
                 if owners:
                     _, frame_id, _ = min(owners, key=lambda item: item[0])
                     owned[frame_id].append(char)
@@ -260,7 +293,9 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
                     }
                 )
 
-            for fallback_index, frame_id in enumerate(page_record["frame_ids"], 1):
+            for fallback_index, frame_id in enumerate(
+                page_record["frame_ids"], 1
+            ):
                 frame = frames[frame_id]
                 if frame.get("translation_action") != "TRANSLATE":
                     continue
@@ -274,7 +309,9 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
                         "source_id": source_id,
                         "source_page": source_page_number,
                         "section": str(frame.get("kind") or "Body"),
-                        "unit_index": int(frame.get("reading_order") or fallback_index),
+                        "unit_index": int(
+                            frame.get("reading_order") or fallback_index
+                        ),
                         "kind": frame["kind"],
                         "source_status": "READABLE",
                         "translation_status": "TRANSLATED",
@@ -285,14 +322,18 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
                         "translated_text": translated_text,
                         "font_scale_used": 1.0,
                         "fit_status": "FIT",
-                        "untranslated_tokens": _retained_english_tokens(translated_text),
+                        "untranslated_tokens": _retained_english_tokens(
+                            translated_text
+                        ),
                     }
                 )
             page_diagnostics.append(
                 {
                     "output_page": output_page,
                     "overlay_characters": len(overlay),
-                    "owned_characters": sum(len(value) for value in owned.values()),
+                    "owned_characters": sum(
+                        len(value) for value in owned.values()
+                    ),
                     "unowned_nonspace_characters": len(page_unowned),
                 }
             )
@@ -322,7 +363,9 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
         if unowned:
             details.append(
                 "unowned overlay glyphs on output pages: "
-                + ", ".join(str(item["output_page"]) for item in unowned[:30])
+                + ", ".join(
+                    str(item["output_page"]) for item in unowned[:30]
+                )
             )
         raise OverlayRecoveryError("; ".join(details))
 
