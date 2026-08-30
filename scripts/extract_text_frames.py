@@ -13,8 +13,10 @@ from typing import Any
 
 try:
     import pdfplumber
+    from pdfplumber.utils import collate_line
 except ImportError:  # pragma: no cover - exercised by CLI dependency check
     pdfplumber = None
+    collate_line = None
 
 
 class FrameExtractionError(ValueError):
@@ -22,35 +24,78 @@ class FrameExtractionError(ValueError):
 
 
 def _require_pdfplumber() -> None:
-    if pdfplumber is None:
+    if pdfplumber is None or collate_line is None:
         raise FrameExtractionError(
             "pdfplumber is required. Run with the bundled Codex PDF Python runtime "
             "or install requirements-exact-mirror.txt."
         )
 
 
-def _line_groups(chars: list[dict[str, Any]], tolerance: float = 2.0) -> list[list[dict[str, Any]]]:
-    lines: list[list[dict[str, Any]]] = []
+def _line_groups(
+    chars: list[dict[str, Any]], page_width: float, tolerance: float = 2.0
+) -> list[list[dict[str, Any]]]:
+    """Group characters into spatial lines without joining parallel columns.
+
+    PDF character streams commonly place left- and right-column glyphs at the
+    same vertical coordinate. A vertical-only grouping therefore concatenates
+    two independent columns into a page-wide line. First form vertical bands,
+    then split each band at a large horizontal whitespace gap.
+    """
+
+    bands: list[list[dict[str, Any]]] = []
     for char in sorted(chars, key=lambda item: (float(item["top"]), float(item["x0"]))):
-        if not str(char.get("text", "")).strip():
+        if str(char.get("text", "")) == "":
             continue
-        if not lines or abs(float(char["top"]) - statistics.median(float(c["top"]) for c in lines[-1])) > tolerance:
-            lines.append([char])
+        if (
+            not bands
+            or abs(
+                float(char["top"])
+                - statistics.median(float(c["top"]) for c in bands[-1])
+            )
+            > tolerance
+        ):
+            bands.append([char])
         else:
-            lines[-1].append(char)
+            bands[-1].append(char)
+
+    lines: list[list[dict[str, Any]]] = []
+    gap_threshold = max(12.0, page_width * 0.02)
+    for band in bands:
+        current: list[dict[str, Any]] = []
+        previous_x1: float | None = None
+        for char in sorted(band, key=lambda item: float(item["x0"])):
+            x0 = float(char["x0"])
+            x1 = float(char["x1"])
+            if (
+                current
+                and previous_x1 is not None
+                and x0 - previous_x1 > gap_threshold
+            ):
+                lines.append(current)
+                current = []
+            current.append(char)
+            previous_x1 = x1 if previous_x1 is None else max(previous_x1, x1)
+        if current:
+            lines.append(current)
     return lines
 
 
 def _line_record(chars: list[dict[str, Any]]) -> dict[str, Any]:
     chars = sorted(chars, key=lambda item: float(item["x0"]))
+    content_chars = [char for char in chars if str(char.get("text", "")).strip()]
     return {
-        "text": "".join(str(char.get("text", "")) for char in chars).strip(),
+        # collate_line preserves explicit PDF spaces and infers missing word
+        # boundaries from glyph gaps. A 1 pt tolerance works for the compact
+        # journal typography exercised by the real-paper regression suite.
+        "text": collate_line(chars, tolerance=1.0).strip(),
         "x0": min(float(char["x0"]) for char in chars),
         "x1": max(float(char["x1"]) for char in chars),
         "top": min(float(char["top"]) for char in chars),
         "bottom": max(float(char["bottom"]) for char in chars),
-        "fontname": Counter(str(char.get("fontname") or "UNKNOWN") for char in chars).most_common(1)[0][0],
-        "size": statistics.median(float(char.get("size") or 0.0) for char in chars),
+        "fontname": Counter(
+            str(char.get("fontname") or "UNKNOWN") for char in content_chars
+        ).most_common(1)[0][0],
+        "size": statistics.median(float(char.get("size") or 0.0) for char in content_chars),
     }
 
 
@@ -65,19 +110,43 @@ def _same_column(first: dict[str, Any], second: dict[str, Any], page_width: floa
 
 
 def _blocks(lines: list[dict[str, Any]], page_width: float) -> list[list[dict[str, Any]]]:
-    if not lines:
-        return []
-    blocks: list[list[dict[str, Any]]] = [[lines[0]]]
-    for line in lines[1:]:
-        previous = blocks[-1][-1]
-        gap = line["top"] - previous["bottom"]
-        expected = max(previous["size"], line["size"]) * 0.85
-        paragraph_indent = abs(line["x0"] - previous["x0"]) > max(12.0, page_width * 0.025)
-        if gap <= expected and _same_column(previous, line, page_width) and not paragraph_indent:
-            blocks[-1].append(line)
-        else:
+    """Build paragraph-like frames while allowing interleaved parallel columns."""
+
+    blocks: list[list[dict[str, Any]]] = []
+    for line in sorted(lines, key=lambda item: (float(item["top"]), float(item["x0"]))):
+        best_index: int | None = None
+        best_gap: float | None = None
+        for index in range(len(blocks) - 1, -1, -1):
+            previous = blocks[index][-1]
+            gap = float(line["top"]) - float(previous["bottom"])
+            if gap < -2.0:
+                continue
+            expected = max(float(previous["size"]), float(line["size"])) * 0.85
+            if gap > expected:
+                continue
+            paragraph_indent = abs(float(line["x0"]) - float(previous["x0"])) > max(
+                12.0, page_width * 0.025
+            )
+            max_size = max(float(previous["size"]), float(line["size"]), 1.0)
+            style_break = abs(float(line["size"]) - float(previous["size"])) > max(
+                1.0, max_size * 0.12
+            )
+            if (
+                _same_column(previous, line, page_width)
+                and not paragraph_indent
+                and not style_break
+            ):
+                if best_gap is None or gap < best_gap:
+                    best_index = index
+                    best_gap = gap
+        if best_index is None:
             blocks.append([line])
-    return blocks
+        else:
+            blocks[best_index].append(line)
+    return sorted(
+        blocks,
+        key=lambda block: (float(block[0]["top"]), float(block[0]["x0"])),
+    )
 
 
 def _kind(block: list[dict[str, Any]], page_height: float, body_size: float) -> str:
@@ -102,10 +171,30 @@ def extract_frames(source_pdf: Path, source_id: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     with pdfplumber.open(source_pdf) as pdf:
         for page_number, page in enumerate(pdf.pages, 1):
-            chars = [char for char in page.chars if str(char.get("text", "")).strip()]
-            lines = [_line_record(group) for group in _line_groups(chars)]
-            positive_sizes = [line["size"] for line in lines if line["size"] > 0]
-            body_size = statistics.median(positive_sizes) if positive_sizes else 10.0
+            # Keep explicit whitespace glyphs so source text retains the
+            # publisher's word boundaries. Empty glyphs alone are discarded.
+            chars = [char for char in page.chars if str(char.get("text", "")) != ""]
+            lines = [
+                _line_record(group)
+                for group in _line_groups(chars, float(page.width))
+                if any(str(char.get("text", "")).strip() for char in group)
+            ]
+
+            # Use the dominant journal-sized glyph as the body-size estimate.
+            # Tiny vertical download marks and footer artifacts otherwise pull
+            # the median down and misclassify ordinary body lines as headings.
+            candidate_sizes = [
+                round(float(char.get("size") or 0.0), 1)
+                for char in chars
+                if str(char.get("text", "")).strip()
+                and 5.0 <= float(char.get("size") or 0.0) <= 14.0
+            ]
+            body_size = (
+                Counter(candidate_sizes).most_common(1)[0][0]
+                if candidate_sizes
+                else 10.0
+            )
+
             reading_order = 0
             for block in _blocks(lines, float(page.width)):
                 if not any(line["text"] for line in block):
