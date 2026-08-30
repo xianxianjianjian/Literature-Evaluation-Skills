@@ -169,7 +169,7 @@ class TextFrameExtractionTests(unittest.TestCase):
             self.assertIn(retained[0]["rotation"], {90, 270})
             normalized = retained[0]["source_text"].replace(" ", "").lower()
             self.assertTrue(
-                "downloaded" in normalized or "deddaolnwod" in normalized,
+                "downloaded" in normalized or "downloaded" in normalized[::-1],
                 "rotated publisher/download furniture must remain identifiable",
             )
             self.assertFalse(
