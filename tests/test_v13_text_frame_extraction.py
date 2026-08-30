@@ -73,6 +73,19 @@ class TextFrameExtractionTests(unittest.TestCase):
         c.showPage()
         c.save()
 
+    def _rotated_margin_pdf(self, path: Path) -> None:
+        c = canvas.Canvas(str(path), pagesize=(600, 800), pageCompression=1)
+        c.setFont("Helvetica", 10)
+        c.drawString(50, 700, "Scientific body text remains translatable")
+        c.saveState()
+        c.translate(585, 80)
+        c.rotate(90)
+        c.setFont("Helvetica", 7)
+        c.drawString(0, 0, "Downloaded from example.org by guest")
+        c.restoreState()
+        c.showPage()
+        c.save()
+
     def test_parallel_columns_are_not_concatenated(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             pdf_path = Path(temporary) / "columns.pdf"
@@ -124,6 +137,35 @@ class TextFrameExtractionTests(unittest.TestCase):
             self.assertFalse(
                 any("Alpha\nBeta" in frame["source_text"] for frame in frames),
                 "borderless table columns must not be vertically merged",
+            )
+
+    def test_rotated_outer_margin_furniture_is_retained_identifier(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            pdf_path = Path(temporary) / "margin-watermark.pdf"
+            self._rotated_margin_pdf(pdf_path)
+            frames = extract_text_frames.extract_frames(pdf_path, "SRC-M1")
+            retained = [
+                frame
+                for frame in frames
+                if frame["translation_action"] == "RETAIN_SOURCE"
+            ]
+            translated = [
+                frame
+                for frame in frames
+                if frame["translation_action"] == "TRANSLATE"
+            ]
+
+            self.assertEqual(len(retained), 1)
+            self.assertEqual(retained[0]["kind"], "identifier")
+            self.assertEqual(retained[0]["retain_reason"], "IDENTIFIER")
+            self.assertIn(retained[0]["rotation"], {90, 270})
+            self.assertIn("Downloaded", retained[0]["source_text"])
+            self.assertFalse(
+                any("Downloaded" in frame["source_text"] for frame in translated),
+                "publisher/download margin furniture must never enter translation frames",
+            )
+            self.assertTrue(
+                any("Scientific body text" in frame["source_text"] for frame in translated)
             )
 
 
