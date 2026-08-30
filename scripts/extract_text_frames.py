@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import statistics
 import sys
 from collections import Counter
@@ -34,13 +35,7 @@ def _require_pdfplumber() -> None:
 def _line_groups(
     chars: list[dict[str, Any]], page_width: float, tolerance: float = 2.0
 ) -> list[list[dict[str, Any]]]:
-    """Group characters into spatial lines without joining parallel columns.
-
-    PDF character streams commonly place left- and right-column glyphs at the
-    same vertical coordinate. A vertical-only grouping therefore concatenates
-    two independent columns into a page-wide line. First form vertical bands,
-    then split each band at a large horizontal whitespace gap.
-    """
+    """Group characters into spatial lines without joining parallel columns."""
 
     bands: list[list[dict[str, Any]]] = []
     for char in sorted(chars, key=lambda item: (float(item["top"]), float(item["x0"]))):
@@ -66,11 +61,7 @@ def _line_groups(
         for char in sorted(band, key=lambda item: float(item["x0"])):
             x0 = float(char["x0"])
             x1 = float(char["x1"])
-            if (
-                current
-                and previous_x1 is not None
-                and x0 - previous_x1 > gap_threshold
-            ):
+            if current and previous_x1 is not None and x0 - previous_x1 > gap_threshold:
                 lines.append(current)
                 current = []
             current.append(char)
@@ -84,9 +75,6 @@ def _line_record(chars: list[dict[str, Any]]) -> dict[str, Any]:
     chars = sorted(chars, key=lambda item: float(item["x0"]))
     content_chars = [char for char in chars if str(char.get("text", "")).strip()]
     return {
-        # collate_line preserves explicit PDF spaces and infers missing word
-        # boundaries from glyph gaps. A 1 pt tolerance works for the compact
-        # journal typography exercised by the real-paper regression suite.
         "text": collate_line(chars, tolerance=1.0).strip(),
         "x0": min(float(char["x0"]) for char in chars),
         "x1": max(float(char["x1"]) for char in chars),
@@ -95,8 +83,119 @@ def _line_record(chars: list[dict[str, Any]]) -> dict[str, Any]:
         "fontname": Counter(
             str(char.get("fontname") or "UNKNOWN") for char in content_chars
         ).most_common(1)[0][0],
-        "size": statistics.median(float(char.get("size") or 0.0) for char in content_chars),
+        "size": statistics.median(
+            float(char.get("size") or 0.0) for char in content_chars
+        ),
     }
+
+
+def _table_candidates(page: Any) -> list[Any]:
+    """Detect ruled tables and conservative borderless tables.
+
+    Default line-based detections are accepted only when they have at least two
+    rows and two columns; this rejects one-cell figure boxes and margin artifacts.
+    The text strategy is enabled only on pages that visibly announce a Table label,
+    so ordinary multi-column body text is not hallucinated as a borderless table.
+    """
+
+    default_tables = list(page.find_tables())
+    tables: list[Any] = []
+    for table in default_tables:
+        max_columns = max(
+            (sum(cell is not None for cell in row.cells) for row in table.rows),
+            default=0,
+        )
+        if len(table.rows) >= 2 and max_columns >= 2:
+            tables.append(table)
+    if tables:
+        return tables
+
+    text = page.extract_text() or ""
+    if not re.search(r"(?mi)^\s*Table\s+[A-Z]?\d+", text):
+        return []
+    try:
+        candidates = page.find_tables(
+            table_settings={
+                "vertical_strategy": "text",
+                "horizontal_strategy": "text",
+                "intersection_tolerance": 5,
+            }
+        )
+    except Exception:
+        return []
+
+    accepted: list[Any] = []
+    for table in candidates:
+        first_row = table.rows[0].cells if table.rows else []
+        columns = sum(cell is not None for cell in first_row)
+        width = float(table.bbox[2]) - float(table.bbox[0])
+        if columns >= 3 and width >= float(page.width) * 0.35:
+            accepted.append(table)
+    return accepted
+
+
+def _annotate_table_cells(lines: list[dict[str, Any]], tables: list[Any]) -> None:
+    cells: list[tuple[tuple[int, int], tuple[float, float, float, float]]] = []
+    for table_index, table in enumerate(tables, 1):
+        for cell_index, cell in enumerate(table.cells, 1):
+            if cell is None:
+                continue
+            cells.append(
+                (
+                    (table_index, cell_index),
+                    tuple(float(value) for value in cell),
+                )
+            )
+
+    for line in lines:
+        cx = (float(line["x0"]) + float(line["x1"])) / 2
+        cy = (float(line["top"]) + float(line["bottom"])) / 2
+        matches: list[
+            tuple[float, tuple[int, int], tuple[float, float, float, float]]
+        ] = []
+        for cell_id, bbox in cells:
+            if (
+                bbox[0] - 0.5 <= cx <= bbox[2] + 0.5
+                and bbox[1] - 0.5 <= cy <= bbox[3] + 0.5
+            ):
+                area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+                matches.append((area, cell_id, bbox))
+        if matches:
+            _, cell_id, bbox = min(matches, key=lambda item: item[0])
+            line["_table_cell_id"] = cell_id
+            line["_table_cell_bbox"] = bbox
+
+
+def _annotate_row_peers(lines: list[dict[str, Any]], tolerance: float = 2.0) -> None:
+    """Mark multi-segment rows so borderless table columns never merge vertically."""
+
+    bands: list[list[dict[str, Any]]] = []
+    for line in sorted(lines, key=lambda item: (float(item["top"]), float(item["x0"]))):
+        if (
+            not bands
+            or abs(
+                float(line["top"])
+                - statistics.median(float(item["top"]) for item in bands[-1])
+            )
+            > tolerance
+        ):
+            bands.append([line])
+        else:
+            bands[-1].append(line)
+
+    for band in bands:
+        # Ignore tiny edge/download-watermark fragments. Otherwise a normal
+        # two-column journal line plus one vertical margin glyph appears tabular.
+        page_span = max(float(item["x1"]) for item in band) - min(
+            float(item["x0"]) for item in band
+        )
+        minimum_segment = max(10.0, page_span * 0.02)
+        count = sum(
+            (float(item["x1"]) - float(item["x0"])) >= minimum_segment
+            for item in band
+        )
+        for line in band:
+            line["_row_peer_count"] = count
 
 
 def _same_column(first: dict[str, Any], second: dict[str, Any], page_width: float) -> bool:
@@ -110,14 +209,27 @@ def _same_column(first: dict[str, Any], second: dict[str, Any], page_width: floa
 
 
 def _blocks(lines: list[dict[str, Any]], page_width: float) -> list[list[dict[str, Any]]]:
-    """Build paragraph-like frames while allowing interleaved parallel columns."""
+    """Build paragraph-like frames without crossing columns or table cells."""
 
     blocks: list[list[dict[str, Any]]] = []
     for line in sorted(lines, key=lambda item: (float(item["top"]), float(item["x0"]))):
         best_index: int | None = None
         best_gap: float | None = None
+        line_cell = line.get("_table_cell_id")
         for index in range(len(blocks) - 1, -1, -1):
             previous = blocks[index][-1]
+            previous_cell = previous.get("_table_cell_id")
+            if line_cell is not None or previous_cell is not None:
+                if line_cell != previous_cell:
+                    continue
+            elif int(line.get("_row_peer_count", 0)) >= 3 or int(
+                previous.get("_row_peer_count", 0)
+            ) >= 3:
+                # Borderless tables may have no detected grid. Three or more
+                # meaningful horizontal peers identifies a tabular row; never
+                # join those segments vertically across rows.
+                continue
+
             gap = float(line["top"]) - float(previous["bottom"])
             if gap < -2.0:
                 continue
@@ -150,6 +262,8 @@ def _blocks(lines: list[dict[str, Any]], page_width: float) -> list[list[dict[st
 
 
 def _kind(block: list[dict[str, Any]], page_height: float, body_size: float) -> str:
+    if any(line.get("_table_cell_id") is not None for line in block):
+        return "table_cell"
     top = min(line["top"] for line in block)
     bottom = max(line["bottom"] for line in block)
     size = statistics.median(line["size"] for line in block)
@@ -171,18 +285,15 @@ def extract_frames(source_pdf: Path, source_id: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     with pdfplumber.open(source_pdf) as pdf:
         for page_number, page in enumerate(pdf.pages, 1):
-            # Keep explicit whitespace glyphs so source text retains the
-            # publisher's word boundaries. Empty glyphs alone are discarded.
             chars = [char for char in page.chars if str(char.get("text", "")) != ""]
             lines = [
                 _line_record(group)
                 for group in _line_groups(chars, float(page.width))
                 if any(str(char.get("text", "")).strip() for char in group)
             ]
+            _annotate_table_cells(lines, _table_candidates(page))
+            _annotate_row_peers(lines)
 
-            # Use the dominant journal-sized glyph as the body-size estimate.
-            # Tiny vertical download marks and footer artifacts otherwise pull
-            # the median down and misclassify ordinary body lines as headings.
             candidate_sizes = [
                 round(float(char.get("size") or 0.0), 1)
                 for char in chars
