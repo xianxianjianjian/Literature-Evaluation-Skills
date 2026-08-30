@@ -24,6 +24,12 @@ class FrameExtractionError(ValueError):
     """Raised when a PDF cannot produce a defensible frame inventory."""
 
 
+LIGATURES = {"ﬀ", "ﬁ", "ﬂ", "ﬃ", "ﬄ"}
+LIGATURE_MAP = str.maketrans(
+    {"ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl", "ﬃ": "ffi", "ﬄ": "ffl"}
+)
+
+
 def _require_pdfplumber() -> None:
     if pdfplumber is None or collate_line is None:
         raise FrameExtractionError(
@@ -35,20 +41,41 @@ def _require_pdfplumber() -> None:
 def _line_groups(
     chars: list[dict[str, Any]], page_width: float, tolerance: float = 2.0
 ) -> list[list[dict[str, Any]]]:
-    """Group characters into spatial lines without joining parallel columns."""
+    """Group characters into spatial lines without joining parallel columns.
+
+    Some journal PDFs encode typographic ligatures (for example ``ﬁ`` and ``ﬂ``)
+    with a slightly shifted glyph box even though the glyph belongs to the same
+    visual baseline as its neighboring letters. Only when a candidate band
+    contains such a ligature do we allow a font-size-relative vertical tolerance;
+    normal text keeps the stricter default tolerance so adjacent lines are not
+    accidentally merged.
+    """
 
     bands: list[list[dict[str, Any]]] = []
     for char in sorted(chars, key=lambda item: (float(item["top"]), float(item["x0"]))):
         if str(char.get("text", "")) == "":
             continue
-        if (
-            not bands
-            or abs(
-                float(char["top"])
-                - statistics.median(float(c["top"]) for c in bands[-1])
-            )
-            > tolerance
-        ):
+        if not bands:
+            bands.append([char])
+            continue
+
+        band = bands[-1]
+        delta = abs(
+            float(char["top"])
+            - statistics.median(float(candidate["top"]) for candidate in band)
+        )
+        has_ligature = str(char.get("text", "")) in LIGATURES or any(
+            str(candidate.get("text", "")) in LIGATURES for candidate in band
+        )
+        if has_ligature:
+            sizes = [float(candidate.get("size") or 0.0) for candidate in band] + [
+                float(char.get("size") or 0.0)
+            ]
+            effective_tolerance = max(tolerance, statistics.median(sizes) * 0.45)
+        else:
+            effective_tolerance = tolerance
+
+        if delta > effective_tolerance:
             bands.append([char])
         else:
             bands[-1].append(char)
@@ -75,7 +102,7 @@ def _line_record(chars: list[dict[str, Any]]) -> dict[str, Any]:
     chars = sorted(chars, key=lambda item: float(item["x0"]))
     content_chars = [char for char in chars if str(char.get("text", "")).strip()]
     return {
-        "text": collate_line(chars, tolerance=1.0).strip(),
+        "text": collate_line(chars, tolerance=1.0).strip().translate(LIGATURE_MAP),
         "x0": min(float(char["x0"]) for char in chars),
         "x1": max(float(char["x1"]) for char in chars),
         "top": min(float(char["top"]) for char in chars),
