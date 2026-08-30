@@ -140,6 +140,15 @@ class OverlayRecoveryTests(unittest.TestCase):
             self.assertEqual(row["source_text"], "Sleep spindle memory")
             self.assertEqual(row["translated_text"], "中文译文ABC 123")
             self.assertNotIn("Sleep spindle memory", row["translated_text"])
+            self.assertEqual(
+                row["untranslated_tokens"],
+                [
+                    {
+                        "text": "ABC",
+                        "reason": "RETAINED_IN_REVIEWED_REFERENCE_TRANSLATION",
+                    }
+                ],
+            )
 
     def test_missing_overlay_text_is_a_hard_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
