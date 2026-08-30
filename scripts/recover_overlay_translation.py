@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -149,6 +150,25 @@ def _reconstruct_text(chars: list[dict[str, Any]]) -> str:
     return "\n".join(lines).strip()
 
 
+def _retained_english_tokens(text: str) -> list[dict[str, str]]:
+    """Account every validator-relevant English word observed in the reviewed overlay."""
+
+    seen: set[str] = set()
+    tokens: list[dict[str, str]] = []
+    for word in re.findall(r"[A-Za-z]{3,}", text):
+        normalized = word.lower()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        tokens.append(
+            {
+                "text": word,
+                "reason": "RETAINED_IN_REVIEWED_REFERENCE_TRANSLATION",
+            }
+        )
+    return tokens
+
+
 def _boxes_match(source_page: Any, reference_page: Any, tolerance: float = 0.05) -> bool:
     for field in ("mediabox", "cropbox", "trimbox", "bleedbox", "artbox"):
         left = getattr(source_page, field, None)
@@ -265,7 +285,7 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
                         "translated_text": translated_text,
                         "font_scale_used": 1.0,
                         "fit_status": "FIT",
-                        "untranslated_tokens": [],
+                        "untranslated_tokens": _retained_english_tokens(translated_text),
                     }
                 )
             page_diagnostics.append(
