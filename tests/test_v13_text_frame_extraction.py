@@ -27,9 +27,6 @@ class TextFrameExtractionTests(unittest.TestCase):
         c.drawString(50, 688, "Left column sentence two")
         c.drawString(330, 700, "Right column sentence one")
         c.drawString(330, 688, "Right column sentence two")
-
-        # Draw two words separately so there is no explicit PDF space glyph.
-        # The extractor should infer the word boundary from glyph geometry.
         c.drawString(50, 640, "Sleep")
         c.drawString(82, 640, "spindles")
         c.showPage()
@@ -83,6 +80,17 @@ class TextFrameExtractionTests(unittest.TestCase):
         c.setFont("Helvetica", 7)
         c.drawString(0, 0, "Downloaded from example.org by guest")
         c.restoreState()
+        c.showPage()
+        c.save()
+
+    def _line_number_gutter_pdf(self, path: Path) -> None:
+        c = canvas.Canvas(str(path), pagesize=(612, 792), pageCompression=1)
+        c.setFont("Helvetica", 9)
+        for index in range(1, 9):
+            y = 710 - (index - 1) * 20
+            c.drawRightString(52, y, str(index))
+            c.drawString(70, y, f"Scientific manuscript line {index} remains body text")
+        c.drawCentredString(306, 30, "1")
         c.showPage()
         c.save()
 
@@ -166,6 +174,38 @@ class TextFrameExtractionTests(unittest.TestCase):
             )
             self.assertTrue(
                 any("Scientific body text" in frame["source_text"] for frame in translated)
+            )
+
+    def test_sequential_line_number_gutter_is_retained_identifier(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            pdf_path = Path(temporary) / "line-numbers.pdf"
+            self._line_number_gutter_pdf(pdf_path)
+            frames = extract_text_frames.extract_frames(pdf_path, "SRC-S1")
+            retained = [
+                frame
+                for frame in frames
+                if frame.get("retain_reason") == "IDENTIFIER"
+                and "1\n2\n3" in frame["source_text"]
+            ]
+            translated = [
+                frame
+                for frame in frames
+                if frame["translation_action"] == "TRANSLATE"
+            ]
+
+            self.assertEqual(len(retained), 1)
+            self.assertEqual(retained[0]["kind"], "identifier")
+            self.assertIn("7\n8", retained[0]["source_text"])
+            self.assertFalse(
+                any(
+                    frame["source_text"].strip().isdigit()
+                    for frame in translated
+                    if "\n" in frame["source_text"]
+                ),
+                "sequential gutter line numbers must not become translation frames",
+            )
+            self.assertTrue(
+                any("Scientific manuscript line" in frame["source_text"] for frame in translated)
             )
 
 
