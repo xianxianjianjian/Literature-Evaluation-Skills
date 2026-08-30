@@ -71,7 +71,6 @@ def validate(font_path: Path) -> dict[str, Any]:
         c.setFont("SimSun", 12)
         c.drawString(24, 135, REQUIRED_TEXT)
 
-        # Exercise the same synthetic style modes as render_exact_mirror.py.
         bold = c.beginText()
         bold.setTextOrigin(24, 100)
         bold.setFont("SimSun", 12)
@@ -132,9 +131,9 @@ def main() -> int:
     try:
         report = validate(font_path)
     except Exception as exc:
-        print(json.dumps({"passed": False, "error": str(exc)}, ensure_ascii=False, indent=2))
+        print(json.dumps({"passed": False, "error": str(exc)}, ensure_ascii=True, indent=2))
         return 2
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    print(json.dumps(report, ensure_ascii=True, indent=2))
     return 0
 
 
