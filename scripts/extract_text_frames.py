@@ -90,13 +90,7 @@ def _line_record(chars: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _table_candidates(page: Any) -> list[Any]:
-    """Detect ruled tables and conservative borderless tables.
-
-    Default line-based detections are accepted only when they have at least two
-    rows and two columns; this rejects one-cell figure boxes and margin artifacts.
-    The text strategy is enabled only on pages that visibly announce a Table label,
-    so ordinary multi-column body text is not hallucinated as a borderless table.
-    """
+    """Detect ruled tables and conservative borderless tables."""
 
     default_tables = list(page.find_tables())
     tables: list[Any] = []
@@ -184,8 +178,6 @@ def _annotate_row_peers(lines: list[dict[str, Any]], tolerance: float = 2.0) -> 
             bands[-1].append(line)
 
     for band in bands:
-        # Ignore tiny edge/download-watermark fragments. Otherwise a normal
-        # two-column journal line plus one vertical margin glyph appears tabular.
         page_span = max(float(item["x1"]) for item in band) - min(
             float(item["x0"]) for item in band
         )
@@ -196,6 +188,81 @@ def _annotate_row_peers(lines: list[dict[str, Any]], tolerance: float = 2.0) -> 
         )
         for line in band:
             line["_row_peer_count"] = count
+
+
+def _margin_identifier_frames(
+    page: Any, source_id: str, page_number: int
+) -> list[dict[str, Any]]:
+    """Retain rotated publisher/download furniture in the outer page margins.
+
+    Wiley and OUP PDFs in the real-paper regression set carry vertical
+    ``Downloaded from ...`` furniture. If those glyphs are treated as horizontal
+    body text, the extractor creates dozens of one-letter replacement frames and
+    the renderer reports false overflows. Such margin text is source furniture,
+    not scientific prose, so it is retained as an identifier.
+    """
+
+    width = float(page.width)
+    height = float(page.height)
+    rotated = [
+        char
+        for char in page.chars
+        if not bool(char.get("upright", True))
+        and (float(char["x0"]) < width * 0.05 or float(char["x1"]) > width * 0.95)
+        and str(char.get("text", "")) != ""
+    ]
+    if not rotated:
+        return []
+
+    groups: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    for char in rotated:
+        side = "left" if float(char["x0"]) < width * 0.5 else "right"
+        matrix = char.get("matrix") or (1, 0, 0, 1, 0, 0)
+        rotation = 270 if float(matrix[1]) < 0 else 90
+        groups.setdefault((side, rotation), []).append(char)
+
+    rows: list[dict[str, Any]] = []
+    for index, ((_, rotation), chars) in enumerate(sorted(groups.items()), 1):
+        chars = sorted(chars, key=lambda item: (float(item["top"]), float(item["x0"])))
+        text = "".join(str(char.get("text", "")) for char in chars).strip()
+        content_chars = [char for char in chars if str(char.get("text", "")).strip()]
+        if not text or not content_chars:
+            continue
+        x0 = min(float(char["x0"]) for char in chars)
+        x1 = max(float(char["x1"]) for char in chars)
+        top = min(float(char["top"]) for char in chars)
+        bottom = max(float(char["bottom"]) for char in chars)
+        font = Counter(
+            str(char.get("fontname") or "UNKNOWN") for char in content_chars
+        ).most_common(1)[0][0]
+        size = statistics.median(
+            float(char.get("size") or 0.0) for char in content_chars
+        )
+        frame_id = f"TF-{source_id}-P{page_number:03d}-M{index:02d}"
+        unit_id = f"TU-{source_id}-P{page_number:03d}-M{index:02d}"
+        rows.append(
+            {
+                "frame_id": frame_id,
+                "source_id": source_id,
+                "source_page": page_number,
+                "unit_id": unit_id,
+                "kind": "identifier",
+                "bbox_pt": [x0, height - bottom, x1, height - top],
+                "rotation": rotation,
+                "reading_order": 1,
+                "source_font": font,
+                "source_font_size_pt": size,
+                "source_leading_pt": max(size * 1.2, 0.1),
+                "weight": "regular",
+                "alignment": "left",
+                "background": "UNREVIEWED",
+                "translation_action": "RETAIN_SOURCE",
+                "retain_reason": "IDENTIFIER",
+                "source_text": text,
+                "reviewed": False,
+            }
+        )
+    return rows
 
 
 def _same_column(first: dict[str, Any], second: dict[str, Any], page_width: float) -> bool:
@@ -225,9 +292,6 @@ def _blocks(lines: list[dict[str, Any]], page_width: float) -> list[list[dict[st
             elif int(line.get("_row_peer_count", 0)) >= 3 or int(
                 previous.get("_row_peer_count", 0)
             ) >= 3:
-                # Borderless tables may have no detected grid. Three or more
-                # meaningful horizontal peers identifies a tabular row; never
-                # join those segments vertically across rows.
                 continue
 
             gap = float(line["top"]) - float(previous["bottom"])
@@ -285,7 +349,12 @@ def extract_frames(source_pdf: Path, source_id: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     with pdfplumber.open(source_pdf) as pdf:
         for page_number, page in enumerate(pdf.pages, 1):
-            chars = [char for char in page.chars if str(char.get("text", "")) != ""]
+            margin_rows = _margin_identifier_frames(page, source_id, page_number)
+            chars = [
+                char
+                for char in page.chars
+                if str(char.get("text", "")) != "" and bool(char.get("upright", True))
+            ]
             lines = [
                 _line_record(group)
                 for group in _line_groups(chars, float(page.width))
@@ -351,6 +420,9 @@ def extract_frames(source_pdf: Path, source_id: str) -> list[dict[str, Any]]:
                         "reviewed": False,
                     }
                 )
+            for margin_index, margin_row in enumerate(margin_rows, reading_order + 1):
+                margin_row["reading_order"] = margin_index
+                rows.append(margin_row)
     if not rows:
         raise FrameExtractionError("No extractable text frames were found.")
     return rows
