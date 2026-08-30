@@ -193,14 +193,7 @@ def _annotate_row_peers(lines: list[dict[str, Any]], tolerance: float = 2.0) -> 
 def _margin_identifier_frames(
     page: Any, source_id: str, page_number: int
 ) -> list[dict[str, Any]]:
-    """Retain rotated publisher/download furniture in the outer page margins.
-
-    Wiley and OUP PDFs in the real-paper regression set carry vertical
-    ``Downloaded from ...`` furniture. If those glyphs are treated as horizontal
-    body text, the extractor creates dozens of one-letter replacement frames and
-    the renderer reports false overflows. Such margin text is source furniture,
-    not scientific prose, so it is retained as an identifier.
-    """
+    """Retain rotated publisher/download furniture in the outer page margins."""
 
     width = float(page.width)
     height = float(page.height)
@@ -239,13 +232,12 @@ def _margin_identifier_frames(
             float(char.get("size") or 0.0) for char in content_chars
         )
         frame_id = f"TF-{source_id}-P{page_number:03d}-M{index:02d}"
-        unit_id = f"TU-{source_id}-P{page_number:03d}-M{index:02d}"
         rows.append(
             {
                 "frame_id": frame_id,
                 "source_id": source_id,
                 "source_page": page_number,
-                "unit_id": unit_id,
+                "unit_id": frame_id.replace("TF-", "TU-", 1),
                 "kind": "identifier",
                 "bbox_pt": [x0, height - bottom, x1, height - top],
                 "rotation": rotation,
@@ -263,6 +255,91 @@ def _margin_identifier_frames(
             }
         )
     return rows
+
+
+def _line_number_identifier_frames(
+    page: Any, source_id: str, page_number: int
+) -> tuple[list[dict[str, Any]], set[int]]:
+    """Retain sequential manuscript line-number gutters as identifiers."""
+
+    width = float(page.width)
+    height = float(page.height)
+    gutter_chars = [
+        char
+        for char in page.chars
+        if bool(char.get("upright", True))
+        and str(char.get("text", "")) != ""
+        and (float(char["x1"]) < width * 0.09 or float(char["x0"]) > width * 0.91)
+    ]
+    if not gutter_chars:
+        return [], set()
+
+    records: list[tuple[list[dict[str, Any]], dict[str, Any]]] = []
+    for group in _line_groups(gutter_chars, width):
+        if not any(str(char.get("text", "")).strip() for char in group):
+            continue
+        record = _line_record(group)
+        if re.fullmatch(r"\d{1,4}", record["text"]):
+            records.append((group, record))
+    if len(records) < 3:
+        return [], set()
+
+    by_side: dict[str, list[tuple[list[dict[str, Any]], dict[str, Any]]]] = {}
+    for group, record in records:
+        midpoint = (float(record["x0"]) + float(record["x1"])) / 2
+        side = "left" if midpoint < width / 2 else "right"
+        by_side.setdefault(side, []).append((group, record))
+
+    rows: list[dict[str, Any]] = []
+    excluded: set[int] = set()
+    for index, (_, items) in enumerate(sorted(by_side.items()), 1):
+        if len(items) < 3:
+            continue
+        items.sort(key=lambda item: float(item[1]["top"]))
+        values = [int(item[1]["text"]) for item in items]
+        sequential_pairs = sum(
+            1 for first, second in zip(values, values[1:]) if 0 < second - first <= 3
+        )
+        if sequential_pairs < max(2, len(values) // 2):
+            continue
+
+        all_chars = [char for group, _ in items for char in group]
+        excluded.update(id(char) for char in all_chars)
+        x0 = min(float(char["x0"]) for char in all_chars)
+        x1 = max(float(char["x1"]) for char in all_chars)
+        top = min(float(char["top"]) for char in all_chars)
+        bottom = max(float(char["bottom"]) for char in all_chars)
+        content_chars = [char for char in all_chars if str(char.get("text", "")).strip()]
+        font = Counter(
+            str(char.get("fontname") or "UNKNOWN") for char in content_chars
+        ).most_common(1)[0][0]
+        size = statistics.median(
+            float(char.get("size") or 0.0) for char in content_chars
+        )
+        frame_id = f"TF-{source_id}-P{page_number:03d}-L{index:02d}"
+        rows.append(
+            {
+                "frame_id": frame_id,
+                "source_id": source_id,
+                "source_page": page_number,
+                "unit_id": frame_id.replace("TF-", "TU-", 1),
+                "kind": "identifier",
+                "bbox_pt": [x0, height - bottom, x1, height - top],
+                "rotation": 0,
+                "reading_order": 1,
+                "source_font": font,
+                "source_font_size_pt": size,
+                "source_leading_pt": max(size * 1.2, 0.1),
+                "weight": "regular",
+                "alignment": "left",
+                "background": "UNREVIEWED",
+                "translation_action": "RETAIN_SOURCE",
+                "retain_reason": "IDENTIFIER",
+                "source_text": "\n".join(str(value) for value in values),
+                "reviewed": False,
+            }
+        )
+    return rows, excluded
 
 
 def _same_column(first: dict[str, Any], second: dict[str, Any], page_width: float) -> bool:
@@ -350,10 +427,15 @@ def extract_frames(source_pdf: Path, source_id: str) -> list[dict[str, Any]]:
     with pdfplumber.open(source_pdf) as pdf:
         for page_number, page in enumerate(pdf.pages, 1):
             margin_rows = _margin_identifier_frames(page, source_id, page_number)
+            line_number_rows, excluded_line_number_chars = _line_number_identifier_frames(
+                page, source_id, page_number
+            )
             chars = [
                 char
                 for char in page.chars
-                if str(char.get("text", "")) != "" and bool(char.get("upright", True))
+                if str(char.get("text", "")) != ""
+                and bool(char.get("upright", True))
+                and id(char) not in excluded_line_number_chars
             ]
             lines = [
                 _line_record(group)
@@ -420,9 +502,12 @@ def extract_frames(source_pdf: Path, source_id: str) -> list[dict[str, Any]]:
                         "reviewed": False,
                     }
                 )
-            for margin_index, margin_row in enumerate(margin_rows, reading_order + 1):
-                margin_row["reading_order"] = margin_index
-                rows.append(margin_row)
+            retained_rows = margin_rows + line_number_rows
+            for retained_index, retained_row in enumerate(
+                retained_rows, reading_order + 1
+            ):
+                retained_row["reading_order"] = retained_index
+                rows.append(retained_row)
     if not rows:
         raise FrameExtractionError("No extractable text frames were found.")
     return rows
