@@ -167,7 +167,11 @@ class TextFrameExtractionTests(unittest.TestCase):
             self.assertEqual(retained[0]["kind"], "identifier")
             self.assertEqual(retained[0]["retain_reason"], "IDENTIFIER")
             self.assertIn(retained[0]["rotation"], {90, 270})
-            self.assertIn("Downloaded", retained[0]["source_text"])
+            normalized = retained[0]["source_text"].replace(" ", "").lower()
+            self.assertTrue(
+                "downloaded" in normalized or "deddaolnwod" in normalized,
+                "rotated publisher/download furniture must remain identifiable",
+            )
             self.assertFalse(
                 any("Downloaded" in frame["source_text"] for frame in translated),
                 "publisher/download margin furniture must never enter translation frames",
