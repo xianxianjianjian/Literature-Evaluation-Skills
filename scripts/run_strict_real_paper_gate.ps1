@@ -99,14 +99,14 @@ Write-Host "[4/7] Rebuild the exact one-to-one layout plan against the requested
     --force
 if ($LASTEXITCODE -ne 0) { throw "Exact layout-plan creation failed." }
 
-Write-Host "[5/7] Render the full Main+SI PDF with the current PR exact renderer"
-& $Python (Join-Path $ScriptDir "render_exact_mirror.py") `
+Write-Host "[5/7] Render the full Main+SI PDF with clipped exact replacement frames"
+& $Python (Join-Path $ScriptDir "render_exact_mirror_v13.py") `
     --work-dir $WorkDir `
     --output $OutputPdf
 if ($LASTEXITCODE -ne 0) { throw "Exact rendering failed." }
 
-Write-Host "[6/7] Independently validate page geometry, SimSun, frame containment, 95%-100% sizing and outside-frame pixels"
-& $Python (Join-Path $ScriptDir "validate_translation_package.py") `
+Write-Host "[6/7] Independently validate geometry, deterministic frame ownership, SimSun, sizing and outside-frame pixels"
+& $Python (Join-Path $ScriptDir "validate_translation_package_v13.py") `
     --work-dir $WorkDir `
     --a-path $OutputPdf `
     --scope FULL_MIRROR `
