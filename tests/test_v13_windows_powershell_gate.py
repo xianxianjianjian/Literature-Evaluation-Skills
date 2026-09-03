@@ -17,8 +17,8 @@ class WindowsPowerShellGateCompatibilityTests(unittest.TestCase):
         text = SCRIPT.read_text(encoding="utf-8")
         self.assertIn('[string]$ReviewedLedger = ""', text)
         self.assertIn('Copy-Item -LiteralPath $ReviewedLedger -Destination $LedgerPath -Force', text)
-        self.assertIn('render_exact_mirror.py', text)
-        self.assertIn('validate_translation_package.py', text)
+        self.assertIn('render_exact_mirror_v13.py', text)
+        self.assertIn('validate_translation_package_v13.py', text)
         self.assertIn('STRICT REAL-PAPER GATE: PASS', text)
 
 
