@@ -282,6 +282,7 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
         media = inventory_page["media_box"]
         width = float(media[2]) - float(media[0])
         height = float(media[3]) - float(media[1])
+        page_render_start = len(rendered_frames)
         overlay_buffer = io.BytesIO()
         overlay_canvas = canvas.Canvas(overlay_buffer, pagesize=(width, height), pageCompression=1)
         for frame_id in inventory_page["frame_ids"]:
@@ -314,10 +315,19 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
         overlay_canvas.save()
         if overflows:
             break
-        overlay_buffer.seek(0)
-        overlay_page = PdfReader(overlay_buffer).pages[0]
         writer.add_page(source_page)
-        writer.pages[-1].merge_page(overlay_page, over=True)
+        if len(rendered_frames) == page_render_start:
+            # A page containing only RETAIN_SOURCE frames needs no overlay. ReportLab
+            # serializes an untouched canvas as a zero-page PDF, so attempting pages[0]
+            # would fail. Preserve the source page byte-for-byte at the page-content level.
+            continue
+        overlay_buffer.seek(0)
+        overlay_reader = PdfReader(overlay_buffer)
+        if len(overlay_reader.pages) != 1:
+            raise ExactMirrorRenderError(
+                f"Expected one overlay page for output page {output_page}; got {len(overlay_reader.pages)}."
+            )
+        writer.pages[-1].merge_page(overlay_reader.pages[0], over=True)
 
     _atomic_jsonl(ledger_path, ledger_rows)
     if overflows:
