@@ -24,7 +24,11 @@ $FontMapPath = Join-Path $WorkDir "font_map.json"
 $PlanPath = Join-Path $WorkDir "mirror_layout_plan.json"
 $ReportPath = Join-Path $WorkDir "strict_real_paper_validation.json"
 
-if (-not $IsWindows) {
+# Windows PowerShell 5.1 does not define the PowerShell 6+ automatic
+# variable $IsWindows. Use the process OS marker instead so the production
+# gate works in both Windows PowerShell 5.1 and PowerShell 7+.
+$RunningOnWindows = ($env:OS -eq "Windows_NT")
+if (-not $RunningOnWindows) {
     throw "The strict production gate must run on Windows with the installed SimSun font."
 }
 if (-not (Test-Path -LiteralPath $WorkDir -PathType Container)) {
