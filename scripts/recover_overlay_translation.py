@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Recover translated overlay text from an earlier mirror PDF without storing it in Git.
+"""Recover exact-frame translations from a previously reviewed mirror PDF.
 
-This release-acceptance bridge is read-only with respect to the reference PDF.
-It subtracts the unchanged source text layer, assigns remaining overlay glyphs
-to reviewed exact source frames, and writes a frame-linked translation ledger.
+This bridge is intentionally conservative. It only auto-recovers a translation
+when overlay glyphs from the reviewed reference fall inside the corresponding
+reviewed exact source frame. Legacy/structural mirrors can have reflowed Chinese
+text, omitted legacy fields, or page-level overlays that do not correspond to
+current v1.3 frames. Those cases are NOT force-mapped. Instead the tool writes a
+partial ledger plus explicit review tasks and fails the strict gate.
 """
 
 from __future__ import annotations
@@ -26,6 +29,11 @@ except ImportError:  # pragma: no cover
 
 class OverlayRecoveryError(ValueError):
     """Raised when the reference overlay cannot be mapped exactly."""
+
+
+PARTIAL_LEDGER_FILE = "translation_ledger.partial.jsonl"
+RECOVERY_TASK_FILE = "translation_recovery_tasks.jsonl"
+RECOVERY_REPORT_FILE = "overlay_recovery_report.json"
 
 
 def _require_dependencies() -> None:
@@ -156,9 +164,7 @@ def _reconstruct_text(chars: list[dict[str, Any]]) -> str:
 
 def _retained_english_tokens(text: str) -> list[dict[str, str]]:
     """Account validator-relevant English retained in the reviewed translation."""
-    words = sorted(
-        set(re.findall(r"[A-Za-z]{3,}(?:[-/][A-Za-z0-9]+)*", text))
-    )
+    words = sorted(set(re.findall(r"[A-Za-z]{3,}(?:[-/][A-Za-z0-9]+)*", text)))
     return [
         {
             "text": word,
@@ -203,6 +209,29 @@ def _boxes_match(
     return True
 
 
+def _missing_frame_task(
+    frame: dict[str, Any], output_page: int
+) -> dict[str, Any]:
+    return {
+        "record_type": "MISSING_FRAME_TRANSLATION",
+        "status": "REVIEW_REQUIRED",
+        "reason": "NO_EXACT_GEOMETRIC_OVERLAY_MATCH",
+        "frame_id": frame["frame_id"],
+        "unit_id": frame["unit_id"],
+        "source_id": frame["source_id"],
+        "source_page": frame["source_page"],
+        "output_page": output_page,
+        "kind": frame.get("kind"),
+        "bbox_pt": frame.get("bbox_pt"),
+        "source_text": frame.get("source_text", ""),
+        "translated_text": None,
+        "review_note": (
+            "Provide/review a real Chinese translation for this exact source frame. "
+            "Do not copy text from an unrelated nearby legacy overlay."
+        ),
+    }
+
+
 def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]:
     _require_dependencies()
     work_dir = work_dir.resolve()
@@ -215,12 +244,8 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
             "Text-frame inventory has missing or duplicate frame IDs."
         )
 
-    sources = {
-        source["source_id"]: source for source in inventory.get("sources", [])
-    }
-    pages = sorted(
-        inventory.get("pages", []), key=lambda page: page["output_page"]
-    )
+    sources = {source["source_id"]: source for source in inventory.get("sources", [])}
+    pages = sorted(inventory.get("pages", []), key=lambda page: page["output_page"])
     if not pages:
         raise OverlayRecoveryError("Source inventory has no pages.")
 
@@ -245,6 +270,7 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
     ledger: list[dict[str, Any]] = []
     missing: list[str] = []
     unowned: list[dict[str, Any]] = []
+    review_tasks: list[dict[str, Any]] = []
     page_diagnostics: list[dict[str, Any]] = []
     try:
         for page_record in pages:
@@ -259,49 +285,59 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
                 )
 
             overlay = _overlay_chars(source_page, reference_page)
-            candidates: list[
-                tuple[float, str, tuple[float, float, float, float]]
-            ] = []
+            candidates: list[tuple[float, str, tuple[float, float, float, float]]] = []
             for frame_id in page_record["frame_ids"]:
                 frame = frames[frame_id]
                 if frame.get("translation_action") != "TRANSLATE":
                     continue
                 bbox = _frame_top_bbox(frame, float(reference_page.height))
-                area = max(
-                    1e-9, (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-                )
+                area = max(1e-9, (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]))
                 candidates.append((area, frame_id, bbox))
 
             owned: dict[str, list[dict[str, Any]]] = defaultdict(list)
-            page_unowned: list[str] = []
+            page_unowned_chars: list[dict[str, Any]] = []
             for char in overlay:
-                owners = [
-                    item for item in candidates if _contains_center(char, item[2])
-                ]
+                owners = [item for item in candidates if _contains_center(char, item[2])]
                 if owners:
                     _, frame_id, _ = min(owners, key=lambda item: item[0])
                     owned[frame_id].append(char)
                 elif str(char.get("text", "")).strip():
-                    page_unowned.append(str(char.get("text", "")))
+                    page_unowned_chars.append(char)
 
-            if page_unowned:
+            if page_unowned_chars:
+                unowned_text = _reconstruct_text(page_unowned_chars)
                 unowned.append(
                     {
                         "output_page": output_page,
-                        "character_count": len(page_unowned),
-                        "sample": "".join(page_unowned[:80]),
+                        "character_count": len(page_unowned_chars),
+                        "sample": unowned_text[:300],
+                    }
+                )
+                review_tasks.append(
+                    {
+                        "record_type": "UNOWNED_LEGACY_OVERLAY",
+                        "status": "REVIEW_REQUIRED",
+                        "reason": "LEGACY_OR_REFLOWED_TEXT_OUTSIDE_CURRENT_EXACT_FRAMES",
+                        "output_page": output_page,
+                        "source_id": source_id,
+                        "source_page": source_page_number,
+                        "character_count": len(page_unowned_chars),
+                        "legacy_overlay_text": unowned_text,
+                        "review_note": (
+                            "This reviewed legacy text is page-level evidence only. It must not be "
+                            "force-assigned to a current exact frame without source/translation review."
+                        ),
                     }
                 )
 
-            for fallback_index, frame_id in enumerate(
-                page_record["frame_ids"], 1
-            ):
+            for fallback_index, frame_id in enumerate(page_record["frame_ids"], 1):
                 frame = frames[frame_id]
                 if frame.get("translation_action") != "TRANSLATE":
                     continue
                 translated_text = _reconstruct_text(owned.get(frame_id, []))
                 if not translated_text:
                     missing.append(frame_id)
+                    review_tasks.append(_missing_frame_task(frame, output_page))
                     continue
                 ledger.append(
                     {
@@ -309,9 +345,7 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
                         "source_id": source_id,
                         "source_page": source_page_number,
                         "section": str(frame.get("kind") or "Body"),
-                        "unit_index": int(
-                            frame.get("reading_order") or fallback_index
-                        ),
+                        "unit_index": int(frame.get("reading_order") or fallback_index),
                         "kind": frame["kind"],
                         "source_status": "READABLE",
                         "translation_status": "TRANSLATED",
@@ -322,19 +356,16 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
                         "translated_text": translated_text,
                         "font_scale_used": 1.0,
                         "fit_status": "FIT",
-                        "untranslated_tokens": _retained_english_tokens(
-                            translated_text
-                        ),
+                        "untranslated_tokens": _retained_english_tokens(translated_text),
+                        "recovery_evidence": "EXACT_GEOMETRIC_OVERLAY_MATCH",
                     }
                 )
             page_diagnostics.append(
                 {
                     "output_page": output_page,
                     "overlay_characters": len(overlay),
-                    "owned_characters": sum(
-                        len(value) for value in owned.values()
-                    ),
-                    "unowned_nonspace_characters": len(page_unowned),
+                    "owned_characters": sum(len(value) for value in owned.values()),
+                    "unowned_nonspace_characters": len(page_unowned_chars),
                 }
             )
     finally:
@@ -342,32 +373,37 @@ def recover(work_dir: Path, reference_pdf: Path, output: Path) -> dict[str, Any]
         for document in source_documents.values():
             document.close()
 
+    compatibility = (
+        "EXACT_OVERLAY_COMPATIBLE"
+        if not missing and not unowned
+        else "LEGACY_OR_REFLOWED_REVIEW_REQUIRED"
+    )
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "reference_pdf": str(reference_pdf),
-        "ledger_rows": len(ledger),
+        "reference_compatibility": compatibility,
+        "ledger_rows_recovered": len(ledger),
         "missing_frame_ids": missing,
         "unowned_overlay": unowned,
+        "review_task_count": len(review_tasks),
+        "partial_ledger": str((work_dir / PARTIAL_LEDGER_FILE).resolve()),
+        "recovery_tasks": str((work_dir / RECOVERY_TASK_FILE).resolve()),
         "pages": page_diagnostics,
         "passed": not missing and not unowned,
     }
-    _write_json(work_dir / "overlay_recovery_report.json", report)
+    _write_json(work_dir / RECOVERY_REPORT_FILE, report)
+
     if missing or unowned:
-        details: list[str] = []
-        if missing:
-            details.append(
-                "missing translated overlay text: "
-                + ", ".join(missing[:30])
-                + (" ..." if len(missing) > 30 else "")
-            )
-        if unowned:
-            details.append(
-                "unowned overlay glyphs on output pages: "
-                + ", ".join(
-                    str(item["output_page"]) for item in unowned[:30]
-                )
-            )
-        raise OverlayRecoveryError("; ".join(details))
+        # Preserve evidence for migration/review, but never write the requested
+        # production ledger path on a failed strict recovery.
+        _write_jsonl(work_dir / PARTIAL_LEDGER_FILE, ledger)
+        _write_jsonl(work_dir / RECOVERY_TASK_FILE, review_tasks)
+        raise OverlayRecoveryError(
+            "Reference mirror is not exact-frame compatible. "
+            f"Recovered {len(ledger)} frame(s), but {len(missing)} frame(s) need translation review "
+            f"and {len(unowned)} page(s) contain legacy/reflowed overlay text. "
+            f"Review {RECOVERY_TASK_FILE}; do not force-map legacy text."
+        )
 
     _write_jsonl(output, ledger)
     return report
@@ -389,7 +425,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     print(
-        f"Recovered {report['ledger_rows']} translated frame(s) from the reviewed overlay PDF."
+        f"Recovered {report['ledger_rows_recovered']} translated frame(s) from the reviewed overlay PDF."
     )
     return 0
 
