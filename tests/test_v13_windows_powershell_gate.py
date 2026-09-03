@@ -13,6 +13,14 @@ class WindowsPowerShellGateCompatibilityTests(unittest.TestCase):
         self.assertNotIn("if (-not $IsWindows)", text)
         self.assertIn('$env:OS -eq "Windows_NT"', text)
 
+    def test_reviewed_ledger_path_skips_only_legacy_recovery(self) -> None:
+        text = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('[string]$ReviewedLedger = ""', text)
+        self.assertIn('Copy-Item -LiteralPath $ReviewedLedger -Destination $LedgerPath -Force', text)
+        self.assertIn('render_exact_mirror.py', text)
+        self.assertIn('validate_translation_package.py', text)
+        self.assertIn('STRICT REAL-PAPER GATE: PASS', text)
+
 
 if __name__ == "__main__":
     unittest.main()
