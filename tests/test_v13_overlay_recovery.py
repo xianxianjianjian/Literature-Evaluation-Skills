@@ -137,9 +137,11 @@ class OverlayRecoveryTests(unittest.TestCase):
             report = recovery.recover(work, reference, output)
             row = json.loads(output.read_text(encoding="utf-8"))
             self.assertTrue(report["passed"])
+            self.assertEqual(report["reference_compatibility"], "EXACT_OVERLAY_COMPATIBLE")
             self.assertEqual(row["source_text"], "Sleep spindle memory")
             self.assertEqual(row["translated_text"], "中文译文ABC 123")
             self.assertNotIn("Sleep spindle memory", row["translated_text"])
+            self.assertEqual(row["recovery_evidence"], "EXACT_GEOMETRIC_OVERLAY_MATCH")
             self.assertEqual(
                 row["untranslated_tokens"],
                 [
@@ -150,17 +152,36 @@ class OverlayRecoveryTests(unittest.TestCase):
                 ],
             )
 
-    def test_missing_overlay_text_is_a_hard_failure(self) -> None:
+    def test_missing_overlay_text_is_a_hard_failure_with_review_task(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             work, _ = _write_package(root)
+            production = work / "translation_ledger.jsonl"
             with self.assertRaises(recovery.OverlayRecoveryError):
-                recovery.recover(work, root / "source.pdf", work / "translation_ledger.jsonl")
+                recovery.recover(work, root / "source.pdf", production)
             report = json.loads(
                 (work / "overlay_recovery_report.json").read_text(encoding="utf-8")
             )
             self.assertFalse(report["passed"])
+            self.assertEqual(
+                report["reference_compatibility"],
+                "LEGACY_OR_REFLOWED_REVIEW_REQUIRED",
+            )
             self.assertEqual(report["missing_frame_ids"], ["TF-1"])
+            self.assertFalse(production.exists())
+            self.assertTrue((work / "translation_ledger.partial.jsonl").exists())
+            tasks = [
+                json.loads(line)
+                for line in (work / "translation_recovery_tasks.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(len(tasks), 1)
+            self.assertEqual(tasks[0]["record_type"], "MISSING_FRAME_TRANSLATION")
+            self.assertEqual(tasks[0]["frame_id"], "TF-1")
+            self.assertEqual(tasks[0]["source_text"], "Sleep spindle memory")
+            self.assertIsNone(tasks[0]["translated_text"])
 
 
 if __name__ == "__main__":
