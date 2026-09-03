@@ -8,7 +8,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$OutputPdf,
 
-    [string]$Python = "python"
+    [string]$Python = "python",
+
+    [string]$ReviewedLedger = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,23 +50,33 @@ Write-Host "[1/7] Validate the installed production SimSun runtime"
 & $Python (Join-Path $ScriptDir "validate_simsun_runtime.py")
 if ($LASTEXITCODE -ne 0) { throw "SimSun runtime validation failed." }
 
-Write-Host "[2/7] Recover the complete frame-linked translation ledger from the prior reviewed mirror"
-& $Python (Join-Path $ScriptDir "recover_overlay_translation.py") `
-    --work-dir $WorkDir `
-    --reference-pdf $ReferencePdf `
-    --output $LedgerPath
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Strict recovery stopped before rendering." -ForegroundColor Yellow
-    if (Test-Path -LiteralPath $RecoveryReportPath) {
-        Write-Host "Recovery report: $RecoveryReportPath" -ForegroundColor Yellow
+if ($ReviewedLedger -ne "") {
+    $ReviewedLedger = [System.IO.Path]::GetFullPath($ReviewedLedger)
+    if (-not (Test-Path -LiteralPath $ReviewedLedger -PathType Leaf)) {
+        throw "Reviewed ledger does not exist: $ReviewedLedger"
     }
-    if (Test-Path -LiteralPath $RecoveryTasksPath) {
-        Write-Host "Translation review tasks: $RecoveryTasksPath" -ForegroundColor Yellow
+    Write-Host "[2/7] Use the explicitly reviewed frame-linked translation ledger"
+    Copy-Item -LiteralPath $ReviewedLedger -Destination $LedgerPath -Force
+    Write-Host "Reviewed ledger copied to: $LedgerPath"
+} else {
+    Write-Host "[2/7] Recover the complete frame-linked translation ledger from the prior reviewed mirror"
+    & $Python (Join-Path $ScriptDir "recover_overlay_translation.py") `
+        --work-dir $WorkDir `
+        --reference-pdf $ReferencePdf `
+        --output $LedgerPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Strict recovery stopped before rendering." -ForegroundColor Yellow
+        if (Test-Path -LiteralPath $RecoveryReportPath) {
+            Write-Host "Recovery report: $RecoveryReportPath" -ForegroundColor Yellow
+        }
+        if (Test-Path -LiteralPath $RecoveryTasksPath) {
+            Write-Host "Translation review tasks: $RecoveryTasksPath" -ForegroundColor Yellow
+        }
+        if (Test-Path -LiteralPath $PartialLedgerPath) {
+            Write-Host "Partial exact matches: $PartialLedgerPath" -ForegroundColor Yellow
+        }
+        throw "Overlay translation recovery requires reviewed legacy-mirror migration; exact rendering was not attempted."
     }
-    if (Test-Path -LiteralPath $PartialLedgerPath) {
-        Write-Host "Partial exact matches: $PartialLedgerPath" -ForegroundColor Yellow
-    }
-    throw "Overlay translation recovery requires reviewed legacy-mirror migration; exact rendering was not attempted."
 }
 
 Write-Host "[3/7] Freeze the production SimSun font map"
