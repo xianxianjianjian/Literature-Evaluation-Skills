@@ -23,6 +23,9 @@ $LedgerPath = Join-Path $WorkDir "translation_ledger.jsonl"
 $FontMapPath = Join-Path $WorkDir "font_map.json"
 $PlanPath = Join-Path $WorkDir "mirror_layout_plan.json"
 $ReportPath = Join-Path $WorkDir "strict_real_paper_validation.json"
+$RecoveryReportPath = Join-Path $WorkDir "overlay_recovery_report.json"
+$RecoveryTasksPath = Join-Path $WorkDir "translation_recovery_tasks.jsonl"
+$PartialLedgerPath = Join-Path $WorkDir "translation_ledger.partial.jsonl"
 
 # Windows PowerShell 5.1 does not define the PowerShell 6+ automatic
 # variable $IsWindows. Use the process OS marker instead so the production
@@ -50,7 +53,19 @@ Write-Host "[2/7] Recover the complete frame-linked translation ledger from the 
     --work-dir $WorkDir `
     --reference-pdf $ReferencePdf `
     --output $LedgerPath
-if ($LASTEXITCODE -ne 0) { throw "Overlay translation recovery failed." }
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Strict recovery stopped before rendering." -ForegroundColor Yellow
+    if (Test-Path -LiteralPath $RecoveryReportPath) {
+        Write-Host "Recovery report: $RecoveryReportPath" -ForegroundColor Yellow
+    }
+    if (Test-Path -LiteralPath $RecoveryTasksPath) {
+        Write-Host "Translation review tasks: $RecoveryTasksPath" -ForegroundColor Yellow
+    }
+    if (Test-Path -LiteralPath $PartialLedgerPath) {
+        Write-Host "Partial exact matches: $PartialLedgerPath" -ForegroundColor Yellow
+    }
+    throw "Overlay translation recovery requires reviewed legacy-mirror migration; exact rendering was not attempted."
+}
 
 Write-Host "[3/7] Freeze the production SimSun font map"
 & $Python (Join-Path $ScriptDir "mirror_pdf.py") create-font-map `
