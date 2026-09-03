@@ -50,6 +50,21 @@ def _require_dependencies() -> None:
         )
 
 
+def _resolve_source_pdf(work_dir: Path, source: dict[str, Any]) -> Path:
+    """Resolve inventory pdf_path relative to the package work directory."""
+    value = source.get("pdf_path")
+    if not isinstance(value, str) or not value.strip():
+        raise ExactMirrorRenderError(
+            f"Source {source.get('source_id', '<unknown>')} requires pdf_path."
+        )
+    path = Path(value)
+    if not path.is_absolute():
+        path = work_dir / path
+    if not path.is_file():
+        raise ExactMirrorRenderError(f"Source PDF is missing: {path}")
+    return path.resolve()
+
+
 def _tokens(text: str) -> list[str]:
     return [token for token in TOKEN_PATTERN.findall(text.replace("\r\n", "\n")) if token]
 
@@ -247,7 +262,8 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
 
     sources = {source["source_id"]: source for source in inventory["sources"]}
     readers = {
-        source_id: PdfReader(str(Path(source["pdf_path"]))) for source_id, source in sources.items()
+        source_id: PdfReader(str(_resolve_source_pdf(work_dir, source)))
+        for source_id, source in sources.items()
     }
     frame_to_ledger = {
         row["frame_ids"][0]: row for row in ledger.values()
