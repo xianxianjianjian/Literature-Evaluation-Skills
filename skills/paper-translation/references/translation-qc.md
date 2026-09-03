@@ -2,6 +2,8 @@
 
 A may be described as academically `COMPLETE` only after four QC passes. Translation QC checks fidelity of the translation artifact; it does not replace the later research audit or the optional archive-completion check.
 
+Read [`translation-evidence-contract.md`](translation-evidence-contract.md). For every manifest scope, the final inventory/ledger result must be recomputed by `validate_translation_package.py`; `FULL_MIRROR` also activates its layout checks. Do not accept a hand-authored QC manifest or a PDF-signature-only check as completion evidence.
+
 ## QC-1 Content Coverage
 
 Confirm that all expected translation units are accounted for, including:
@@ -52,20 +54,19 @@ Do not replace author-reported values with recalculated values during Translatio
 
 Check:
 
-- overflow/clipping;
-- reading/column order;
-- font readability;
-- table legibility;
-- figure/caption placement;
-- continuation/extension pages;
-- Main/SI boundaries;
-- source-page reverse mapping.
+- exact page count, page boxes, rotation and one-to-one Main/SI mapping;
+- reviewed source/output text-frame containment;
+- embedded SimSun for every CJK glyph with no fallback;
+- 95%-100% font sizing with unchanged leading/frame geometry;
+- exact table cells and figure-label replacement;
+- no extension page, adaptive layout or page-wide reflow panel;
+- zero same-renderer pixel changes outside reviewed replacement frames.
 
 Layout QC requires actual render/visual inspection. A valid layout plan alone is not proof that the rendered PDF is visually correct.
 
 ## Academic Completion Gate
 
-For `FULL_MIRROR`, Translation/A can be `COMPLETE` when:
+For any manifest scope, Translation/A can be `COMPLETE` when:
 
 - Canonical Abstract exists and passes alignment;
 - terminology issues are resolved or explicitly accounted for;
@@ -73,7 +74,10 @@ For `FULL_MIRROR`, Translation/A can be `COMPLETE` when:
 - SI status is explicitly accounted for;
 - no critical unlogged source gap remains;
 - all four QC passes succeed;
+- the independent translation-package validator passes and generates `translation_validation.json`;
 - A has been generated and verified against the active paper/source version.
+
+For `FULL_MIRROR/EXACT_TEXT_FRAME`, schema-v2 inventory/plan, `text_frame_inventory.jsonl`, `font_map.json` and validator-generated `layout_diff.json` must pass. A boolean render flag or notes cannot satisfy this gate. These exact checks are not imposed on `MAIN_ONLY` or `ABSTRACT_ONLY`; user-requested `STRUCTURAL_MIRROR` is reported separately and cannot be labeled exact.
 
 A Zotero attachment key is **not** part of this academic Translation gate. If Zotero archive work is still pending, keep Translation/A `COMPLETE`, record the pending action, and report archive closure separately.
 

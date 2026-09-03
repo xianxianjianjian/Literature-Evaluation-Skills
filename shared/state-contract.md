@@ -8,6 +8,16 @@
 
 不得再维护第二份全局 `status.yaml`。每个状态变化必须写回该 manifest，恢复流程必须先读取它和现有产物。
 
+Translation stage additionally records its requested scope:
+
+```yaml
+stages:
+  translation:
+    scope: FULL_MIRROR  # FULL_MIRROR | MAIN_ONLY | ABSTRACT_ONLY
+```
+
+New weekly manifests default to `FULL_MIRROR`. Older manifests remain readable with a null/missing scope, but scope must be made explicit before Translation can become `COMPLETE`.
+
 ## 允许状态
 
 ```text

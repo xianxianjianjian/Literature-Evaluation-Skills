@@ -22,6 +22,7 @@ PACKAGE_ENTRIES = (
     "assets",
     "docs",
     "README.md",
+    "requirements-exact-mirror.txt",
 )
 
 

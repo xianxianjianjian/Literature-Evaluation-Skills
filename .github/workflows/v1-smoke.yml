@@ -22,6 +22,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install exact-mirror runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+          python -m pip install -r requirements-exact-mirror.txt
+
       - name: Compile helpers and tests
         run: python -m compileall scripts tests
 
@@ -46,3 +52,43 @@ jobs:
           python "$temp_root/bundle/plugins/literature-evaluation/scripts/validate_deliverables.py" \
             --plugin-root "$temp_root/bundle/plugins/literature-evaluation" \
             --workspace-root "$temp_root/data"
+
+  production-simsun:
+    name: production SimSun (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install exact-mirror runtime
+        run: python -m pip install -r requirements-exact-mirror.txt
+
+      - name: Verify Windows PowerShell 5.1 strict-gate preflight
+        shell: powershell
+        run: |
+          $temp = Join-Path $env:RUNNER_TEMP "ps51-strict-gate"
+          New-Item -ItemType Directory -Force -Path $temp | Out-Null
+          $missingReference = Join-Path $temp "missing-reference.pdf"
+          $output = Join-Path $temp "out.pdf"
+          $python = (Get-Command python).Source
+          try {
+            & .\scripts\run_strict_real_paper_gate.ps1 `
+              -WorkDir $temp `
+              -ReferencePdf $missingReference `
+              -OutputPdf $output `
+              -Python $python
+            throw "Strict gate unexpectedly succeeded without a reference PDF."
+          }
+          catch {
+            if ($_.Exception.Message -notlike "Reference translated mirror PDF does not exist:*") {
+              throw
+            }
+          }
+
+      - name: Verify real Windows SimSun embedding
+        run: python scripts/validate_simsun_runtime.py

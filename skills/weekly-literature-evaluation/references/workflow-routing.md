@@ -10,6 +10,8 @@ In weekly context, always read:
 
 before routing.
 
+When Translation is requested, preserve `stages.translation.scope`, `layout_fidelity`, `cjk_font_family` and `minimum_font_scale`. Default an unqualified request to `FULL_MIRROR / EXACT_TEXT_FRAME / SimSun / 0.95`; do not infer a narrower scope or structural layout because extraction or fitting is difficult. `STRUCTURAL_MIRROR` requires explicit user selection.
+
 The manifest owns workflow status. Other files contain evidence or stage-specific records but must not maintain a competing global status.
 
 ## Supported request modes
@@ -234,7 +236,7 @@ The weekly **academic workflow** is complete when:
 - Search decision/audit records exist;
 - selected paper/source identity is stable for the requested scope;
 - canonical Abstract exists for full workflow;
-- A exists and passes Translation QC when FULL_MIRROR is required;
+- A exists and passes the independent translation-package validator for the manifest layout fidelity; new `FULL_MIRROR` defaults require schema-v2 exact-frame, SimSun and `layout_diff.json` checks;
 - B exists and passes Deep Reading completion/QC;
 - C exists in weekly context and meets submission-profile requirements;
 - required `selection_log.csv` / `reading_history.csv` records are correct;

@@ -6,7 +6,9 @@ Scientific data and source relationships must be preserved when localizing visua
 
 Translate titles, headers, labels, footnotes and explanatory text. Lock numerical cells and significance markers to the source and perform cell-by-cell numeric checks.
 
-For wide or dense tables, prefer:
+Preserve row/column topology, header levels, merged cells, footnotes and significance markers. In `EXACT_TEXT_FRAME`, translate every textual cell inside its original cell frame and retain numeric cells/data; image maps, continuation tables and flattened prose are forbidden. The source-image-plus-translation-map fallback remains available only for explicitly requested `STRUCTURAL_MIRROR`.
+
+For explicitly requested structural mirrors, wide or dense tables may prefer:
 
 - line wrapping;
 - landscape orientation;
@@ -31,7 +33,7 @@ Normally retain the original figure image/data layer. Do not alter:
 - significance markers;
 - plotted numerical information.
 
-Translate the caption and, when safe, provide a Chinese label map or localized overlay that does not change data.
+Translate the caption. In `EXACT_TEXT_FRAME`, replace every translatable embedded label only inside its reviewed source label frame; label maps outside the figure are not an exact-mirror substitute. Pixels outside label frames remain locked.
 
 ### Conceptual / timeline / paradigm figures
 
@@ -46,6 +48,8 @@ and must not be presented as part of the author's original artwork.
 ## Supporting Information
 
 Main Article and SI are one evidence package but retain separate source identities (`SRC-M1`, `SRC-S1`, ...).
+
+Before translating, enumerate every scientific Main/SI figure and table in `source_inventory.json`, including objects found through DOCX drawing relationships rather than only paragraphs/tables exposed by a high-level API. Reconcile that inventory with `mirror_layout_plan.json` before completion.
 
 Rules:
 

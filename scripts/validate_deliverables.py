@@ -18,6 +18,8 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from runtime_paths import resolve_data_root
+from sanitize_docx_metadata import validate_docx_metadata
+import validate_translation_package as translation_validator
 from workflow_state import WorkflowStateError, load_manifest
 
 PLUGIN_REQUIRED_DIRECTORIES = [
@@ -54,6 +56,7 @@ PLUGIN_REQUIRED_FILES = [
     "skills/paper-translation/references/figures-tables-supplement.md",
     "skills/paper-translation/references/mirror-layout.md",
     "skills/paper-translation/references/translation-qc.md",
+    "skills/paper-translation/references/translation-evidence-contract.md",
     "skills/paper-deep-reading/SKILL.md",
     "skills/paper-deep-reading/agents/openai.yaml",
     "skills/paper-deep-reading/references/source-audit.md",
@@ -63,6 +66,7 @@ PLUGIN_REQUIRED_FILES = [
     "skills/paper-deep-reading/references/discussion-and-critique.md",
     "skills/paper-deep-reading/references/dynamic-coverage.md",
     "skills/paper-deep-reading/references/deliverables-and-qc.md",
+    "skills/paper-deep-reading/references/psychology-methods-routing.md",
     "shared/evidence-policy.md",
     "shared/identifier-policy.md",
     "shared/source-identity-policy.md",
@@ -76,9 +80,16 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/workflow_state.py",
     "scripts/validate_deliverables.py",
     "scripts/mirror_pdf.py",
+    "scripts/exact_mirror.py",
+    "scripts/extract_text_frames.py",
+    "scripts/render_exact_mirror.py",
+    "scripts/validate_translation_package.py",
+    "scripts/sanitize_docx_metadata.py",
+    "scripts/psychology_method_router.py",
     "scripts/runtime_paths.py",
     "scripts/init_workspace.py",
     "scripts/build_plugin_bundle.py",
+    "requirements-exact-mirror.txt",
 ]
 WORKSPACE_REQUIRED_DIRECTORIES = [
     "knowledge",
@@ -127,6 +138,7 @@ B_SECTION_ALIASES = [
     ("改进", "redesign"),
     ("迁移", "transfer value"),
     ("术语", "terminology", "evidence index"),
+    ("研究设计与适用方法规范", "study design and applicable methods"),
 ]
 
 
@@ -290,6 +302,58 @@ def check_pdf(path: Path | None, required: bool) -> Check:
     return Check("artifact:A", header == b"%PDF-", "PDF signature valid" if header == b"%PDF-" else "invalid PDF signature")
 
 
+def check_translation_package(
+    work_dir: Path | None,
+    a_path: Path | None,
+    scope: str | None,
+    required: bool,
+    report_path: Path | None = None,
+    layout_fidelity: str | None = None,
+) -> list[Check]:
+    if work_dir is None:
+        return [
+            Check(
+                "translation-package",
+                not required,
+                "not requested" if not required else "Translation/A completion requires --translation-work-dir",
+            )
+        ]
+    if a_path is None:
+        return [Check("translation-package", False, "translation package validation requires --a-path")]
+    if scope is None:
+        return [Check("translation-package", False, "translation package validation requires translation scope")]
+    translated, layout_diff, resolved_fidelity = translation_validator.validate_package_detailed(
+        work_dir, a_path, scope, layout_fidelity
+    )
+    checks = [
+        Check(f"translation:{item.code}", item.passed, item.detail)
+        for item in translated
+    ]
+    if report_path is not None:
+        translation_validator.write_report(
+            report_path,
+            work_dir,
+            a_path,
+            scope,
+            translated,
+            resolved_fidelity,
+        )
+        if layout_diff is not None:
+            translation_validator.write_layout_diff(
+                work_dir / translation_validator.LAYOUT_DIFF_FILE,
+                layout_diff,
+            )
+    elif required:
+        checks.append(
+            Check(
+                "translation:validation-report",
+                False,
+                "Translation/A completion requires --translation-report",
+            )
+        )
+    return checks
+
+
 def docx_text(path: Path) -> str:
     with zipfile.ZipFile(path) as archive:
         xml = archive.read("word/document.xml")
@@ -297,7 +361,9 @@ def docx_text(path: Path) -> str:
     return "\n".join(text for text in root.itertext() if text and text.strip())
 
 
-def check_docx_b(path: Path | None, required: bool) -> Check:
+def check_docx_b(
+    path: Path | None, required: bool, *, expected_author: str | None = None
+) -> Check:
     if path is None:
         return Check("artifact:B", not required, "not requested" if not required else "path required")
     if not path.is_file() or path.stat().st_size == 0:
@@ -309,7 +375,18 @@ def check_docx_b(path: Path | None, required: bool) -> Check:
     except (OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
         return Check("artifact:B", False, f"invalid DOCX package: {exc}")
     missing = [aliases[0] for aliases in B_SECTION_ALIASES if not any(alias.casefold() in text for alias in aliases)]
-    return Check("artifact:B", not missing, "base schema markers found" if not missing else f"missing base-schema markers: {', '.join(missing)}")
+    metadata_failures = validate_docx_metadata(path, expected_author=expected_author)
+    passed = not missing and not metadata_failures
+    details: list[str] = []
+    if missing:
+        details.append(f"missing base-schema markers: {', '.join(missing)}")
+    if metadata_failures:
+        details.append("metadata: " + "; ".join(metadata_failures))
+    return Check(
+        "artifact:B",
+        passed,
+        "base schema and metadata valid" if passed else " | ".join(details),
+    )
 
 
 def parse_markdown_sections(markdown: str) -> dict[str, str]:
@@ -419,6 +496,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--b-path", type=Path)
     parser.add_argument("--c-path", type=Path)
     parser.add_argument("--canonical-abstract", type=Path)
+    parser.add_argument("--translation-work-dir", type=Path)
+    parser.add_argument(
+        "--translation-scope",
+        choices=sorted(translation_validator.SCOPES),
+        help="Override translation scope when no workflow manifest supplies it.",
+    )
+    parser.add_argument(
+        "--translation-layout-fidelity",
+        choices=sorted(translation_validator.LAYOUT_FIDELITIES),
+        help="Override translation layout fidelity when no workflow manifest supplies it.",
+    )
+    parser.add_argument("--translation-report", type=Path)
     parser.add_argument("--require-a", action="store_true")
     parser.add_argument("--require-b", action="store_true")
     parser.add_argument("--require-c", action="store_true")
@@ -480,7 +569,63 @@ def main(argv: list[str] | None = None) -> int:
                 require_archive_complete=args.require_archive_complete,
             )
         )
-    checks.append(check_pdf(args.a_path, args.require_a))
+    manifest_data = None
+    if args.manifest:
+        try:
+            manifest_data = load_manifest(args.manifest)
+        except (WorkflowStateError, OSError):
+            # check_manifest already records the actionable validation failure.
+            pass
+    manifest_scope = (
+        manifest_data["stages"]["translation"].get("scope") if manifest_data else None
+    )
+    manifest_layout_fidelity = (
+        manifest_data["stages"]["translation"].get("layout_fidelity")
+        if manifest_data
+        else None
+    )
+    if args.translation_scope and manifest_scope and args.translation_scope != manifest_scope:
+        checks.append(
+            Check(
+                "translation:scope-conflict",
+                False,
+                f"CLI scope {args.translation_scope} differs from manifest scope {manifest_scope}",
+            )
+        )
+    translation_scope = args.translation_scope or manifest_scope
+    if (
+        args.translation_layout_fidelity
+        and manifest_layout_fidelity
+        and args.translation_layout_fidelity != manifest_layout_fidelity
+    ):
+        checks.append(
+            Check(
+                "translation:layout-fidelity-conflict",
+                False,
+                "CLI layout fidelity differs from manifest layout fidelity",
+            )
+        )
+    translation_layout_fidelity = (
+        args.translation_layout_fidelity or manifest_layout_fidelity
+    )
+    translation_complete = bool(
+        manifest_data
+        and (
+            manifest_data["stages"]["translation"]["status"] == "COMPLETE"
+            or manifest_data["outputs"]["A"]["status"] == "COMPLETE"
+        )
+    )
+    checks.append(check_pdf(args.a_path, args.require_a or translation_complete))
+    checks.extend(
+        check_translation_package(
+            args.translation_work_dir,
+            args.a_path,
+            translation_scope,
+            translation_complete or args.translation_work_dir is not None,
+            args.translation_report,
+            translation_layout_fidelity,
+        )
+    )
     checks.append(check_docx_b(args.b_path, args.require_b))
     checks.extend(check_c(data_root, args.c_path, args.require_c, args.canonical_abstract))
     for check in checks:

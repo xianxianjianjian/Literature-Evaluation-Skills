@@ -1,16 +1,16 @@
 # CI Verification
 
-This file records how the usable V1 release candidate is automatically checked before publishing to `main`.
+This file records how changes to the stable plugin line are automatically checked before merge to `main`.
 
 ## Release branch
 
-The active release line is:
+The stable release line is:
 
 ```text
-v1-release-candidate
+main
 ```
 
-Historical Phase branches remain development snapshots only. Draft PR #4 (`v1-release-candidate → main`) is the final V1 CI/audit surface; opening or updating the draft PR does not authorize merge.
+Historical Phase branches remain development snapshots only. New work uses topic branches and normal pull requests targeting `main`; a green PR does not authorize merge.
 
 ## Required automated checks
 
@@ -19,6 +19,7 @@ The workflow `.github/workflows/v1-smoke.yml` must run on Python 3.11 and 3.12 a
 1. `python -m compileall scripts tests`
 2. `python -m unittest discover -s tests -v`
 3. `python scripts/validate_deliverables.py --repo-root .`
+4. `python scripts/validate_plugin_package.py --plugin-root .`
 
 The test suite must protect both completion dimensions:
 
@@ -29,7 +30,7 @@ It must also preserve real source blockers such as the Mullins Main-PDF trace ra
 
 ## What green CI means
 
-Green CI verifies deterministic repository contracts: syntax, state invariants, history/terminology logic, structural A/B/C checks, synthetic acceptance scenarios and archive-integration helper behavior.
+Green CI verifies deterministic repository contracts: syntax, state invariants, history/terminology logic, translation inventory/ledger/layout coverage, table topology, DOCX metadata, psychology-method routing, structural A/B/C checks, synthetic acceptance scenarios and archive-integration helper behavior.
 
 It does **not** prove:
 
@@ -44,9 +45,9 @@ Those boundaries are intentional and do not make the core V1 unusable.
 
 Before merge:
 
-1. confirm the exact `v1-release-candidate` HEAD passed Python 3.11 and 3.12;
-2. run the final `main...v1-release-candidate` diff/hygiene audit;
+1. confirm the exact topic-branch HEAD passed Python 3.11 and 3.12;
+2. review the final `main...<topic-branch>` diff;
 3. ensure no stale rule makes Zotero transport a prerequisite for academic completion;
 4. ensure strict archive checks still reject unverified Zotero claims;
-5. obtain explicit user approval to publish V1;
-6. merge only the final RC into `main`.
+5. obtain explicit approval before merge or release tagging;
+6. merge only the reviewed topic branch into `main`.

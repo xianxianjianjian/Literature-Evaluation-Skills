@@ -40,6 +40,8 @@ Include argument reconstruction, theory/concept analysis, Research Gap, RQ/Aim/H
 
 Include Study Architecture, Sample Ledger, Measurement Chain, participant/researcher process views, acquisition vs preprocessing, analysis map, and Reproducibility Gap Table as applicable.
 
+Include **研究设计与适用方法规范 / Research Design and Applicable Method Standards**: selected design modules, why they apply, consequential non-applicable modules, reporting-completeness findings and separate validity judgments. Do not compute a checklist-derived total score.
+
 #### 4. Results
 
 Include Analysis Question Tree, Result Matrix, planned-vs-actual comparison, non-significant findings, correction accounting, figure/table evidence, consistency checks, and Hypothesis–Result closure.
@@ -137,6 +139,7 @@ For `COMPLETE`, require all applicable items below:
 - Innovation / Redesign / Transfer Value completed where relevant;
 - every A3 audit issue prominently treated;
 - B generated and verified as the correct artifact for the active paper/source version;
+- B DOCX metadata sanitized and `docProps/core.xml` verified; no generator identifier or non-requested author/comments/keywords remain;
 - C generated when weekly context requires it;
 - required knowledge/history update recorded.
 

@@ -244,13 +244,17 @@ class DeliverableValidatorTests(unittest.TestCase):
     def test_docx_base_schema_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "B.docx"
-            text = "文献定位 摘要 引言 方法 结果 讨论 创新 局限 改进 迁移 术语"
+            text = "文献定位 摘要 引言 方法 结果 讨论 创新 局限 改进 迁移 术语 研究设计与适用方法规范"
             xml = (
                 '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
                 f"<w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body></w:document>"
             )
             with zipfile.ZipFile(path, "w") as archive:
                 archive.writestr("word/document.xml", xml)
+                archive.writestr(
+                    "docProps/core.xml",
+                    '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator></dc:creator><cp:lastModifiedBy></cp:lastModifiedBy><cp:keywords></cp:keywords><dc:description></dc:description></cp:coreProperties>',
+                )
             result = validator.check_docx_b(path, required=True)
             self.assertTrue(result.passed, result.detail)
 

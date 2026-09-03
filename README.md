@@ -4,7 +4,7 @@
 
 V1 的核心目标不是生成普通摘要，而是形成可核验、可追溯、可恢复的研究档案：重要结论回到原文位置，作者解释与评译者分析分离，Main/SI 一体审计，Translation/Methods/Results/Discussion 都有明确完成与 QC 规则。
 
-当前插件版本：`1.1.0`。本次升级只改变安装、运行路径、工作区与打包方式，不修改 V1 已冻结的学术逻辑、两个 Gate、证据合同或 A/B/C 范围。
+当前插件版本：`1.3.0`。`FULL_MIRROR` 现在默认执行原位文本框替换：页面、分栏、图表和非文本区域保持不变，中文强制嵌入宋体 SimSun，字号只能在原字号的 100%–95% 内适配。旧自适应布局仅作为用户显式选择的结构镜像。
 
 ## 四 Skill 架构
 
@@ -123,11 +123,48 @@ python <plugin-root>/scripts/init_workspace.py \
 
 ## 交付物
 
-- **A**：中文全文翻译镜像版 PDF。
+- **A**：默认采用宋体原位文本框替换的中文全文镜像版 PDF。
 - **B**：完整文献研究笔记 DOCX。
 - **C**：每周评译提交稿。
 
 C 中的评论正文默认至少 500 个有效中文字符；原文摘要与中文摘要不计入这 500 字。
+
+### A 的 v1.3.0 原位镜像证据
+
+新的 `FULL_MIRROR` 默认写入 `layout_fidelity: EXACT_TEXT_FRAME`、`cjk_font_family: SimSun` 和 `minimum_font_scale: 0.95`。每个 work directory 必须包含 schema-v2 inventory、逐框 ledger、`text_frame_inventory.jsonl`、`font_map.json`、精确 layout plan 和 issue 记录。先创建字体映射并生成 A：
+
+```bash
+python scripts/mirror_pdf.py create-font-map \
+  --font-path C:\Windows\Fonts\simsun.ttc \
+  --output <data-root>/work/<paper_id>/font_map.json
+
+python scripts/render_exact_mirror.py \
+  --work-dir <data-root>/work/<paper_id> \
+  --output <A.pdf>
+```
+
+再执行独立检查：
+
+```bash
+python scripts/validate_translation_package.py \
+  --work-dir <data-root>/work/<paper_id> \
+  --a-path <A.pdf> \
+  --scope FULL_MIRROR \
+  --layout-fidelity EXACT_TEXT_FRAME \
+  --report <data-root>/work/<paper_id>/translation_validation.json
+```
+
+验证器会自动写入 `layout_diff.json`，并阻止页数/页面 Box 改变、文本框越界、非 SimSun 中文、字号低于95%、表格单元格破坏、图内标签遗漏和替换框外像素变化的 A 进入 `COMPLETE`。`render_checked=true` 不能代替这些测量。
+
+### B 的心理学方法路由与元数据
+
+心理学/行为科学/认知神经科学论文采用三遍阅读，并按实际设计选择 JARS、STROBE、CONSORT-SPI、JARS-Qual/MMARS、COBIDAS 或中介/SEM 时间性模块。报告完整性不等于研究质量，不生成机械总分。B 必须包含“研究设计与适用方法规范”，并在交付前运行：
+
+```bash
+python scripts/sanitize_docx_metadata.py --input <B.docx>
+```
+
+除非用户明确指定作者，DOCX 的作者、last-modified-by、keywords、comments/description 和 Word comments 必须清空，且 `docProps/core.xml` 不得出现生成工具标识。
 
 ## 最快开始方式
 
@@ -273,6 +310,14 @@ python scripts/validate_plugin_package.py --plugin-root .
 python scripts/validate_deliverables.py --repo-root .
 ```
 
+心理学方法路由可选辅助命令：
+
+```bash
+python scripts/psychology_method_router.py --profile <study-profile.json>
+```
+
+该命令只选择适用的阅读提示模块，不评分论文或替代学术判断。
+
 已安装插件与独立数据目录分别验证：
 
 ```bash
@@ -338,4 +383,4 @@ V1 核心于 2026-08-21 合并到 `main`；`v1.0.0` tag 固定核心发布点。
 
 长期分支仍以 `main` 为稳定主线。功能分支在验证和合并后可删除，历史由 Git commits/tags 保留。
 
-详见 [`docs/branch-strategy.md`](docs/branch-strategy.md) 和 [`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md)。
+详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)、[`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md)、[`docs/releases/v1.2.0.md`](docs/releases/v1.2.0.md) 和 [`docs/releases/v1.3.0.md`](docs/releases/v1.3.0.md)。

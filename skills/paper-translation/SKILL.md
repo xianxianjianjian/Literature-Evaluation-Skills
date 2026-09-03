@@ -1,6 +1,6 @@
 ---
 name: paper-translation
-description: Professionally translate an academic paper into Chinese with terminology verification, a canonical abstract, full-text/SI coverage, figure/table integrity, and a page-structure-aware Chinese mirror PDF. Can run independently or from the weekly workflow.
+description: Professionally translate an academic paper into Chinese with terminology verification, full Main/SI coverage, figure/table integrity, and an exact source-position Chinese mirror PDF by default. Can run independently or from the weekly workflow.
 ---
 
 # Paper Translation
@@ -34,6 +34,7 @@ Read the reference that owns each translation decision:
 - Translation Units and full scientific coverage → [`references/fulltext-translation.md`](references/fulltext-translation.md)
 - figures, tables and SI → [`references/figures-tables-supplement.md`](references/figures-tables-supplement.md)
 - mirror layout → [`references/mirror-layout.md`](references/mirror-layout.md)
+- source inventory, ledger, object/page mapping and independent validation → [`references/translation-evidence-contract.md`](references/translation-evidence-contract.md)
 - completion QC → [`references/translation-qc.md`](references/translation-qc.md)
 
 ## Entry modes and scopes
@@ -41,12 +42,13 @@ Read the reference that owns each translation decision:
 Accept handoff from Search, a Zotero item, or a directly supplied source package. Supported scopes:
 
 - `ABSTRACT_ONLY`
+- `MAIN_ONLY`
 - `SECTION_ONLY`
 - `SUPPLEMENT_ONLY`
 - `FULL_MIRROR`
 - `UPDATE_EXISTING`
 
-If the user simply asks to translate a paper without narrowing scope, default to `FULL_MIRROR`.
+If the user simply asks to translate a paper without narrowing scope, default to `FULL_MIRROR` with `layout_fidelity: EXACT_TEXT_FRAME`, `cjk_font_family: SimSun`, and `minimum_font_scale: 0.95`. Structural mirror layout is available only when the user explicitly requests `STRUCTURAL_MIRROR`; never silently downgrade exact layout.
 
 Search completion is not a prerequisite when the user directly supplies a paper, but a Minimal Intake is still mandatory.
 
@@ -67,16 +69,18 @@ Prefer Version of Record for identity and page mapping. A legal author manuscrip
 For `FULL_MIRROR`:
 
 1. Minimal Intake and source identity check.
-2. Build Source/Page/Structure Map.
+2. Fix-render paginated sources as needed, then build schema-v2 `source_inventory.json` and reviewed `text_frame_inventory.jsonl` before translation. Inventory PDF pages visually and inspect DOCX drawings/relationships; paragraph-only extraction is insufficient.
 3. Run terminology preflight and create/update `paper_terminology.csv`.
 4. Translate the Abstract through two translation passes plus an alignment pass and write `canonical_abstract.md`.
 5. Translate Main Article by stable Translation Units and record `translation_ledger.jsonl`.
 6. Translate/verify tables, figures, captions, notes and Supporting Information.
 7. Record translation-specific issues in `translation_issues.jsonl` using `TRI-xxx`.
-8. Run Coverage, Semantic, Numeric and Layout QC.
-9. Render and verify A: `[A] 中文全文翻译镜像版`.
-10. Archive A to Zotero when available; otherwise stage a handoff/pending action without changing the academic completion state.
-11. Propose evidence-backed terminology-registry updates where warranted.
+8. Create `font_map.json` for the locally installed `simsun.ttc`, then create the schema-v2 `mirror_layout_plan.json`; do not bypass the mirror helper with reflow or page-wide overlay panels.
+9. Render A through `render_exact_mirror.py`, visually compare every source/output page, and record object/table/text-frame placement and render notes.
+10. Run Coverage, Semantic and Numeric QC, then run `validate_translation_package.py` to generate `translation_validation.json`.
+11. Only after the independent validator passes, verify A as `[A] 中文全文翻译镜像版` and set Translation/A `COMPLETE`.
+12. Archive A to Zotero when available; otherwise stage a handoff/pending action without changing the academic completion state.
+13. Propose evidence-backed terminology-registry updates where warranted.
 
 ## Canonical Abstract
 
@@ -96,11 +100,9 @@ Original conceptual figures may be localized only without changing structure and
 
 ## Mirror PDF production
 
-A follows the escalation:
+For ordinary `FULL_MIRROR`, keep each source page as the immutable base and replace only reviewed text frames, table cells, or figure-label regions. Preserve page count, page boxes, rotation, columns, headers/footers, figures, tables and all non-text pixels. Chinese glyphs must use embedded SimSun with no fallback. Keep source font size first; try only `100%, 99%, 98%, 97%, 96%, 95%` without changing frame geometry or leading. If 95% still overflows, keep Translation/A `PROVISIONAL`; do not move the frame, add a page, compress tracking, or switch layout modes.
 
-`Strict Mirror → Adaptive Mirror → Readable Extension`
-
-Prioritize page correspondence, then structure, nearby figure/table placement, paragraph correspondence and finally line correspondence. Protect readability. Chinese body text may often begin around 105%–115% of the source visual size when space allows; approximately 8.5 pt is an extreme safety floor rather than a target.
+The former `Strict Mirror → Adaptive Mirror → Readable Extension` sequence belongs only to user-requested `STRUCTURAL_MIRROR` and the artifact/report must use that name rather than claiming exact mirror fidelity.
 
 ## Zotero archive handoff
 
@@ -124,16 +126,20 @@ Never silently overwrite an existing preferred translation; preserve evidence hi
 
 ## Completion states
 
-For `FULL_MIRROR`, Translation `COMPLETE` requires:
+For any manifest scope, Translation `COMPLETE` requires:
 
 - source identity/package accounted for;
 - canonical Abstract complete;
 - terminology issues resolved or explicitly accounted for;
 - 100% expected translatable coverage accounted for;
 - Main and SI status explicit;
+- `source_inventory.json`, `translation_ledger.jsonl`, and `translation_issues.jsonl` cross-validate for the requested scope;
 - no critical unlogged source gaps;
 - Coverage/Semantic/Numeric/Layout QC complete;
+- `translation_validation.json` was generated by the validator and passed for the active A;
 - A generated and verified as the correct artifact for the active `paper_id`/source version.
+
+`FULL_MIRROR` with `EXACT_TEXT_FRAME` additionally requires schema-v2 `source_inventory.json`, `text_frame_inventory.jsonl`, `font_map.json`, `mirror_layout_plan.json`, validator-generated `layout_diff.json`, one-to-one pages, exact table cells, embedded SimSun, 95%-100% frame sizing and zero rendered changes outside reviewed replacement regions. Do not apply these exact-layout requirements to `MAIN_ONLY` or `ABSTRACT_ONLY`.
 
 **A verified Zotero attachment key is not required for Translation academic completion.** Pending Zotero work belongs to the archive layer.
 
