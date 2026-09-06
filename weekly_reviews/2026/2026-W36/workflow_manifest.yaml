@@ -49,7 +49,9 @@
     },
     "C": {
       "status": "COMPLETE",
-      "git_path": "weekly_reviews/2026/2026-W36/C_Yuksel_2025_周文献评价.md"
+      "git_path": "weekly_reviews/2026/2026-W36/C_Yuksel_2025_周文献评价.md",
+      "git_repository": "https://github.com/xianxianjianjian/Literature-Evaluation-Skills.git",
+      "git_commit": "38e3509"
     }
   },
   "pending_zotero_actions": [

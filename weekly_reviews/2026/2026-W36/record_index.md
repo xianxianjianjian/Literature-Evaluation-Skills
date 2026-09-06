@@ -13,4 +13,4 @@
 | Zotero / Git 状态 | `archive_record.md` | 父条目已验证；附件与 GitHub 提交仍待闭合 |
 | A | `work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·结构镜像版_Yuksel_2025.pdf` | PROVISIONAL；待精确镜像纠正或用户明确选择结构镜像 |
 | B | `work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx` | COMPLETE；待 Zotero 附件 |
-| C | `weekly_reviews/2026/2026-W36/C_Yuksel_2025_周文献评价.md` | COMPLETE；待 GitHub 仓库目标 |
+| C | `weekly_reviews/2026/2026-W36/C_Yuksel_2025_周文献评价.md` | COMPLETE；已随提交 `38e3509` 推送到 GitHub |

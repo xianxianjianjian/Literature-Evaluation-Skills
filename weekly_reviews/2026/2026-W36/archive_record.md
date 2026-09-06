@@ -15,8 +15,10 @@
 
 ## Git / GitHub
 
-- 当前项目目录在 2026-09-06 检查时不是 Git 工作树，未发现分支或远程地址。
-- 因缺少目标仓库，尚未 commit/push；所有可追踪文本记录保存在 `.literature-evaluation/weekly_reviews/2026/2026-W36/` 与 `.literature-evaluation/knowledge/`。
+- 运行时数据目录本身不是 Git 工作树；项目树内找到并确认记录仓库：`Literature-Evaluation-Skills`。
+- 远程：`https://github.com/xianxianjianjian/Literature-Evaluation-Skills.git`；分支：`main`。
+- W36 首次同步提交：`38e3509`，已于 2026-09-06 推送到 `origin/main`。
+- Git 仅保存 knowledge、主题/检索决策、C、流程与归档状态；原文、A、B 按仓库规则不提交。
 
 ## 流程纠正
 
