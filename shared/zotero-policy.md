@@ -116,3 +116,4 @@ academic artifact COMPLETE
 - 真实 Zotero Desktop live write acceptance；
 - collection 自动定位；
 - 更完善的归档 reconciliation/repair 工具。
+新入库的默认流程必须使用 `zotero_bridge.py ingest-pdf` 或等价的 Zotero Desktop PDF 导入/自动识别路径：Main PDF 先进入目标文库，Zotero 自动识别生成父条目，再独立核对 DOI、标题、年份、collection 和 Main child。`create` 仅是带原因的 metadata-only fallback；它本身永远不能关闭归档状态。

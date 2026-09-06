@@ -69,18 +69,20 @@ Prefer Version of Record for identity and page mapping. A legal author manuscrip
 For `FULL_MIRROR`:
 
 1. Minimal Intake and source identity check.
-2. Fix-render paginated sources as needed, then build schema-v2 `source_inventory.json` and reviewed `text_frame_inventory.jsonl` before translation. Inventory PDF pages visually and inspect DOCX drawings/relationships; paragraph-only extraction is insufficient.
-3. Run terminology preflight and create/update `paper_terminology.csv`.
-4. Translate the Abstract through two translation passes plus an alignment pass and write `canonical_abstract.md`.
-5. Translate Main Article by stable Translation Units and record `translation_ledger.jsonl`.
-6. Translate/verify tables, figures, captions, notes and Supporting Information.
-7. Record translation-specific issues in `translation_issues.jsonl` using `TRI-xxx`.
-8. Create `font_map.json` for the locally installed `simsun.ttc`, then create the schema-v2 `mirror_layout_plan.json`; do not bypass the mirror helper with reflow or page-wide overlay panels.
-9. Render A through `render_exact_mirror.py`, visually compare every source/output page, and record object/table/text-frame placement and render notes.
-10. Run Coverage, Semantic and Numeric QC, then run `validate_translation_package.py` to generate `translation_validation.json`.
-11. Only after the independent validator passes, verify A as `[A] 中文全文翻译镜像版` and set Translation/A `COMPLETE`.
-12. Archive A to Zotero when available; otherwise stage a handoff/pending action without changing the academic completion state.
-13. Propose evidence-backed terminology-registry updates where warranted.
+2. Separate authority roles: use publisher XML/JATS/HTML first for language when clean and complete, then selectable PDF, another legal official source, and OCR only last; always use the Version-of-Record PDF as the visual/geometry authority. Record both choices in `source_inventory.json`.
+3. Fix-render paginated sources as needed, then build schema-v2 `source_inventory.json`, reviewed `text_frame_inventory.jsonl`, `figure_text_inventory.jsonl`, and `source_conflicts.jsonl` before translation. Inventory PDF pages visually and inspect DOCX drawings/relationships; paragraph-only extraction is insufficient.
+4. Run terminology preflight and create/update `paper_terminology.csv`.
+5. Translate the Abstract through two translation passes plus an alignment pass and write `canonical_abstract.md`.
+6. Translate Main Article by stable Translation Units and record `translation_ledger.jsonl`.
+7. Translate/verify tables, figures, captions, notes and Supporting Information. Every embedded figure label must close its reviewed/rendered/validated lifecycle in `figure_text_inventory.jsonl`.
+8. Preserve every Main/SI disagreement verbatim and record it in `source_conflicts.jsonl` with `AUD-xxx`; never normalize one source to the other.
+9. Record translation-specific issues in `translation_issues.jsonl` using `TRI-xxx`.
+10. Create `font_map.json` for the locally installed `simsun.ttc`, then create the schema-v2 `mirror_layout_plan.json`; do not bypass the mirror helper with reflow or page-wide overlay panels.
+11. Render A through `render_exact_mirror.py`, visually compare every source/output page, and record object/table/text-frame placement and render notes.
+12. Run Coverage, Semantic and Numeric QC, then run `validate_translation_package.py` to generate validator-owned `numeric_integrity.json`, `layout_diff.json`, and `translation_validation.json`.
+13. Only after the independent validator passes, verify A as `[A] 中文全文翻译镜像版` and set Translation/A `COMPLETE`.
+14. Archive A to Zotero when available; otherwise stage a handoff/pending action without changing the academic completion state.
+15. Propose evidence-backed terminology-registry updates where warranted.
 
 ## Canonical Abstract
 
@@ -151,6 +153,7 @@ Use `PROVISIONAL` when a named source/SI/content/layout gap affects the requeste
 - Do not intensify or weaken causal language beyond the source.
 - If authors themselves overstate causality, translate faithfully; criticism belongs to Deep Reading.
 - Preserve all numbers, statistics, equations, parameters, software names and data.
+- Preserve scientific notation, signs, percentages, statistic labels/values, df/CI/effect sizes, units, superscripts/subscripts, DOI and software versions exactly. Any non-whitelisted discrepancy blocks `COMPLETE`.
 - Do not add unreported experimental steps or parameter values.
 - Preserve non-significant findings and uncertainty language.
 - Do not silently correct source errors or inconsistencies.

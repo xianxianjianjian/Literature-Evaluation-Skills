@@ -132,16 +132,16 @@ Use A0–A3 severity. `A3` means the issue may affect a core conclusion and must
 Use this as minimum required coverage:
 
 ```text
-0 Literature Positioning & Research Audit
-1 Abstract
-2 Introduction
+0 文献定位与研究审计
+1 Abstract 精读
+2 Introduction：理论框架与研究问题
 3 Methods
 4 Results
 5 Discussion
 6 Innovation
 7 Limitations
 8 Redesign
-9 Transfer Value
+9 Research Transfer
 10 Terminology & Evidence Index
 ```
 
@@ -238,6 +238,8 @@ Do not create headings for trivial details simply to make B longer.
 Create `[B] 文献研究笔记·完整精读版` as a DOCX research archive when the environment supports document generation. Important conclusions must be traceable to source anchors/evidence IDs. Include a **研究设计与适用方法规范** subsection that identifies the applied method modules and separates reporting completeness from validity judgment.
 
 Before B is delivered, run `scripts/sanitize_docx_metadata.py`. Unless the user explicitly supplies an author name, author, last-modified-by, keywords and comments/description must be empty, Word comments removed, and generator identifiers absent from `docProps/core.xml` and other document properties.
+
+Then run `scripts/validate_deep_reading_package.py`. `COMPLETE` requires valid OOXML namespaces/relationships, `python-docx` readability, the exact 0–10 heading schema and required dynamic subsections, evidence/Main-SI audit files, an independent LibreOffice-compatible render to PDF, one PNG per rendered page, and reviewed visual-QA evidence covering blank pages, overflow, clipped tables, orphan headings, missing glyphs and page-count errors. Renderer failure or missing visual evidence forces B/Deep Reading to `PROVISIONAL` with `needs_update`; a DOCX merely existing or opening as ZIP is insufficient.
 
 ### C
 

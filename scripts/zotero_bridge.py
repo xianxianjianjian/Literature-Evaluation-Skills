@@ -792,6 +792,153 @@ def command_pending_template(args: argparse.Namespace) -> int:
     return 0
 
 
+def pdf_ingest_preview(args: argparse.Namespace) -> dict[str, Any]:
+    """Describe the PDF-first ingest without treating metadata creation as success."""
+    pdf = args.pdf.resolve()
+    metadata = load_metadata(args.metadata)
+    _, normalized_doi = build_connector_item(metadata)
+    if not pdf.is_file() or pdf.suffix.casefold() != ".pdf":
+        raise ZoteroBridgeError(f"Main Article PDF does not exist or is not PDF: {pdf}")
+    if not args.collection_key.strip():
+        raise ZoteroBridgeError("PDF-first ingest requires --collection-key.")
+    if args.fallback_metadata and not (args.fallback_reason or "").strip():
+        raise ZoteroBridgeError("Metadata-only fallback requires --fallback-reason.")
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "operation": "PDF_FIRST_INGEST",
+        "pdf": str(pdf),
+        "expected_identity": {
+            "doi": normalized_doi or None,
+            "title": str(metadata.get("title") or "").strip(),
+            "year": str(metadata.get("year") or metadata.get("date") or "").strip() or None,
+        },
+        "target_collection_key": args.collection_key.strip(),
+        "steps": [
+            "import Main PDF into target collection",
+            "allow Zotero automatic metadata recognition to create the parent",
+            "verify DOI/title/year and target collection",
+            "verify Main PDF is a child of that parent",
+        ],
+        "metadata_only_fallback_requested": bool(args.fallback_metadata),
+        "fallback_reason": (args.fallback_reason or "").strip() or None,
+        "archive_complete": False,
+    }
+
+
+def _parent_in_collection(item: dict[str, Any], collection_key: str) -> bool:
+    data = item_data(item)
+    collections = data.get("collections")
+    return isinstance(collections, list) and collection_key in collections
+
+
+def command_ingest_pdf(args: argparse.Namespace) -> int:
+    """Gate a Zotero Desktop PDF-first recognition workflow.
+
+    Zotero owns recognition of a newly imported PDF.  This command plans the
+    operation and independently verifies the recognized parent/child result.  It
+    never substitutes a metadata-only parent without an explicit recorded reason.
+    """
+    preview = pdf_ingest_preview(args)
+    if not args.yes:
+        preview["status"] = "PREVIEW"
+        preview["next_action"] = (
+            "Import the PDF into the selected Zotero collection with Zotero Desktop "
+            "and rerun with --recognized-parent-key <key> --yes after recognition."
+        )
+        emit(preview)
+        return 0
+
+    metadata = load_metadata(args.metadata)
+    title = str(metadata.get("title") or "").strip()
+    doi = str(metadata.get("doi") or "").strip()
+    matches = find_parent_matches(
+        api_base_url=args.api_base_url,
+        timeout=args.timeout,
+        doi=doi or None,
+        title=title or None,
+        limit=25,
+    )
+    if len(matches) > 1:
+        raise ZoteroBridgeError("PDF-first ingest stopped: multiple plausible parent items matched.")
+
+    recognized_key = (args.recognized_parent_key or "").strip()
+    if recognized_key:
+        verified = api_get(
+            args.api_base_url,
+            f"/{DEFAULT_LIBRARY_PREFIX}/items/{quote(recognized_key, safe='')}",
+            timeout=args.timeout,
+        )
+        if not isinstance(verified, dict) or not is_parent_bibliographic_item(verified):
+            raise ZoteroBridgeError("Recognized parent key is not a bibliographic parent item.")
+        if matches and item_key(matches[0]) != recognized_key:
+            raise ZoteroBridgeError("Recognized parent conflicts with DOI/title duplicate precheck.")
+        if not _parent_in_collection(verified, args.collection_key.strip()):
+            raise ZoteroBridgeError("Recognized parent is not in the requested target collection.")
+        children = api_get(
+            args.api_base_url,
+            f"/{DEFAULT_LIBRARY_PREFIX}/items/{quote(recognized_key, safe='')}/children",
+            timeout=args.timeout,
+        )
+        pdf_children = [
+            child
+            for child in children
+            if isinstance(child, dict)
+            and item_data(child).get("itemType") == "attachment"
+            and str(item_data(child).get("contentType") or "").casefold() == "application/pdf"
+        ] if isinstance(children, list) else []
+        if not pdf_children:
+            raise ZoteroBridgeError("Recognized parent has no PDF child; archive remains incomplete.")
+        actual = item_data(verified)
+        expected_doi = normalize_doi(doi)
+        actual_doi = normalize_doi(str(actual.get("DOI") or actual.get("doi") or ""))
+        if expected_doi and expected_doi != actual_doi:
+            raise ZoteroBridgeError("Recognized DOI does not match expected DOI.")
+        if title and str(actual.get("title") or "").strip().casefold() != title.casefold():
+            raise ZoteroBridgeError("Recognized title does not match expected title.")
+        preview.update(
+            {
+                "status": "VERIFIED",
+                "recognized_parent_key": recognized_key,
+                "main_attachment_keys": [item_key(child) for child in pdf_children],
+                "archive_complete": True,
+            }
+        )
+        emit(preview)
+        return 0
+
+    if args.fallback_metadata:
+        preview.update(
+            {
+                "status": "METADATA_FALLBACK_REQUIRED",
+                "archive_complete": False,
+                "pending_zotero_action": {
+                    "action": "replace_metadata_fallback_with_pdf_first_parent",
+                    "reason": args.fallback_reason.strip(),
+                    "expected_attachment_name": "[ORIGINAL] Main Article",
+                },
+                "note": (
+                    "Metadata-only fallback is explicitly recorded but is not archive completion. "
+                    "Use the existing create/attach helpers only as a resumable fallback."
+                ),
+            }
+        )
+        emit(preview)
+        return 4
+
+    preview.update(
+        {
+            "status": "AWAITING_ZOTERO_AUTO_RECOGNITION",
+            "archive_complete": False,
+            "next_action": (
+                "Import the Main PDF into the target collection in Zotero Desktop, wait for "
+                "automatic recognition, then rerun with --recognized-parent-key and --yes."
+            ),
+        }
+    )
+    emit(preview)
+    return 4
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -874,6 +1021,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Request Zotero Desktop authorization and execute the write. Without --yes, preview only.",
     )
     attach.set_defaults(handler=command_attach)
+
+    ingest = subparsers.add_parser(
+        "ingest-pdf",
+        help="Plan and verify the default PDF-first Zotero recognition workflow.",
+    )
+    ingest.add_argument("--pdf", type=Path, required=True)
+    ingest.add_argument("--metadata", type=Path, required=True)
+    ingest.add_argument("--collection-key", required=True)
+    ingest.add_argument("--recognized-parent-key")
+    ingest.add_argument("--fallback-metadata", action="store_true")
+    ingest.add_argument("--fallback-reason")
+    ingest.add_argument("--yes", action="store_true")
+    ingest.set_defaults(handler=command_ingest_pdf)
 
     pending = subparsers.add_parser(
         "pending", help="Prepare a pending_zotero_actions record without writing Zotero."

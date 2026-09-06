@@ -33,6 +33,14 @@ class FullWorkflowCompletionTests(unittest.TestCase):
             "git_path": "weekly_reviews/2026/2026-W34/weekly_review.md",
         }
         data["source_change"]["last_checked"] = "2026-08-21"
+        if zotero_keys:
+            data["archive"].update(
+                {
+                    "zotero_parent_key": "PARENT",
+                    "zotero_collection_key": "COLLECTION",
+                    "zotero_main_attachment_key": "MAIN",
+                }
+            )
         return data
 
     def _check(
@@ -69,6 +77,8 @@ class FullWorkflowCompletionTests(unittest.TestCase):
         checks = self._check(data, archive=True)
         self.assertFalse(next(c for c in checks if c.name == "archive:A-zotero-key").passed)
         self.assertFalse(next(c for c in checks if c.name == "archive:B-zotero-key").passed)
+        self.assertFalse(next(c for c in checks if c.name == "archive:parent-key").passed)
+        self.assertFalse(next(c for c in checks if c.name == "archive:main-key").passed)
         self.assertFalse(next(c for c in checks if c.name == "workflow:no-pending-zotero").passed)
 
     def test_archive_complete_passes_with_verified_keys(self) -> None:

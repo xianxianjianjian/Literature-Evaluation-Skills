@@ -46,6 +46,8 @@ Compare source versus translation tokens such as:
 - durations/times;
 - frequencies/sampling rates;
 - software versions;
+- scientific notation and positive/negative signs;
+- DOI and superscripts/subscripts;
 - table cells and significance markers.
 
 Do not replace author-reported values with recalculated values during Translation. If an apparent inconsistency is noticed, preserve the source and flag it for `AUD-xxx` review later.
@@ -77,7 +79,7 @@ For any manifest scope, Translation/A can be `COMPLETE` when:
 - the independent translation-package validator passes and generates `translation_validation.json`;
 - A has been generated and verified against the active paper/source version.
 
-For `FULL_MIRROR/EXACT_TEXT_FRAME`, schema-v2 inventory/plan, `text_frame_inventory.jsonl`, `font_map.json` and validator-generated `layout_diff.json` must pass. A boolean render flag or notes cannot satisfy this gate. These exact checks are not imposed on `MAIN_ONLY` or `ABSTRACT_ONLY`; user-requested `STRUCTURAL_MIRROR` is reported separately and cannot be labeled exact.
+For `FULL_MIRROR/EXACT_TEXT_FRAME`, schema-v2 inventory/plan, `text_frame_inventory.jsonl`, `figure_text_inventory.jsonl`, `source_conflicts.jsonl`, `paper_terminology.csv`, `font_map.json`, and validator-generated `numeric_integrity.json`/`layout_diff.json` must pass. A boolean render flag or notes cannot satisfy this gate. These exact checks are not imposed on `MAIN_ONLY` or `ABSTRACT_ONLY`; user-requested `STRUCTURAL_MIRROR` is reported separately and cannot be labeled exact.
 
 A Zotero attachment key is **not** part of this academic Translation gate. If Zotero archive work is still pending, keep Translation/A `COMPLETE`, record the pending action, and report archive closure separately.
 

@@ -7,6 +7,19 @@
   "zotero_collection_key": "CXGQF4XF",
   "zotero_main_attachment_key": "BH9KQ377",
   "zotero_archive_status": "PARENT_VERIFIED_MAIN_ATTACHED_OTHERS_PENDING",
+  "zotero_last_live_check": {
+    "checked_date": "2026-09-06",
+    "status": "UNAVAILABLE",
+    "reason": "Zotero Desktop local API and Connector were not running during the v1.4 regression; previously verified keys were preserved without claiming a new verification."
+  },
+  "archive": {
+    "zotero_parent_key": "89TU6WAS",
+    "zotero_collection_key": "CXGQF4XF",
+    "zotero_main_attachment_key": "BH9KQ377",
+    "required_si_source_ids": ["SRC-S1"],
+    "zotero_si_attachment_keys": {},
+    "metadata_only_fallback": false
+  },
   "stages": {
     "topic": {
       "status": "COMPLETE",
@@ -24,16 +37,20 @@
       "update_reason": [
         "A currently uses STRUCTURAL_MIRROR_READABLE_EXTENSION, but no explicit user selection of STRUCTURAL_MIRROR is recorded. Rebuild with EXACT_TEXT_FRAME or obtain an explicit structural-mirror choice before marking Translation/A COMPLETE."
       ],
-      "scope": "FULL_MAIN_AND_SCIENTIFIC_SI",
-      "layout_fidelity": "STRUCTURAL_MIRROR_READABLE_EXTENSION",
+      "scope": "FULL_MIRROR",
+      "layout_fidelity": "STRUCTURAL_MIRROR",
+      "user_selected_layout": false,
       "cjk_font_family": "SimSun",
       "minimum_font_scale": 0.95,
       "profile_change_reason": "Publisher double-column PDF text layer had broken reading order; PMC JATS supplied the clean language source while the publisher PDF and original figures remained the visual authority. The output is not labelled EXACT_TEXT_FRAME."
     },
     "deep_reading": {
-      "status": "COMPLETE",
-      "needs_update": false,
-      "update_reason": []
+      "status": "PROVISIONAL",
+      "needs_update": true,
+      "update_reason": [
+        "v1.4 B validation found that the current DOCX does not use the required Chinese 0-10 heading schema and lacks several required Methods/Results/Discussion subsections.",
+        "No b_visual_qa.json exists for the independent rendered PDF/all-page PNG package; independent office-render provenance is not established."
+      ]
     }
   },
   "outputs": {
@@ -45,9 +62,10 @@
       "validation_note": "Usable structural mirror retained for provenance; not an EXACT_TEXT_FRAME deliverable."
     },
     "B": {
-      "status": "COMPLETE",
+      "status": "PROVISIONAL",
       "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx",
-      "zotero_attachment_key": null
+      "zotero_attachment_key": null,
+      "validation_report": "work/10.1038-s42003-025-07868-5/deep_reading_validation_v14.json"
     },
     "C": {
       "status": "COMPLETE",

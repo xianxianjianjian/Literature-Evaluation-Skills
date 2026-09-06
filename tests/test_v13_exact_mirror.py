@@ -262,6 +262,8 @@ class ExactMirrorTests(unittest.TestCase):
                     "page_count": 1,
                     "pdf_path": str(pdf_path),
                     "status": "AVAILABLE",
+                    "language_authority": "PUBLISHER_XML_JATS_HTML" if role == "MAIN" else "SELECTABLE_PDF",
+                    "geometry_authority": "VERSION_OF_RECORD_PDF" if role == "MAIN" else "PUBLISHER_SUPPLEMENT_PDF",
                 }
                 for source_id, role, pdf_path in sources
             ],
@@ -281,6 +283,34 @@ class ExactMirrorTests(unittest.TestCase):
         _write_jsonl(work / "text_frame_inventory.jsonl", frames)
         _write_jsonl(work / "translation_ledger.jsonl", ledger)
         (work / "translation_issues.jsonl").write_text("", encoding="utf-8")
+        figure_rows = []
+        for item in objects:
+            if item["kind"] != "figure":
+                continue
+            for frame_id in item["label_frame_ids"]:
+                frame = next(candidate for candidate in frames if candidate["frame_id"] == frame_id)
+                ledger_row = next(candidate for candidate in ledger if candidate["frame_ids"] == [frame_id])
+                figure_rows.append(
+                    {
+                        "figure_id": item["object_id"],
+                        "source_id": item["source_id"],
+                        "source_page": item["source_page"],
+                        "frame_id": frame_id,
+                        "bbox_pt": frame["bbox_pt"],
+                        "source_text": "Speed",
+                        "translated_text": ledger_row["translated_text"],
+                        "reviewed": True,
+                        "rendered": True,
+                        "validated": True,
+                    }
+                )
+        _write_jsonl(work / "figure_text_inventory.jsonl", figure_rows)
+        (work / "source_conflicts.jsonl").write_text("", encoding="utf-8")
+        (work / "paper_terminology.csv").write_text(
+            "English_Term,Preferred_Chinese,Confidence,Evidence_IDs\n"
+            "source,中文,HIGH,TERMEV-0001\n",
+            encoding="utf-8",
+        )
         font_map = {
             "schema_version": 1,
             "cjk_font_family": "SimSun",

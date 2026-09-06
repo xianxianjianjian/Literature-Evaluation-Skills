@@ -155,7 +155,7 @@ Use `PROVISIONAL` when the academic archive is scientifically usable but a named
 
 Use `BLOCKED` when missing Main/SI/source identity prevents defensible reconstruction of a core part of the paper.
 
-Do not use `PROVISIONAL` merely because Zotero automatic writing is unavailable. Do not call a file `COMPLETE` merely because a DOCX exists; it still has to pass the academic gate above.
+Do not use `PROVISIONAL` merely because Zotero automatic writing is unavailable. Do not call a file `COMPLETE` merely because a DOCX exists; it must pass `validate_deep_reading_package.py`, including independent office rendering and all-page visual QA. Render failure is a B production gap and therefore keeps B/Deep Reading `PROVISIONAL` with `needs_update`.
 
 ## Final QC checklist
 

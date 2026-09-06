@@ -78,6 +78,8 @@ def _write_package(root: Path) -> tuple[Path, Path]:
                 "page_count": 1,
                 "pdf_path": str(source),
                 "status": "AVAILABLE",
+                "language_authority": "SELECTABLE_PDF",
+                "geometry_authority": "VERSION_OF_RECORD_PDF",
             }
         ],
         "pages": [

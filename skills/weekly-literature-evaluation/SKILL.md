@@ -227,7 +227,7 @@ The weekly **academic workflow** may be declared `COMPLETE` when the applicable 
 
 ## Archive completion
 
-Report archive closure separately. A fully closed Zotero archive additionally requires the desired Main/SI/A/B parent/attachments to be verified and the applicable pending actions cleared.
+Report archive closure separately. A fully closed Zotero archive additionally requires the target collection, bibliographic parent, Main PDF child, every required scientific SI child, A and B to be verified, `metadata_only_fallback: false`, and the applicable pending actions cleared.
 
 Do not describe the Zotero archive as complete merely because the academic workflow is complete. Conversely, do not call the academic workflow incomplete merely because automatic Zotero writing is unavailable.
 

@@ -14,6 +14,7 @@ import csv
 import json
 import re
 import sys
+import tempfile
 from datetime import date
 from pathlib import Path
 from typing import Iterable
@@ -273,6 +274,111 @@ def command_find(args: argparse.Namespace) -> None:
         raise HistoryError(f"No record found for {field}={value!r}.")
 
 
+def _write_rows_atomic(path: Path, fields: list[str], rows: list[dict[str, str]]) -> None:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", newline="", delete=False, dir=path.parent, suffix=".tmp"
+    ) as handle:
+        temporary = Path(handle.name)
+        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="raise")
+        writer.writeheader()
+        writer.writerows(rows)
+    temporary.replace(path)
+
+
+def reconcile_record(
+    path: Path,
+    fields: list[str],
+    *,
+    record_type: str,
+    paper_id: str | None,
+    doi: str | None,
+    week: str | None,
+    updates: dict[str, object],
+    corrections_path: Path,
+    correction_id: str,
+    reason: str,
+    corrected_date: str,
+) -> dict[str, object]:
+    """Apply an explicit correction and append immutable old/new evidence."""
+    if not re.fullmatch(r"HISTCOR-\d{4,}", correction_id):
+        raise HistoryError("Correction_ID must use HISTCOR-0001 format.")
+    validate_iso_date(corrected_date, "Corrected_Date")
+    if not reason.strip():
+        raise HistoryError("A non-empty correction reason is required.")
+    if not isinstance(updates, dict) or not updates:
+        raise HistoryError("updates must be a non-empty JSON object.")
+    unknown = sorted(set(updates) - set(fields))
+    protected = sorted(set(updates) & {"Week", "Paper_ID", "DOI"})
+    if unknown:
+        raise HistoryError(f"Unknown correction fields: {', '.join(unknown)}")
+    if protected:
+        raise HistoryError(f"Identity fields cannot be reconciled in place: {', '.join(protected)}")
+
+    rows = read_rows(path, fields)
+    probe = {"Paper_ID": paper_id or "", "DOI": doi or ""}
+    matches = [
+        (index, row)
+        for index, row in enumerate(rows)
+        if same_identity(row, probe)
+        and (record_type != "selection" or row.get("Week", "").strip() == (week or "").strip())
+    ]
+    if len(matches) != 1:
+        raise HistoryError(f"Expected exactly one {record_type} record; matched {len(matches)}.")
+    index, old_row = matches[0]
+    new_row = dict(old_row)
+    for field, value in updates.items():
+        new_row[field] = "" if value is None else str(value)
+    if new_row == old_row:
+        raise HistoryError("Correction does not change the selected record.")
+
+    if corrections_path.is_file():
+        for line in corrections_path.read_text(encoding="utf-8-sig").splitlines():
+            if line.strip() and json.loads(line).get("correction_id") == correction_id:
+                raise HistoryError(f"Correction_ID already exists: {correction_id}")
+
+    rows[index] = new_row
+    _write_rows_atomic(path, fields, rows)
+    correction = {
+        "schema_version": 1,
+        "correction_id": correction_id,
+        "record_type": record_type,
+        "paper_id": old_row.get("Paper_ID") or None,
+        "doi": old_row.get("DOI") or None,
+        "week": old_row.get("Week") or None,
+        "old_values": {field: old_row.get(field, "") for field in updates},
+        "new_values": {field: new_row.get(field, "") for field in updates},
+        "reason": reason.strip(),
+        "corrected_date": corrected_date,
+    }
+    corrections_path.parent.mkdir(parents=True, exist_ok=True)
+    with corrections_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(correction, ensure_ascii=False) + "\n")
+    return correction
+
+
+def command_reconcile(args: argparse.Namespace) -> None:
+    try:
+        updates = json.loads(args.updates_json)
+    except json.JSONDecodeError as exc:
+        raise HistoryError(f"--updates-json is invalid JSON: {exc}") from exc
+    record_type = "selection" if args.command == "reconcile-selection" else "reading"
+    fields = SELECTION_FIELDS if record_type == "selection" else READING_FIELDS
+    correction = reconcile_record(
+        args.file,
+        fields,
+        record_type=record_type,
+        paper_id=args.paper_id,
+        doi=args.doi,
+        week=args.week,
+        updates=updates,
+        corrections_path=args.corrections,
+        correction_id=args.correction_id,
+        reason=args.reason,
+        corrected_date=args.corrected_date,
+    )
+    print(json.dumps(correction, ensure_ascii=False, indent=2))
+
+
 def add_common_record_arguments(parser: argparse.ArgumentParser) -> None:
     """Add concise append arguments; JSON supports the complete schema."""
     parser.add_argument("--file", type=Path, required=True)
@@ -317,6 +423,22 @@ def build_parser() -> argparse.ArgumentParser:
     by_id.add_argument("--file", type=Path, required=True)
     by_id.add_argument("--paper-id", required=True)
     by_id.set_defaults(handler=command_find)
+
+    for name, help_text in (
+        ("reconcile-selection", "Traceably correct one week-scoped selection record."),
+        ("reconcile-reading", "Traceably correct one completed-reading record."),
+    ):
+        reconcile = subparsers.add_parser(name, help=help_text)
+        reconcile.add_argument("--file", type=Path, required=True)
+        reconcile.add_argument("--corrections", type=Path, required=True)
+        reconcile.add_argument("--paper-id")
+        reconcile.add_argument("--doi")
+        reconcile.add_argument("--week", required=name == "reconcile-selection")
+        reconcile.add_argument("--updates-json", required=True)
+        reconcile.add_argument("--correction-id", required=True)
+        reconcile.add_argument("--reason", required=True)
+        reconcile.add_argument("--corrected-date", required=True)
+        reconcile.set_defaults(handler=command_reconcile)
     return parser
 
 

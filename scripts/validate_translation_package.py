@@ -33,6 +33,15 @@ from exact_mirror import (
     validate_text_frames,
 )
 from mirror_pdf import MirrorPlanError, validate_plan_data
+from translation_integrity import (
+    NUMERIC_REPORT_FILE,
+    TranslationIntegrityError,
+    validate_figure_text_inventory,
+    validate_numeric_integrity,
+    validate_paper_terminology,
+    validate_source_conflicts,
+    write_json as write_integrity_json,
+)
 
 try:
     from pypdf import PdfReader
@@ -818,6 +827,21 @@ def _validate_exact_package(
         checks.append(TranslationCheck("layout:exact-plan", True, "V2 exact plan valid"))
     except (MirrorPlanError, TranslationPackageError, OSError) as exc:
         return checks + [TranslationCheck("layout:exact-plan", False, str(exc))], diff
+
+    # These content gates are deliberately downstream of the renderer schemas.
+    # They independently compare evidence rather than trusting generator flags.
+    try:
+        numeric_result, numeric_report = validate_numeric_integrity(work_dir, ledger)
+        write_integrity_json(work_dir / NUMERIC_REPORT_FILE, numeric_report)
+        checks.append(TranslationCheck(numeric_result.code, numeric_result.passed, numeric_result.detail))
+        for result in (
+            validate_figure_text_inventory(work_dir, inventory, frames, ledger),
+            validate_source_conflicts(work_dir, ledger),
+            validate_paper_terminology(work_dir),
+        ):
+            checks.append(TranslationCheck(result.code, result.passed, result.detail))
+    except (TranslationIntegrityError, OSError) as exc:
+        checks.append(TranslationCheck("content:integrity-evidence", False, str(exc)))
 
     output_identity = Path(plan["output_pdf"]).resolve() == a_path.resolve()
     checks.append(

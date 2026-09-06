@@ -8,6 +8,7 @@ Exact mirror requires:
 
 - `schema_version: 2`, `scope: FULL_MIRROR`, `layout_fidelity: EXACT_TEXT_FRAME`;
 - `sources`: `source_id`, `role`, `page_count`, fixed `pdf_path` and availability;
+- separate `language_authority` and `geometry_authority`; geometry authority is always the Version-of-Record PDF for exact mirror;
 - `pages`: source/output page, all five PDF boxes, rotation, unit/object/frame IDs;
 - `units`: stable frame-level translation units;
 - `objects`: every scientific figure/table with page `bbox_pt` and label frames.
@@ -103,6 +104,18 @@ Schema v2 maps every source page to exactly one output page and records:
 
 Each issue requires `issue_id`, `status` and `completion_impact`. A SimSun absence is `BLOCKED`; an unresolved frame/background/overflow or untranslated label is normally `PROVISIONAL`.
 
+## 7. `figure_text_inventory.jsonl`
+
+For every expected figure label record `figure_id`, source ID/page, exact `frame_id`/`bbox_pt`, source and translated text, and `reviewed`, `rendered`, `validated`. All three flags must be true and the translated text must match the exact ledger. Missing, extra, shifted or unvalidated labels block exact-A completion.
+
+## 8. `source_conflicts.jsonl`
+
+Keep an empty file when no Main/SI conflict is identified. For each conflict use a stable `CONFLICT-xxx`, distinct `source_values`, the affected ledger `unit_ids`, one or more `AUD-xxx`, and `preserved_separately: true`. If translated values collapse a recorded disagreement, completion fails.
+
+## 9. Numeric integrity evidence
+
+The independent validator compares source and translation tokens and writes `numeric_integrity.json`. It includes scientific notation, explicit signs, percentages, `p/t/F/z/χ²/β/r/rs/R²/df/CI`, effect sizes, units, DOI and software versions. A rare intentional difference requires a row in `numeric_integrity_whitelist.jsonl` with unit, source/translated token, reason, reviewer and date; all other discrepancies block completion.
+
 ## Independent completion check
 
 ```text
@@ -114,7 +127,7 @@ python scripts/validate_translation_package.py \
   --report <work-dir>/translation_validation.json
 ```
 
-The validator generates `layout_diff.json` itself and recomputes page boxes, rotations, one-to-one mapping, replacement frames, table cells, embedded/CJK SimSun use, 95%-100% glyph sizing, English-token accounting and same-renderer pixels outside replacement frames. Do not edit either validation report.
+The validator generates `numeric_integrity.json` and `layout_diff.json` itself and recomputes page boxes, rotations, one-to-one mapping, replacement frames, table cells, figure-label closure, embedded/CJK SimSun use, 95%-100% glyph sizing, English-token accounting and same-renderer pixels outside replacement frames. Do not edit validator reports.
 
 Use the existing `source_manifest.json` for source identity. Do not add per-unit, per-page, per-object or font hashes.
 

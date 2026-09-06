@@ -16,6 +16,13 @@ REQUIRED_CJK_FONT = "SimSun"
 MINIMUM_FONT_SCALE = 0.95
 MAXIMUM_FONT_SCALE = 1.0
 FONT_SCALE_STEPS = (1.0, 0.99, 0.98, 0.97, 0.96, 0.95)
+LANGUAGE_AUTHORITIES = {
+    "PUBLISHER_XML_JATS_HTML",
+    "SELECTABLE_PDF",
+    "ALTERNATE_LEGAL_OFFICIAL_SOURCE",
+    "OCR",
+}
+GEOMETRY_AUTHORITIES = {"VERSION_OF_RECORD_PDF", "PUBLISHER_SUPPLEMENT_PDF"}
 FRAME_ACTIONS = {"TRANSLATE", "RETAIN_SOURCE"}
 FRAME_KINDS = {
     "title",
@@ -145,6 +152,14 @@ def validate_exact_inventory(data: Any) -> dict[str, Any]:
             raise ExactMirrorError(f"sources[{index}] page_count must be positive.")
         if not nonempty_text(source.get("pdf_path")):
             raise ExactMirrorError(f"sources[{index}] pdf_path is required.")
+        if source.get("language_authority") not in LANGUAGE_AUTHORITIES:
+            raise ExactMirrorError(f"sources[{index}] requires a supported language_authority.")
+        if source.get("geometry_authority") not in GEOMETRY_AUTHORITIES:
+            raise ExactMirrorError(f"sources[{index}] requires a PDF geometry_authority.")
+        if source.get("role") == "MAIN" and source.get("geometry_authority") != "VERSION_OF_RECORD_PDF":
+            raise ExactMirrorError("Main exact geometry must use the Version-of-Record PDF.")
+        if source.get("role") == "SI" and source.get("geometry_authority") != "PUBLISHER_SUPPLEMENT_PDF":
+            raise ExactMirrorError("SI exact geometry must use the publisher supplement PDF.")
         source_counts[source_id] = source["page_count"]
 
     seen_pages: set[tuple[str, int]] = set()

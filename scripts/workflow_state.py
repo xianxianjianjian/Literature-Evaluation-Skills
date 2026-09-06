@@ -77,12 +77,21 @@ def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any
                 "layout_fidelity": "EXACT_TEXT_FRAME",
                 "cjk_font_family": DEFAULT_CJK_FONT_FAMILY,
                 "minimum_font_scale": DEFAULT_MINIMUM_FONT_SCALE,
+                "user_selected_layout": False,
             },
         },
         "outputs": {
             "A": {"status": "NOT_STARTED", "zotero_attachment_key": None},
             "B": {"status": "NOT_STARTED", "zotero_attachment_key": None},
             "C": {"status": "NOT_STARTED", "git_path": None},
+        },
+        "archive": {
+            "zotero_parent_key": None,
+            "zotero_collection_key": None,
+            "zotero_main_attachment_key": None,
+            "required_si_source_ids": [],
+            "zotero_si_attachment_keys": {},
+            "metadata_only_fallback": False,
         },
         "pending_zotero_actions": [],
         "blocking_issues": [],
@@ -107,7 +116,20 @@ def normalize_manifest(data: object) -> dict[str, Any]:
                 translation["layout_fidelity"] = "LEGACY_STRUCTURAL"
                 translation.setdefault("cjk_font_family", None)
                 translation.setdefault("minimum_font_scale", None)
+            translation.setdefault("user_selected_layout", False)
     data.setdefault("blocking_issues", [])
+    archive_defaults = {
+        "zotero_parent_key": data.get("zotero_parent_key"),
+        "zotero_collection_key": data.get("zotero_collection_key"),
+        "zotero_main_attachment_key": data.get("zotero_main_attachment_key"),
+        "required_si_source_ids": [],
+        "zotero_si_attachment_keys": {},
+        "metadata_only_fallback": False,
+    }
+    archive = data.setdefault("archive", {})
+    if isinstance(archive, dict):
+        for field, default in archive_defaults.items():
+            archive.setdefault(field, default)
     return data
 
 
@@ -199,6 +221,14 @@ def validate_manifest(data: object) -> dict[str, Any]:
             raise WorkflowStateError(
                 "EXACT_TEXT_FRAME requires translation.minimum_font_scale=0.95."
             )
+    if (
+        layout_fidelity == "STRUCTURAL_MIRROR"
+        and stages["translation"]["status"] == "COMPLETE"
+        and translation.get("user_selected_layout") is not True
+    ):
+        raise WorkflowStateError(
+            "STRUCTURAL_MIRROR can be COMPLETE only after an explicit user layout choice."
+        )
 
     if stages["search"]["status"] in {"PROVISIONAL", "COMPLETE"} and not has_paper:
         raise WorkflowStateError(
@@ -236,6 +266,27 @@ def validate_manifest(data: object) -> dict[str, Any]:
     value = outputs["C"].get("git_path")
     if value is not None and (not isinstance(value, str) or not value.strip()):
         raise WorkflowStateError("outputs.C.git_path must be null or text.")
+
+    archive = data.get("archive")
+    if not isinstance(archive, dict):
+        raise WorkflowStateError("archive must be an object.")
+    for field in ("zotero_parent_key", "zotero_collection_key", "zotero_main_attachment_key"):
+        value = archive.get(field)
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise WorkflowStateError(f"archive.{field} must be null or text.")
+    required_si = archive.get("required_si_source_ids")
+    si_keys = archive.get("zotero_si_attachment_keys")
+    if not isinstance(required_si, list) or not all(
+        isinstance(item, str) and item.strip() for item in required_si
+    ):
+        raise WorkflowStateError("archive.required_si_source_ids must be a list of source IDs.")
+    if not isinstance(si_keys, dict) or not all(
+        isinstance(key, str) and key.strip() and isinstance(item, str) and item.strip()
+        for key, item in si_keys.items()
+    ):
+        raise WorkflowStateError("archive.zotero_si_attachment_keys must map source IDs to keys.")
+    if not isinstance(archive.get("metadata_only_fallback"), bool):
+        raise WorkflowStateError("archive.metadata_only_fallback must be true or false.")
 
     pending = data.get("pending_zotero_actions")
     if not isinstance(pending, list) or not all(isinstance(item, dict) for item in pending):
@@ -326,10 +377,17 @@ def command_set_stage(args: argparse.Namespace) -> None:
 
 
 def command_set_translation_profile(args: argparse.Namespace) -> None:
+    if args.layout_fidelity == "STRUCTURAL_MIRROR" and not args.explicit_user_choice:
+        raise WorkflowStateError(
+            "STRUCTURAL_MIRROR requires --explicit-user-choice; exact layout cannot be downgraded automatically."
+        )
     data = load_manifest(args.manifest)
     translation = data["stages"]["translation"]
     translation["scope"] = args.scope
     translation["layout_fidelity"] = args.layout_fidelity
+    translation["user_selected_layout"] = bool(
+        args.layout_fidelity == "STRUCTURAL_MIRROR" and args.explicit_user_choice
+    )
     if args.layout_fidelity == "EXACT_TEXT_FRAME":
         translation["cjk_font_family"] = DEFAULT_CJK_FONT_FAMILY
         translation["minimum_font_scale"] = DEFAULT_MINIMUM_FONT_SCALE
@@ -534,6 +592,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     translation_profile.add_argument(
         "--layout-fidelity", choices=sorted(LAYOUT_FIDELITIES), required=True
+    )
+    translation_profile.add_argument(
+        "--explicit-user-choice",
+        action="store_true",
+        help="Required only when the user explicitly selected STRUCTURAL_MIRROR.",
     )
     translation_profile.set_defaults(handler=command_set_translation_profile)
 

@@ -90,7 +90,9 @@ class RealPaperBBoxFittingTests(unittest.TestCase):
     def test_real_bbox_can_require_intermediate_97_percent_scale(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             font_path = self._fixture_font(Path(temporary))
-            pdfmetrics.registerFont(TTFont("SimSun", str(font_path)))
+            # Other exact-mirror tests may have registered the host's real SimSun
+            # under the same ReportLab name. Isolate this synthetic metric test.
+            pdfmetrics._fonts["SimSun"] = TTFont("SyntheticSimSunBBox", str(font_path))
             fitted = render_exact_mirror._layout("中" * 11, self._frame())
             self.assertIsNotNone(fitted)
             scale, lines = fitted
@@ -100,7 +102,7 @@ class RealPaperBBoxFittingTests(unittest.TestCase):
     def test_real_bbox_overflow_at_95_percent_is_not_silently_shrunk(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             font_path = self._fixture_font(Path(temporary))
-            pdfmetrics.registerFont(TTFont("SimSun", str(font_path)))
+            pdfmetrics._fonts["SimSun"] = TTFont("SyntheticSimSunOverflow", str(font_path))
             fitted = render_exact_mirror._layout("中" * 12, self._frame())
             self.assertIsNone(fitted)
 

@@ -11,6 +11,7 @@ TERM-0009,"cueing benefit","","线索提示获益","","认知心理学；睡眠�
 TERM-0010,"reactivation","","再激活","","认知心理学；睡眠神经科学","记忆加工","已有记忆表征在无完整再学习时被重新激活的过程","TMR固定效应和条件",HIGH,TE6,TERMEV-0003,CONTEXTUAL,2026-09-05,2026-09-06,"表格列名保持一致"
 TERM-0011,"SWS×REM product","","SWS×REM乘积","","睡眠神经科学","跨阶段指标","SWS与REM时间百分比相乘得到的复合睡眠阶段指标","Yuksel 2025跨睡眠阶段时间指标",HIGH,TE7,TERMEV-0005,CONTEXTUAL,2026-09-05,2026-09-06,"不将相关关系写成阶段协同机制"
 TERM-0012,"delta/theta power","","δ/θ功率","","睡眠神经科学；EEG","时频分析","δ与θ频段内的脑电功率","线索诱发时频活动",HIGH,TE7,TERMEV-0005,CONTEXTUAL,2026-09-05,2026-09-06,"按原文频段范围报告"
-TERM-0013,"cluster-based permutation test","","基于簇的置换检验","","统计学；EEG","多重比较","利用置换分布对相邻时间、频率或空间点形成的统计簇进行推断的方法","EEG时频多重比较",HIGH,TE7,TERMEV-0005,CONTEXTUAL,2026-09-05,2026-09-06,"与Bonferroni和FDR分开"
+TERM-0013,"cluster-based permutation test","","基于簇的置换检验","","统计学；EEG","多重比较","利用置换分布对相邻时间、频率或空间点形成的统计簇进行推断的方法","EEG时频多重比较",HIGH,TE7,,DEPRECATED,2026-09-05,2026-09-06,"Yuksel 2025并未报告置换检验；已解除TERMEV-0005关联，保留本行作为纠错历史"
 TERM-0014,"compound symmetry covariance structure","","复合对称协方差结构","","统计学","重复测量模型","假定各观测方差相同且任意两次观测协方差相同的协方差结构","线性混合效应模型重复测量",HIGH,TE7,TERMEV-0005,CONTEXTUAL,2026-09-05,2026-09-06,"不补充原文未报告参数"
 TERM-0015,"percent change in error","","误差百分比变化","","认知心理学；统计学","行为结局","相对于基线的误差百分比变化","Yuksel 2025空间位置记忆主要结局",HIGH,TE7,TERMEV-0005,CONTEXTUAL,2026-09-05,2026-09-06,"正值表示误差增加即记忆变差"
+TERM-0016,"FDR-corrected time-frequency cluster identification","","FDR校正的时频簇识别","","统计学；EEG","时频多重比较","先对逐时频点单样本t检验进行FDR校正，再以MATLAB bwlabeln识别相邻显著点形成的簇","Yuksel 2025线索诱发EEG时频分析",HIGH,TE7,TERMEV-0005,CONTEXTUAL,2026-09-06,2026-09-06,"按原文方法表述；不得称为基于簇的置换检验"

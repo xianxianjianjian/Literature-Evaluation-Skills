@@ -13,6 +13,7 @@
   - `[A] 中文全文翻译·结构镜像版` → `handoff/[A] 中文全文翻译·结构镜像版_Yuksel_2025.pdf`
   - `[B] 文献研究笔记·完整精读版` → `handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx`
 - 本次修复通过仍有效的 Connector 导入会话，将 SRC-M1 原文流式写入既有父条目；附件键、父键和本地存储 URL 均已查回。
+- 2026-09-06 v1.4 回归时 Zotero Desktop 未运行，本地 API 与 Connector 均不可达；本次未重新声称实时验证，保留此前已核验的父键/Main 键，SI/A/B 继续 pending。
 - 用户确认的后续规则：新焦点论文优先将 Main PDF 导入目标分类并由 Zotero 自动识别父条目；不得把元数据-only 父条目作为常规完成路径。
 
 ## Git / GitHub
@@ -26,3 +27,5 @@
 
 - 现有 A 为 `STRUCTURAL_MIRROR_READABLE_EXTENSION`，并非默认要求的 `EXACT_TEXT_FRAME`。
 - 未找到用户明确选择 `STRUCTURAL_MIRROR` 的记录，因此 Translation 与 A 已改为 `PROVISIONAL / needs_update`；现有文件保留作可用版本与溯源，不冒充精确镜像版。
+- v1.4 独立 B 验收发现当前 DOCX 不符合固定中文 0–10 标题结构，且缺少 `b_visual_qa.json` 与可核验的独立 office-render 来源，因此 Deep Reading/B 同步改为 `PROVISIONAL / needs_update`。既有完成历史通过 `HISTCOR-0001` 标记纠正。
+- 术语纠错：原 `cluster-based permutation test` / TERM-0013 已弃用并解除 TERMEV-0005 关联；按原文方法改为 `FDR-corrected time-frequency cluster identification` / TERM-0016。
