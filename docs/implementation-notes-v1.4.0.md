@@ -20,7 +20,7 @@ Schema changes are additive. Older manifests gain missing archive fields during 
 
 - The SLEEPY collection (`CXGQF4XF`) remains the archive target. After the user deleted parent `89TU6WAS`, the Main PDF was re-imported through the Connector PDF-first path; Zotero automatic recognition generated parent `BHX9LWRZ` and Main child `NQSZH9AA`, both independently verified.
 - The focal-paper method term was corrected from the unsupported cluster-based permutation-test attribution to `FDR-corrected time-frequency cluster identification`; the earlier evidence state remains in the append-only event history.
-- Exact-A regeneration is complete; the A PDF is academically complete but its Zotero attachment remains pending because the active Zotero 9.0.6 instance lacks Zotero 10+ Local API writes and no native Zotero window was exposed to the task. B remains `PROVISIONAL`; required SI, B schema/render/visual-QA evidence and Zotero A/B attachment are still pending.
+- Exact-A regeneration is complete. After Zotero was upgraded to 10.0.1 and the user authorized local writes, A was attached and independently verified as child `C3YDZ6JF` under parent `BHX9LWRZ`; the Zotero copy matches the local artifact by SHA-256, MD5 and byte length. B remains `PROVISIONAL`; required SI, B schema/render/visual-QA evidence and the Zotero B attachment are still pending.
 - The existing B DOCX core metadata contains no generator identity and no comments part, but that hygiene check alone is insufficient for completion.
 
 ## Verification

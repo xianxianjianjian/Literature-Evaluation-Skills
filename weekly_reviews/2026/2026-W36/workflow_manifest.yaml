@@ -9,8 +9,8 @@
   "zotero_archive_status": "PARENT_VERIFIED_MAIN_ATTACHED_OTHERS_PENDING",
   "zotero_last_live_check": {
     "checked_date": "2026-09-06",
-    "status": "AVAILABLE_AND_MAIN_VERIFIED",
-    "reason": "Main PDF was imported through Zotero Connector saveStandaloneAttachment; Zotero automatic recognition created parent BHX9LWRZ. DOI/title/year/collection and child NQSZH9AA were verified, and the Zotero-stored PDF SHA-256 matched SRC-M1. A attachment remains pending because Zotero 9.0.6 lacks Zotero 10+ Local API writes and the native Zotero window was unavailable to the automation surface."
+    "status": "AVAILABLE_AND_A_VERIFIED",
+    "reason": "Zotero 10.0.1 Local API and Connector were available. DOI/title/year/SLEEPY collection and Main child NQSZH9AA remained uniquely verified. A was attached under parent BHX9LWRZ as child C3YDZ6JF; Zotero metadata verification passed and the stored PDF SHA-256/MD5/length exactly matched the local A artifact."
   },
   "archive": {
     "zotero_parent_key": "BHX9LWRZ",
@@ -55,7 +55,7 @@
     "A": {
       "status": "COMPLETE",
       "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.0.pdf",
-      "zotero_attachment_key": null,
+      "zotero_attachment_key": "C3YDZ6JF",
       "archive_label": "[A] 中文全文翻译·精确镜像版 v1.4.0",
       "validation_report": "work/10.1038-s42003-025-07868-5/v14_exact/translation_validation.json",
       "validation_note": "FULL_MIRROR / EXACT_TEXT_FRAME; 21 pages; independent validation passed 27/27; visual all-page contact-sheet review passed."
@@ -87,25 +87,11 @@
       "action": "ATTACH_OUTPUT",
       "paper_id": "10.1038-s42003-025-07868-5",
       "parent_key": "BHX9LWRZ",
-      "expected_label": "[A] 中文全文翻译·精确镜像版 v1.4.0",
-      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.0.pdf",
-      "reason": "Pending only at Zotero attachment write: Zotero 9.0.6 does not expose Zotero 10+ Local API writes, and the native Zotero window was not available to the automation surface. Do not create a duplicate or standalone A item."
-    },
-    {
-      "action": "ATTACH_OUTPUT",
-      "paper_id": "10.1038-s42003-025-07868-5",
-      "parent_key": "BHX9LWRZ",
       "expected_label": "[B] 文献研究笔记·完整精读版",
       "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx"
     }
   ],
-  "blocking_issues": [
-    {
-      "scope": "ZOTERO_A_ATTACHMENT_ONLY",
-      "status": "BLOCKED_BY_WRITE_ROUTE",
-      "reason": "Existing-parent attachment requires either Zotero 10+ Local API write support or native Zotero-window access. Main PDF and auto-generated parent are already verified."
-    }
-  ],
+  "blocking_issues": [],
   "source_change": {
     "last_checked": "2026-09-05"
   }

@@ -77,6 +77,6 @@ Plugin version at audit start: `1.3.0`
 
 - All P0 items listed as partial, missing, not test-enforced, or conflicting above are implemented and covered by the v1.4 validator/test surface.
 - The original 152-test baseline failure was isolated to ReportLab's process-global test font registry; the regression fixture now assigns its synthetic font deterministically without weakening the production font gate.
-- Yuksel W36 is deliberately not re-certified: A remains `PROVISIONAL` until an exact-position Main+SI rebuild passes, and B remains `PROVISIONAL` until the v1.4 Chinese heading, renderer-provenance, all-page PNG and visual-QA gates pass.
-- Zotero's previously verified collection/parent/Main keys are preserved, while SI/A/B remain pending. The 2026-09-06 live probe was unavailable and therefore did not alter verified historical state.
+- Yuksel W36 A has since been rebuilt and independently validated as `FULL_MIRROR / EXACT_TEXT_FRAME`; B remains `PROVISIONAL` until the v1.4 Chinese heading, renderer-provenance, all-page PNG and visual-QA gates pass.
+- Zotero collection `CXGQF4XF`, parent `BHX9LWRZ` and Main child `NQSZH9AA` remain verified. After the desktop upgrade to Zotero 10.0.1 and explicit local-write authorization, A child `C3YDZ6JF` was attached and matched to the local artifact by SHA-256, MD5 and byte length; SI and B remain pending.
 - The managed topic/search schema and journal registry remain P1. Research-record extraction into a dedicated private Git repository is also deferred under the non-destructive migration plan.
