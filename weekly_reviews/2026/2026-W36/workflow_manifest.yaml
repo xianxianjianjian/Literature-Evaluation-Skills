@@ -3,19 +3,19 @@
   "workflow_id": "2026-W36-weekly-literature-evaluation",
   "week": "2026-W36",
   "paper_id": "10.1038-s42003-025-07868-5",
-  "zotero_parent_key": "89TU6WAS",
+  "zotero_parent_key": "BHX9LWRZ",
   "zotero_collection_key": "CXGQF4XF",
-  "zotero_main_attachment_key": "BH9KQ377",
+  "zotero_main_attachment_key": "NQSZH9AA",
   "zotero_archive_status": "PARENT_VERIFIED_MAIN_ATTACHED_OTHERS_PENDING",
   "zotero_last_live_check": {
     "checked_date": "2026-09-06",
-    "status": "UNAVAILABLE",
-    "reason": "Zotero Desktop local API and Connector were not running during the v1.4 regression; previously verified keys were preserved without claiming a new verification."
+    "status": "AVAILABLE_AND_MAIN_VERIFIED",
+    "reason": "Main PDF was imported through Zotero Connector saveStandaloneAttachment; Zotero automatic recognition created parent BHX9LWRZ. DOI/title/year/collection and child NQSZH9AA were verified, and the Zotero-stored PDF SHA-256 matched SRC-M1. A attachment remains pending because Zotero 9.0.6 lacks Zotero 10+ Local API writes and the native Zotero window was unavailable to the automation surface."
   },
   "archive": {
-    "zotero_parent_key": "89TU6WAS",
+    "zotero_parent_key": "BHX9LWRZ",
     "zotero_collection_key": "CXGQF4XF",
-    "zotero_main_attachment_key": "BH9KQ377",
+    "zotero_main_attachment_key": "NQSZH9AA",
     "required_si_source_ids": ["SRC-S1"],
     "zotero_si_attachment_keys": {},
     "metadata_only_fallback": false
@@ -77,7 +77,7 @@
     {
       "action": "ATTACH_SOURCE",
       "paper_id": "10.1038-s42003-025-07868-5",
-      "parent_key": "89TU6WAS",
+      "parent_key": "BHX9LWRZ",
       "source_id": "SRC-S1",
       "reason": "Main Article attachment is verified; Supplementary Materials remains pending.",
       "expected_label": "[SUPPLEMENT] Supplementary Materials",
@@ -86,19 +86,26 @@
     {
       "action": "ATTACH_OUTPUT",
       "paper_id": "10.1038-s42003-025-07868-5",
-      "parent_key": "89TU6WAS",
+      "parent_key": "BHX9LWRZ",
       "expected_label": "[A] 中文全文翻译·精确镜像版 v1.4.0",
-      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.0.pdf"
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.0.pdf",
+      "reason": "Pending only at Zotero attachment write: Zotero 9.0.6 does not expose Zotero 10+ Local API writes, and the native Zotero window was not available to the automation surface. Do not create a duplicate or standalone A item."
     },
     {
       "action": "ATTACH_OUTPUT",
       "paper_id": "10.1038-s42003-025-07868-5",
-      "parent_key": "89TU6WAS",
+      "parent_key": "BHX9LWRZ",
       "expected_label": "[B] 文献研究笔记·完整精读版",
       "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx"
     }
   ],
-  "blocking_issues": [],
+  "blocking_issues": [
+    {
+      "scope": "ZOTERO_A_ATTACHMENT_ONLY",
+      "status": "BLOCKED_BY_WRITE_ROUTE",
+      "reason": "Existing-parent attachment requires either Zotero 10+ Local API write support or native Zotero-window access. Main PDF and auto-generated parent are already verified."
+    }
+  ],
   "source_change": {
     "last_checked": "2026-09-05"
   }

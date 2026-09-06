@@ -2,18 +2,18 @@
 
 ## Zotero
 
-- 父条目：`89TU6WAS`
+- 当前父条目：`BHX9LWRZ`（旧父条目 `89TU6WAS` 已由用户删除）
 - 所属分类：`SLEEPY`（集合键 `CXGQF4XF`；已由写入响应验证）
 - DOI：`10.1038/s42003-025-07868-5`
-- 父条目状态：已创建并通过本地 API 按 DOI 唯一查回。
-- 原文附件：`BH9KQ377`，标题 `[ORIGINAL] Main Article`；已作为 Zotero 存储型 PDF 挂到父条目并通过本地文件 URL 验证。
+- 父条目状态：2026-09-06 通过 Zotero Connector 的 PDF-first `saveStandaloneAttachment` 路径导入 Main PDF，Zotero 自动识别并生成父条目；本地 API 按 DOI 唯一查回，题名、年份与 SLEEPY 集合均核验通过。
+- 当前原文附件：`NQSZH9AA`；已作为 Zotero 存储型 PDF 挂到父条目。Zotero 存储副本 SHA-256 `A88A59EB07264BE72661C9DD49314CE059AA3F60F1A4D88864058F8FD2711FE5` 与 `SRC-M1` 完全一致。
 - 附件状态：Main 已完成；SI、A、B 尚待上传，因此完整 Zotero 归档仍未闭合。
 - 待上传附件：
   - `[SUPPLEMENT] Supplementary Materials` → `sources/SRC-S1_Supplementary-Materials.pdf`
   - `[A] 中文全文翻译·精确镜像版 v1.4.0` → `handoff/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.0.pdf`
   - `[B] 文献研究笔记·完整精读版` → `handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx`
-- 本次修复通过仍有效的 Connector 导入会话，将 SRC-M1 原文流式写入既有父条目；附件键、父键和本地存储 URL 均已查回。
-- 2026-09-06 v1.4 回归时 Zotero Desktop 未运行，本地 API 与 Connector 均不可达；本次未重新声称实时验证，保留此前已核验的父键/Main 键，SI/A/B 继续 pending。
+- 2026-09-06 重新入库时 Zotero Desktop Local API 与 Connector 均可用。旧父条目已删除，SRC-M1 由 Connector 作为独立 PDF 导入，自动识别生成新父条目 `BHX9LWRZ` 和 Main 子附件 `NQSZH9AA`；1.4.0 `ingest-pdf` 复核状态为 `VERIFIED`。
+- A 本地成品已核验存在，SHA-256 为 `A878CB0CB0DF262A44C569311860761352E42BA7AC797CACBAB5B9A479CB65EE`。本机 Zotero 9.0.6 不支持 Zotero 10+ Local API existing-parent 写入，且本任务未获得原生 Zotero 窗口自动化表面；为避免产生独立 A 条目或重复父条目，本次未错误回退，A 仍为待挂载。
 - 用户确认的后续规则：新焦点论文优先将 Main PDF 导入目标分类并由 Zotero 自动识别父条目；不得把元数据-only 父条目作为常规完成路径。
 
 ## Git / GitHub

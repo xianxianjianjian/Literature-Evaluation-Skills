@@ -12,7 +12,7 @@ Plugin version at audit start: `1.3.0`
 - Research data root: `D:\codex\workplace\reference\.literature-evaluation`
 - Current research Git root: `D:\codex\workplace\reference\Literature-Evaluation-Skills` (weekly records are currently mixed into the plugin repository)
 - Zotero collection policy: selected focal papers are archived to the user-selected collection; the active W36 target is `SLEEPY` (`CXGQF4XF`).
-- Zotero focal parent: Yuksel 2025, parent `89TU6WAS`; verified Main attachment `BH9KQ377`.
+- Zotero focal parent at audit time: Yuksel 2025, parent `89TU6WAS`; verified Main attachment `BH9KQ377`. On 2026-09-06 the user deleted that item; the PDF-first re-import subsequently generated parent `BHX9LWRZ` with verified Main attachment `NQSZH9AA` (see the W36 archive record).
 - Baseline test result: 152 run, 151 passed, 1 failed (`test_real_bbox_can_require_intermediate_97_percent_scale`).
 - B-runtime gap: `python-docx` is not importable by the default Python and `soffice` is not on `PATH`; therefore an independent DOCX render cannot currently be certified by that runtime.
 
