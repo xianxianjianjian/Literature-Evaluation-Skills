@@ -32,17 +32,15 @@
       "update_reason": []
     },
     "translation": {
-      "status": "PROVISIONAL",
-      "needs_update": true,
-      "update_reason": [
-        "A currently uses STRUCTURAL_MIRROR_READABLE_EXTENSION, but no explicit user selection of STRUCTURAL_MIRROR is recorded. Rebuild with EXACT_TEXT_FRAME or obtain an explicit structural-mirror choice before marking Translation/A COMPLETE."
-      ],
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": [],
       "scope": "FULL_MIRROR",
-      "layout_fidelity": "STRUCTURAL_MIRROR",
+      "layout_fidelity": "EXACT_TEXT_FRAME",
       "user_selected_layout": false,
       "cjk_font_family": "SimSun",
       "minimum_font_scale": 0.95,
-      "profile_change_reason": "Publisher double-column PDF text layer had broken reading order; PMC JATS supplied the clean language source while the publisher PDF and original figures remained the visual authority. The output is not labelled EXACT_TEXT_FRAME."
+      "profile_change_reason": "Rebuilt under literature-evaluation v1.4.0. Publisher JATS supplied language authority; the Version of Record PDF and publisher supplement supplied geometry authority. Independent exact-package validation passed 27/27 checks."
     },
     "deep_reading": {
       "status": "PROVISIONAL",
@@ -55,11 +53,12 @@
   },
   "outputs": {
     "A": {
-      "status": "PROVISIONAL",
-      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·结构镜像版_Yuksel_2025.pdf",
+      "status": "COMPLETE",
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.0.pdf",
       "zotero_attachment_key": null,
-      "archive_label": "[A] 中文全文翻译·结构镜像版",
-      "validation_note": "Usable structural mirror retained for provenance; not an EXACT_TEXT_FRAME deliverable."
+      "archive_label": "[A] 中文全文翻译·精确镜像版 v1.4.0",
+      "validation_report": "work/10.1038-s42003-025-07868-5/v14_exact/translation_validation.json",
+      "validation_note": "FULL_MIRROR / EXACT_TEXT_FRAME; 21 pages; independent validation passed 27/27; visual all-page contact-sheet review passed."
     },
     "B": {
       "status": "PROVISIONAL",
@@ -88,8 +87,8 @@
       "action": "ATTACH_OUTPUT",
       "paper_id": "10.1038-s42003-025-07868-5",
       "parent_key": "89TU6WAS",
-      "expected_label": "[A] 中文全文翻译·结构镜像版",
-      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·结构镜像版_Yuksel_2025.pdf"
+      "expected_label": "[A] 中文全文翻译·精确镜像版 v1.4.0",
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.0.pdf"
     },
     {
       "action": "ATTACH_OUTPUT",
