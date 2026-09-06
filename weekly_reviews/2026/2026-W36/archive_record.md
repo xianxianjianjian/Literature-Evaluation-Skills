@@ -6,13 +6,14 @@
 - 所属分类：`SLEEPY`（集合键 `CXGQF4XF`；已由写入响应验证）
 - DOI：`10.1038/s42003-025-07868-5`
 - 父条目状态：已创建并通过本地 API 按 DOI 唯一查回。
-- 附件状态：待上传；API 查回 `numChildren = 0`，因此不得标记为已归档。
+- 原文附件：`BH9KQ377`，标题 `[ORIGINAL] Main Article`；已作为 Zotero 存储型 PDF 挂到父条目并通过本地文件 URL 验证。
+- 附件状态：Main 已完成；SI、A、B 尚待上传，因此完整 Zotero 归档仍未闭合。
 - 待上传附件：
-  - `[ORIGINAL] Main Article` → `sources/SRC-M1_Version-of-Record.pdf`
   - `[SUPPLEMENT] Supplementary Materials` → `sources/SRC-S1_Supplementary-Materials.pdf`
   - `[A] 中文全文翻译·结构镜像版` → `handoff/[A] 中文全文翻译·结构镜像版_Yuksel_2025.pdf`
   - `[B] 文献研究笔记·完整精读版` → `handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx`
-- 自动附件阻塞：当前 Zotero 9.0.6 未暴露文献插件要求的 Zotero 10+ 本地附件写入身份；Connector 接受父条目写入，但没有持久化 localhost 附件 URL。网页端状态绑定连续超时，未执行无法验证的上传。
+- 本次修复通过仍有效的 Connector 导入会话，将 SRC-M1 原文流式写入既有父条目；附件键、父键和本地存储 URL 均已查回。
+- 用户确认的后续规则：新焦点论文优先将 Main PDF 导入目标分类并由 Zotero 自动识别父条目；不得把元数据-only 父条目作为常规完成路径。
 
 ## Git / GitHub
 

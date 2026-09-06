@@ -4,7 +4,9 @@
   "week": "2026-W36",
   "paper_id": "10.1038-s42003-025-07868-5",
   "zotero_parent_key": "89TU6WAS",
-  "zotero_archive_status": "PARENT_VERIFIED_ATTACHMENTS_PENDING",
+  "zotero_collection_key": "CXGQF4XF",
+  "zotero_main_attachment_key": "BH9KQ377",
+  "zotero_archive_status": "PARENT_VERIFIED_MAIN_ATTACHED_OTHERS_PENDING",
   "stages": {
     "topic": {
       "status": "COMPLETE",
@@ -56,14 +58,13 @@
   },
   "pending_zotero_actions": [
     {
-      "action": "ATTACH_SOURCE_PACKAGE",
+      "action": "ATTACH_SOURCE",
       "paper_id": "10.1038-s42003-025-07868-5",
       "parent_key": "89TU6WAS",
-      "reason": "Zotero 9 local API does not expose verified local-file writes; Connector created the parent but did not persist localhost attachment URLs.",
-      "expected_labels": [
-        "[ORIGINAL] Main Article",
-        "[SUPPLEMENT] Supplementary Materials"
-      ]
+      "source_id": "SRC-S1",
+      "reason": "Main Article attachment is verified; Supplementary Materials remains pending.",
+      "expected_label": "[SUPPLEMENT] Supplementary Materials",
+      "local_path": "work/10.1038-s42003-025-07868-5/sources/SRC-S1_Supplementary-Materials.pdf"
     },
     {
       "action": "ATTACH_OUTPUT",
