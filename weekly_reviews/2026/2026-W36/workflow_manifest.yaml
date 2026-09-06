@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "workflow_id": "2026-W36-weekly-literature-evaluation",
+  "week": "2026-W36",
+  "paper_id": "10.1038-s42003-025-07868-5",
+  "zotero_parent_key": "7R7IRXFW",
+  "zotero_archive_status": "PARENT_VERIFIED_ATTACHMENTS_PENDING",
+  "stages": {
+    "topic": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "search": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "translation": {
+      "status": "PROVISIONAL",
+      "needs_update": true,
+      "update_reason": [
+        "A currently uses STRUCTURAL_MIRROR_READABLE_EXTENSION, but no explicit user selection of STRUCTURAL_MIRROR is recorded. Rebuild with EXACT_TEXT_FRAME or obtain an explicit structural-mirror choice before marking Translation/A COMPLETE."
+      ],
+      "scope": "FULL_MAIN_AND_SCIENTIFIC_SI",
+      "layout_fidelity": "STRUCTURAL_MIRROR_READABLE_EXTENSION",
+      "cjk_font_family": "SimSun",
+      "minimum_font_scale": 0.95,
+      "profile_change_reason": "Publisher double-column PDF text layer had broken reading order; PMC JATS supplied the clean language source while the publisher PDF and original figures remained the visual authority. The output is not labelled EXACT_TEXT_FRAME."
+    },
+    "deep_reading": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    }
+  },
+  "outputs": {
+    "A": {
+      "status": "PROVISIONAL",
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·结构镜像版_Yuksel_2025.pdf",
+      "zotero_attachment_key": null,
+      "archive_label": "[A] 中文全文翻译·结构镜像版",
+      "validation_note": "Usable structural mirror retained for provenance; not an EXACT_TEXT_FRAME deliverable."
+    },
+    "B": {
+      "status": "COMPLETE",
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx",
+      "zotero_attachment_key": null
+    },
+    "C": {
+      "status": "COMPLETE",
+      "git_path": "weekly_reviews/2026/2026-W36/C_Yuksel_2025_周文献评价.md"
+    }
+  },
+  "pending_zotero_actions": [
+    {
+      "action": "ATTACH_SOURCE_PACKAGE",
+      "paper_id": "10.1038-s42003-025-07868-5",
+      "parent_key": "7R7IRXFW",
+      "reason": "Zotero 9 local API does not expose verified local-file writes; Connector created the parent but did not persist localhost attachment URLs.",
+      "expected_labels": [
+        "[ORIGINAL] Main Article",
+        "[SUPPLEMENT] Supplementary Materials"
+      ]
+    },
+    {
+      "action": "ATTACH_OUTPUT",
+      "paper_id": "10.1038-s42003-025-07868-5",
+      "parent_key": "7R7IRXFW",
+      "expected_label": "[A] 中文全文翻译·结构镜像版",
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·结构镜像版_Yuksel_2025.pdf"
+    },
+    {
+      "action": "ATTACH_OUTPUT",
+      "paper_id": "10.1038-s42003-025-07868-5",
+      "parent_key": "7R7IRXFW",
+      "expected_label": "[B] 文献研究笔记·完整精读版",
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx"
+    }
+  ],
+  "blocking_issues": [],
+  "source_change": {
+    "last_checked": "2026-09-05"
+  }
+}
