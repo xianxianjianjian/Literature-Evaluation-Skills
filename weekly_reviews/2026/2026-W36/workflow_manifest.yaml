@@ -3,7 +3,7 @@
   "workflow_id": "2026-W36-weekly-literature-evaluation",
   "week": "2026-W36",
   "paper_id": "10.1038-s42003-025-07868-5",
-  "zotero_parent_key": "7R7IRXFW",
+  "zotero_parent_key": "89TU6WAS",
   "zotero_archive_status": "PARENT_VERIFIED_ATTACHMENTS_PENDING",
   "stages": {
     "topic": {
@@ -58,7 +58,7 @@
     {
       "action": "ATTACH_SOURCE_PACKAGE",
       "paper_id": "10.1038-s42003-025-07868-5",
-      "parent_key": "7R7IRXFW",
+      "parent_key": "89TU6WAS",
       "reason": "Zotero 9 local API does not expose verified local-file writes; Connector created the parent but did not persist localhost attachment URLs.",
       "expected_labels": [
         "[ORIGINAL] Main Article",
@@ -68,14 +68,14 @@
     {
       "action": "ATTACH_OUTPUT",
       "paper_id": "10.1038-s42003-025-07868-5",
-      "parent_key": "7R7IRXFW",
+      "parent_key": "89TU6WAS",
       "expected_label": "[A] 中文全文翻译·结构镜像版",
       "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·结构镜像版_Yuksel_2025.pdf"
     },
     {
       "action": "ATTACH_OUTPUT",
       "paper_id": "10.1038-s42003-025-07868-5",
-      "parent_key": "7R7IRXFW",
+      "parent_key": "89TU6WAS",
       "expected_label": "[B] 文献研究笔记·完整精读版",
       "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx"
     }
