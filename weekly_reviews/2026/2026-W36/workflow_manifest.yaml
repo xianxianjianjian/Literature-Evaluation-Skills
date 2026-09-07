@@ -6,18 +6,22 @@
   "zotero_parent_key": "BHX9LWRZ",
   "zotero_collection_key": "CXGQF4XF",
   "zotero_main_attachment_key": "NQSZH9AA",
-  "zotero_archive_status": "PARENT_VERIFIED_MAIN_ATTACHED_OTHERS_PENDING",
+  "zotero_archive_status": "PARENT_VERIFIED_MAIN_SI_A_B_ATTACHED",
   "zotero_last_live_check": {
-    "checked_date": "2026-09-06",
-    "status": "AVAILABLE_AND_A_VERIFIED",
-    "reason": "Zotero 10.0.1 Local API and Connector were available. DOI/title/year/SLEEPY collection and Main child NQSZH9AA remained uniquely verified. A was attached under parent BHX9LWRZ as child C3YDZ6JF; Zotero metadata verification passed and the stored PDF SHA-256/MD5/length exactly matched the local A artifact."
+    "checked_date": "2026-09-07",
+    "status": "MAIN_SI_A_B_VERIFIED",
+    "reason": "Zotero 10.0.1 Local API and Connector were available. Parent BHX9LWRZ remained in SLEEPY with Main NQSZH9AA. A v1.4.1 HMZ78SCI, B v1.4.1 RBPXH2K2 and SI 2IQ74JYZ were verified by parent relation, title, stored file URL, MD5 and byte length; obsolete A v1.4.0 C3YDZ6JF was moved to Zotero Trash."
   },
   "archive": {
     "zotero_parent_key": "BHX9LWRZ",
     "zotero_collection_key": "CXGQF4XF",
     "zotero_main_attachment_key": "NQSZH9AA",
-    "required_si_source_ids": ["SRC-S1"],
-    "zotero_si_attachment_keys": {},
+    "required_si_source_ids": [
+      "SRC-S1"
+    ],
+    "zotero_si_attachment_keys": {
+      "SRC-S1": "2IQ74JYZ"
+    },
     "metadata_only_fallback": false
   },
   "stages": {
@@ -35,36 +39,45 @@
       "status": "COMPLETE",
       "needs_update": false,
       "update_reason": [],
+      "skill_version": "1.4.1",
       "scope": "FULL_MIRROR",
       "layout_fidelity": "EXACT_TEXT_FRAME",
       "user_selected_layout": false,
       "cjk_font_family": "SimSun",
       "minimum_font_scale": 0.95,
-      "profile_change_reason": "Rebuilt under literature-evaluation v1.4.0. Publisher JATS supplied language authority; the Version of Record PDF and publisher supplement supplied geometry authority. Independent exact-package validation passed 27/27 checks."
+      "profile_change_reason": "Rebuilt and validated under literature-evaluation v1.4.1. Publisher JATS supplied language authority; the Version of Record PDF and publisher supplement supplied geometry authority. Independent exact-package validation passed all 30 checks."
     },
     "deep_reading": {
-      "status": "PROVISIONAL",
-      "needs_update": true,
-      "update_reason": [
-        "v1.4 B validation found that the current DOCX does not use the required Chinese 0-10 heading schema and lacks several required Methods/Results/Discussion subsections.",
-        "No b_visual_qa.json exists for the independent rendered PDF/all-page PNG package; independent office-render provenance is not established."
-      ]
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": [],
+      "skill_version": "1.4.1",
+      "scope": "MAIN_SI_FULL_RESEARCH_AUDIT",
+      "evidence_classes": [
+        "原文直接内容",
+        "作者解释",
+        "评译者分析",
+        "外部依据"
+      ],
+      "profile_change_reason": "Rebuilt under literature-evaluation v1.4.1 with exact 0-10 heading schema, complete Methods/Results/Discussion routing, Main+SI claim anchors, Word independent rendering, 21-page all-page visual QA, and sanitized DOCX metadata."
     }
   },
   "outputs": {
     "A": {
       "status": "COMPLETE",
-      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.0.pdf",
-      "zotero_attachment_key": "C3YDZ6JF",
-      "archive_label": "[A] 中文全文翻译·精确镜像版 v1.4.0",
-      "validation_report": "work/10.1038-s42003-025-07868-5/v14_exact/translation_validation.json",
-      "validation_note": "FULL_MIRROR / EXACT_TEXT_FRAME; 21 pages; independent validation passed 27/27; visual all-page contact-sheet review passed."
+      "local_path": "work/10.1038-s42003-025-07868-5/v141_exact/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.1.pdf",
+      "zotero_attachment_key": "HMZ78SCI",
+      "archive_label": "[A] 中文全文翻译·精确镜像版 v1.4.1",
+      "validation_report": "work/10.1038-s42003-025-07868-5/v141_exact/translation_validation.json",
+      "validation_note": "FULL_MIRROR / EXACT_TEXT_FRAME; 21 pages; independent validation passed all 30 checks; Zotero-stored MD5 d4ceabc4c1c7d7c1f9848d9fbf605192 and length 4205657 bytes matched the local artifact."
     },
     "B": {
-      "status": "PROVISIONAL",
-      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx",
-      "zotero_attachment_key": null,
-      "validation_report": "work/10.1038-s42003-025-07868-5/deep_reading_validation_v14.json"
+      "status": "COMPLETE",
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025_v1.4.1.docx",
+      "zotero_attachment_key": "RBPXH2K2",
+      "archive_label": "[B] 文献研究笔记·完整精读版 v1.4.1",
+      "validation_report": "work/10.1038-s42003-025-07868-5/deep_reading_validation_v141.json",
+      "validation_note": "Main+SI complete; 21 Word-rendered pages; exact 0-10 schema and 14/14 validation checks passed; all pages visually reviewed; metadata sanitized; Zotero-stored MD5 4db820dfbf3a23f0a79f9374bdbba104 and length 73445 bytes matched the local artifact."
     },
     "C": {
       "status": "COMPLETE",
@@ -73,26 +86,9 @@
       "git_commit": "38e3509"
     }
   },
-  "pending_zotero_actions": [
-    {
-      "action": "ATTACH_SOURCE",
-      "paper_id": "10.1038-s42003-025-07868-5",
-      "parent_key": "BHX9LWRZ",
-      "source_id": "SRC-S1",
-      "reason": "Main Article attachment is verified; Supplementary Materials remains pending.",
-      "expected_label": "[SUPPLEMENT] Supplementary Materials",
-      "local_path": "work/10.1038-s42003-025-07868-5/sources/SRC-S1_Supplementary-Materials.pdf"
-    },
-    {
-      "action": "ATTACH_OUTPUT",
-      "paper_id": "10.1038-s42003-025-07868-5",
-      "parent_key": "BHX9LWRZ",
-      "expected_label": "[B] 文献研究笔记·完整精读版",
-      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025.docx"
-    }
-  ],
+  "pending_zotero_actions": [],
   "blocking_issues": [],
   "source_change": {
-    "last_checked": "2026-09-05"
+    "last_checked": "2026-09-07"
   }
 }
