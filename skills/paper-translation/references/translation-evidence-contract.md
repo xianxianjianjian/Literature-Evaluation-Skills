@@ -50,6 +50,8 @@ Every source text frame, table cell and figure label requires:
 - bottom-left PDF `bbox_pt` and rotation;
 - source font, font size, leading, weight, alignment and background;
 - `translation_action: TRANSLATE | RETAIN_SOURCE`;
+- `translatable` and `replacement_status: TRANSLATED | INTENTIONAL_PRESERVE | NON_TRANSLATABLE`;
+- boolean `source_cleared`, `target_rendered`, and `residual_checked` lifecycle fields;
 - an allowed `retain_reason` for retained frames;
 - `reviewed: true` after visual source-page inspection.
 
@@ -61,11 +63,11 @@ Exact rows retain the ordinary provenance fields and additionally require:
 
 - exactly one `frame_id`;
 - `source_text` and `translated_text`;
-- actual `font_scale_used` from `0.95` through `1.00`;
+- actual `font_scale_used` from `0.95` through `1.10` for body-like roles and through `1.00` for excluded roles;
 - `fit_status: FIT` for completion;
 - `untranslated_tokens`, each with token text and reason.
 
-`OVERFLOW` is usable evidence but prevents `COMPLETE`. Do not claim overflow is solved by moving the frame, changing leading or adding a page.
+`OVERFLOW` is usable evidence but prevents `COMPLETE`. Do not claim overflow is solved by moving the frame or adding a page. Leading may change only within the recorded 1.15-1.45 ratio while the frame remains fixed.
 
 ## 4. `font_map.json`
 
@@ -127,7 +129,7 @@ python scripts/validate_translation_package.py \
   --report <work-dir>/translation_validation.json
 ```
 
-The validator generates `numeric_integrity.json` and `layout_diff.json` itself and recomputes page boxes, rotations, one-to-one mapping, replacement frames, table cells, figure-label closure, embedded/CJK SimSun use, 95%-100% glyph sizing, English-token accounting and same-renderer pixels outside replacement frames. Do not edit validator reports.
+The validator generates `numeric_integrity.json`, `untranslated_residual_audit.json`, `typography_fit.json`, and `layout_diff.json` itself and recomputes page boxes, rotations, one-to-one mapping, replacement-frame closure, table cells, figure-label closure, embedded/CJK SimSun use, role-specific 95%-110% glyph sizing, semantic English-token accounting, source/output frame OCR residuals and same-renderer pixels outside replacement frames. Do not edit validator reports.
 
 Use the existing `source_manifest.json` for source identity. Do not add per-unit, per-page, per-object or font hashes.
 

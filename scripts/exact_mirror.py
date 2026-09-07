@@ -15,7 +15,8 @@ LEGACY_LAYOUT_FIDELITY = "LEGACY_STRUCTURAL"
 REQUIRED_CJK_FONT = "SimSun"
 MINIMUM_FONT_SCALE = 0.95
 MAXIMUM_FONT_SCALE = 1.0
-FONT_SCALE_STEPS = (1.0, 0.99, 0.98, 0.97, 0.96, 0.95)
+MAXIMUM_BODY_FONT_SCALE = 1.10
+FONT_SCALE_STEPS = tuple(round(value / 100, 2) for value in range(110, 94, -1))
 LANGUAGE_AUTHORITIES = {
     "PUBLISHER_XML_JATS_HTML",
     "SELECTABLE_PDF",
@@ -24,6 +25,8 @@ LANGUAGE_AUTHORITIES = {
 }
 GEOMETRY_AUTHORITIES = {"VERSION_OF_RECORD_PDF", "PUBLISHER_SUPPLEMENT_PDF"}
 FRAME_ACTIONS = {"TRANSLATE", "RETAIN_SOURCE"}
+REPLACEMENT_STATUSES = {"TRANSLATED", "INTENTIONAL_PRESERVE", "NON_TRANSLATABLE"}
+EXPANDABLE_FRAME_KINDS = {"abstract", "body", "caption", "footnote"}
 FRAME_KINDS = {
     "title",
     "author",
@@ -282,6 +285,14 @@ def validate_text_frames(
             raise ExactMirrorError(f"text frame {frame_id} has invalid translation_action.")
         if action == "RETAIN_SOURCE" and row.get("retain_reason") not in RETAIN_REASONS:
             raise ExactMirrorError(f"retained text frame {frame_id} requires retain_reason.")
+        expected_status = "TRANSLATED" if action == "TRANSLATE" else "INTENTIONAL_PRESERVE"
+        if row.get("replacement_status") not in REPLACEMENT_STATUSES or row.get("replacement_status") != expected_status:
+            raise ExactMirrorError(f"text frame {frame_id} has inconsistent replacement_status.")
+        if row.get("translatable") is not (action == "TRANSLATE"):
+            raise ExactMirrorError(f"text frame {frame_id} has inconsistent translatable flag.")
+        for field in ("source_cleared", "target_rendered", "residual_checked"):
+            if not isinstance(row.get(field), bool):
+                raise ExactMirrorError(f"text frame {frame_id} requires boolean {field}.")
         if row.get("reviewed") is not True:
             raise ExactMirrorError(f"text frame {frame_id} must be visually reviewed.")
         frames[frame_id] = row
@@ -353,8 +364,9 @@ def validate_exact_ledger(
         if not nonempty_text(row.get("source_text")) or not nonempty_text(row.get("translated_text")):
             raise ExactMirrorError(f"ledger unit {unit_id} requires source_text and translated_text.")
         scale = row.get("font_scale_used")
-        if not finite_number(scale) or not MINIMUM_FONT_SCALE <= float(scale) <= MAXIMUM_FONT_SCALE:
-            raise ExactMirrorError(f"ledger unit {unit_id} font_scale_used must be 0.95-1.00.")
+        maximum = MAXIMUM_BODY_FONT_SCALE if frames[frame_ids[0]]["kind"] in EXPANDABLE_FRAME_KINDS else MAXIMUM_FONT_SCALE
+        if not finite_number(scale) or not MINIMUM_FONT_SCALE <= float(scale) <= maximum:
+            raise ExactMirrorError(f"ledger unit {unit_id} font_scale_used must be 0.95-{maximum:.2f}.")
         if row.get("fit_status") not in FIT_STATUSES:
             raise ExactMirrorError(f"ledger unit {unit_id} has invalid fit_status.")
         tokens = row.get("untranslated_tokens")

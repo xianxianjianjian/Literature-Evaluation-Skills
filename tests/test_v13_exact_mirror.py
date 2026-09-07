@@ -175,6 +175,11 @@ class ExactMirrorTests(unittest.TestCase):
                     "alignment": "left",
                     "background": background,
                     "translation_action": "TRANSLATE",
+                    "translatable": True,
+                    "replacement_status": "TRANSLATED",
+                    "source_cleared": False,
+                    "target_rendered": False,
+                    "residual_checked": False,
                     "reviewed": True,
                 }
                 if background == "uniform-color":

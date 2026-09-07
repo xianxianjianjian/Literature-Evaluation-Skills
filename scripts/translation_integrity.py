@@ -37,24 +37,27 @@ PAPER_TERMINOLOGY_FILE = "paper_terminology.csv"
 _SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻", "0123456789+-")
 _NUMBER = r"[+\-−–]?(?:\d+(?:[.,]\d+)?|[.,]\d+)"
 _SCI = re.compile(
-    rf"(?<![\w.])({_NUMBER}\s*(?:×|x|X|\*)\s*10\s*(?:\^|\*\*)?\s*[+\-−–⁺⁻]?\s*[0-9⁰¹²³⁴⁵⁶⁷⁸⁹]+)",
+    rf"(?<![A-Za-z0-9_.])({_NUMBER}\s*(?:×|x|X|\*)\s*10\s*(?:\^|\*\*)?\s*[+\-−–⁺⁻]?\s*[0-9⁰¹²³⁴⁵⁶⁷⁸⁹]+)",
     re.IGNORECASE,
 )
 _STAT = re.compile(
-    rf"(?<!\w)(p|t|f|z|χ\s*[²2]|chi\s*[- ]?square|β|beta|r\s*[s²2]?|r\s*\^\s*2|df|ci|icc|or|hr)\s*(?:\([^)]*\))?\s*(=|<|>|≤|≥|~=|≈)?\s*({_NUMBER})",
+    rf"(?<![A-Za-z0-9_])(p|t|f|z|χ\s*[²2]|chi\s*[- ]?square|β|beta|r\s*[s²2]?|r\s*\^\s*2|df|ci|icc|or|hr)\s*(?:\([^)]*\))?\s*(=|<|>|≤|≥|~=|≈)?\s*({_NUMBER})",
     re.IGNORECASE,
 )
 _STAT_SCI = re.compile(
-    rf"(?<!\w)(p|t|f|z|χ\s*[²2]|chi\s*[- ]?square|β|beta|r\s*[s²2]?|r\s*\^\s*2|df|ci|icc|or|hr)\s*(=|<|>|≤|≥|~=|≈)?\s*({_NUMBER}\s*(?:×|x|X|\*)\s*10\s*(?:\^|\*\*)?\s*[+\-−–⁺⁻]?\s*[0-9⁰¹²³⁴⁵⁶⁷⁸⁹]+)",
+    rf"(?<![A-Za-z0-9_])(p|t|f|z|χ\s*[²2]|chi\s*[- ]?square|β|beta|r\s*[s²2]?|r\s*\^\s*2|df|ci|icc|or|hr)\s*(=|<|>|≤|≥|~=|≈)?\s*({_NUMBER}\s*(?:×|x|X|\*)\s*10\s*(?:\^|\*\*)?\s*[+\-−–⁺⁻]?\s*[0-9⁰¹²³⁴⁵⁶⁷⁸⁹]+)",
     re.IGNORECASE,
 )
 _UNIT = re.compile(
-    rf"(?<!\w)({_NUMBER})\s*(%|hz|khz|mhz|ms|s|sec|secs|second|seconds|min|mins|minute|minutes|h|hr|hrs|hour|hours|day|days|night|nights|db|mv|μv|uv|mm|cm|m|kg|g)\b",
+    rf"(?<![A-Za-z0-9_])({_NUMBER})\s*(%|hz|khz|mhz|ms|s|sec|secs|second|seconds|min|mins|minute|minutes|h|hr|hrs|hour|hours|day|days|night|nights|db|mv|μv|uv|mm|cm|m|kg|g)(?![A-Za-z])",
     re.IGNORECASE,
 )
 _DOI = re.compile(r"\b10\.\d{4,9}/[-._;()/:a-z0-9]+", re.IGNORECASE)
 _VERSION = re.compile(r"\bv(?:ersion\s*)?\d+(?:\.\d+){1,4}\b", re.IGNORECASE)
-_PLAIN = re.compile(rf"(?<![\w.]){_NUMBER}(?![\w.])")
+_TIMEPOINT = re.compile(r"(?<![A-Za-z0-9_])T\d+(?![A-Za-z0-9_])", re.IGNORECASE)
+_BRACKET_CITATION = re.compile(r"\[\s*\d+(?:\s*[,;–—-]\s*\d+)*\s*\]")
+_SUPERSCRIPT_CITATION = re.compile(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+(?:[˒,，–—-][⁰¹²³⁴⁵⁶⁷⁸⁹]+)*")
+_PLAIN = re.compile(rf"(?<![A-Za-z0-9_.–—-]){_NUMBER}(?![A-Za-z0-9_.])")
 
 
 def _canon(value: str) -> str:
@@ -74,7 +77,7 @@ def extract_numeric_tokens(text: str) -> list[str]:
         return []
     spans: list[tuple[int, int]] = []
     tokens: list[str] = []
-    for pattern in (_DOI, _STAT_SCI, _SCI, _STAT, _UNIT, _VERSION):
+    for pattern in (_DOI, _STAT_SCI, _SCI, _STAT, _UNIT, _VERSION, _TIMEPOINT):
         for match in pattern.finditer(text):
             if any(match.start() < end and match.end() > start for start, end in spans):
                 continue
@@ -83,6 +86,10 @@ def extract_numeric_tokens(text: str) -> list[str]:
     masked = list(text)
     for start, end in spans:
         masked[start:end] = " " * (end - start)
+    remaining = "".join(masked)
+    for pattern in (_BRACKET_CITATION, _SUPERSCRIPT_CITATION):
+        for match in pattern.finditer(remaining):
+            masked[match.start():match.end()] = " " * (match.end() - match.start())
     tokens.extend(_canon(match.group(0)) for match in _PLAIN.finditer("".join(masked)))
     return tokens
 

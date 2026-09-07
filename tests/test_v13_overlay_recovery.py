@@ -118,6 +118,11 @@ def _write_package(root: Path) -> tuple[Path, Path]:
         "alignment": "left",
         "background": "uniform-white",
         "translation_action": "TRANSLATE",
+        "translatable": True,
+        "replacement_status": "TRANSLATED",
+        "source_cleared": False,
+        "target_rendered": False,
+        "residual_checked": False,
         "source_text": "Sleep spindle memory",
         "reviewed": True,
     }

@@ -44,6 +44,15 @@ class NumericIntegrityTests(unittest.TestCase):
         self.assertIn("12.5hz", tokens)
         self.assertIn("10.1000/test.v2", tokens)
 
+    def test_numeric_tokens_survive_direct_cjk_adjacency(self) -> None:
+        tokens = translation_integrity.extract_numeric_tokens(
+            "在T1误差中，975 ms后rs = −0.29，频率为8 Hz。"
+        )
+        self.assertIn("t1", tokens)
+        self.assertIn("975ms", tokens)
+        self.assertIn("rs=-0.29", tokens)
+        self.assertIn("8hz", tokens)
+
     def test_unapproved_sign_change_blocks_completion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp)

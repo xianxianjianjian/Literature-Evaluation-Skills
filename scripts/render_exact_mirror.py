@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover - CLI dependency check
 
 from exact_mirror import (
     FONT_SCALE_STEPS,
+    EXPANDABLE_FRAME_KINDS,
     ExactMirrorError,
     load_json,
     load_jsonl,
@@ -31,10 +32,11 @@ from exact_mirror import (
     validate_text_frames,
 )
 from mirror_pdf import MirrorPlanError, validate_plan_data
-
-TOKEN_PATTERN = re.compile(
-    r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]|[A-Za-z0-9][A-Za-z0-9_.:/%+−–—<>=()\[\]-]*|\s+|.",
-    re.DOTALL,
+from normalize_chinese_typography import (
+    SemanticToken,
+    normalize_chinese_text,
+    normalize_inline_citations,
+    semantic_tokens,
 )
 
 
@@ -65,32 +67,71 @@ def _resolve_source_pdf(work_dir: Path, source: dict[str, Any]) -> Path:
     return path.resolve()
 
 
-def _tokens(text: str) -> list[str]:
-    return [token for token in TOKEN_PATTERN.findall(text.replace("\r\n", "\n")) if token]
+def _token_width(token: SemanticToken, font_name: str, font_size: float) -> float:
+    size = font_size * 0.65 if token.kind == "CITATION" else font_size
+    if token.kind in {"SCIENTIFIC", "STAT"}:
+        match = re.fullmatch(r"(.+?10)([+−-]?\d+)", token.text)
+        if match:
+            return (
+                pdfmetrics.stringWidth(match.group(1), font_name, font_size)
+                + pdfmetrics.stringWidth(match.group(2), font_name, font_size * 0.65)
+            )
+    return pdfmetrics.stringWidth(token.text, font_name, size)
 
 
-def _wrap_paragraph(text: str, font_name: str, font_size: float, width: float) -> list[str]:
+def _wrap_paragraph(text: str, font_name: str, font_size: float, width: float) -> list[list[SemanticToken]]:
     if not text:
-        return [""]
-    lines: list[str] = []
-    current = ""
-    for token in _tokens(text):
-        if token == "\n":
-            lines.append(current.rstrip())
-            current = ""
+        return [[]]
+    lines: list[list[SemanticToken]] = []
+    current: list[SemanticToken] = []
+    current_width = 0.0
+    for token in semantic_tokens(text):
+        if token.kind == "BREAK":
+            while current and current[-1].kind == "SPACE":
+                current.pop()
+            lines.append(current)
+            current = []
+            current_width = 0.0
             continue
-        candidate = current + token
-        if current and pdfmetrics.stringWidth(candidate, font_name, font_size) > width:
-            lines.append(current.rstrip())
-            current = token.lstrip()
-        else:
-            current = candidate
+        token_width = _token_width(token, font_name, font_size)
+        if current and current_width + token_width > width:
+            if token.kind == "PUNCTUATION" and token.text in "，。；：！？、）】》":
+                carry: list[SemanticToken] = []
+                while current and current[-1].kind == "SPACE":
+                    current_width -= _token_width(current.pop(), font_name, font_size)
+                if current:
+                    carry.insert(0, current.pop())
+                lines.append(current)
+                current = carry + [token]
+                current_width = sum(_token_width(item, font_name, font_size) for item in current)
+                continue
+            if current[-1].kind == "PUNCTUATION" and current[-1].text in "（【《":
+                opener = current.pop()
+                current_width -= _token_width(opener, font_name, font_size)
+                lines.append(current)
+                current = [opener, token]
+                current_width = _token_width(opener, font_name, font_size) + token_width
+                continue
+            while current and current[-1].kind == "SPACE":
+                current_width -= _token_width(current.pop(), font_name, font_size)
+            lines.append(current)
+            current = [] if token.kind == "SPACE" else [token]
+            current_width = 0.0 if token.kind == "SPACE" else token_width
+            continue
+        if not current and token.kind == "SPACE":
+            continue
+        current.append(token)
+        current_width += token_width
     if current or not lines:
-        lines.append(current.rstrip())
+        lines.append(current)
     return lines
 
 
-def _layout(text: str, frame: dict[str, Any]) -> tuple[float, list[str]] | None:
+def _used_height(lines: list[list[SemanticToken]], font_size: float, leading: float) -> float:
+    return font_size + max(0, len(lines) - 1) * leading
+
+
+def _layout(text: str, source_text: str, frame: dict[str, Any]) -> tuple[float, float, list[list[SemanticToken]], dict[str, Any]] | None:
     x0, y0, x1, y1 = [float(value) for value in frame["bbox_pt"]]
     if frame.get("rotation") in {90, 270}:
         width = y1 - y0
@@ -99,13 +140,34 @@ def _layout(text: str, frame: dict[str, Any]) -> tuple[float, list[str]] | None:
         width = x1 - x0
         height = y1 - y0
     source_size = float(frame["source_font_size_pt"])
-    leading = float(frame["source_leading_pt"])
-    for scale in FONT_SCALE_STEPS:
+    source_leading = float(frame["source_leading_pt"])
+    source_lines = _wrap_paragraph(source_text, "SimSun", source_size, width)
+    source_used_height = _used_height(source_lines, source_size, source_leading)
+    scales = FONT_SCALE_STEPS if frame.get("kind", "body") in EXPANDABLE_FRAME_KINDS else tuple(scale for scale in FONT_SCALE_STEPS if scale <= 1.0)
+    candidates: list[tuple[float, float, list[list[SemanticToken]], float]] = []
+    for scale in scales:
         font_size = source_size * scale
-        lines = _wrap_paragraph(text, "SimSun", font_size, width)
-        required_height = font_size + max(0, len(lines) - 1) * leading
-        if required_height <= height + 0.01:
-            return scale, lines
+        for leading_ratio in (1.25, 1.20, 1.30, 1.15, 1.35, 1.40, 1.45):
+            leading = font_size * leading_ratio
+            lines = _wrap_paragraph(text, "SimSun", font_size, width)
+            required_height = _used_height(lines, font_size, leading)
+            if required_height <= height + 0.01:
+                target_ratio = required_height / source_used_height if source_used_height else 1.0
+                candidates.append((scale, leading, lines, target_ratio))
+    if candidates:
+        scale, leading, lines, ratio = min(
+            candidates,
+            key=lambda item: (
+                0 if 0.90 <= item[3] <= 1.05 else abs(item[3] - 0.975),
+                abs(item[0] - 1.0),
+            ),
+        )
+        return scale, leading, lines, {
+            "source_used_height_pt": round(source_used_height, 3),
+            "target_used_height_pt": round(_used_height(lines, source_size * scale, leading), 3),
+            "target_source_height_ratio": round(ratio, 4),
+            "occupancy_status": "TARGET" if 0.90 <= ratio <= 1.05 else "WARNING",
+        }
     return None
 
 
@@ -148,7 +210,7 @@ def _set_background(c: Any, frame: dict[str, Any], work_dir: Path) -> None:
 
 def _draw_line(
     c: Any,
-    line: str,
+    line: list[SemanticToken],
     x: float,
     baseline: float,
     width: float,
@@ -156,32 +218,46 @@ def _draw_line(
     frame: dict[str, Any],
     is_last: bool,
 ) -> None:
-    measured = pdfmetrics.stringWidth(line, "SimSun", font_size)
+    measured = sum(_token_width(token, "SimSun", font_size) for token in line)
     alignment = frame["alignment"]
     if alignment == "center":
         x += max(0.0, (width - measured) / 2)
     elif alignment == "right":
         x += max(0.0, width - measured)
-    text = c.beginText()
-    if "italic" in str(frame.get("weight", "")):
-        text.setTextTransform(1, 0, 0.18, 1, x, baseline)
-    else:
-        text.setTextOrigin(x, baseline)
-    text.setFont("SimSun", font_size)
-    if str(frame.get("weight", "")).startswith("bold"):
-        text.setTextRenderMode(2)
-        c.setLineWidth(max(0.2, font_size * 0.035))
-    if alignment == "justified" and not is_last and len(line) > 1 and measured < width:
-        text.setCharSpace((width - measured) / (len(line) - 1))
-    text.textOut(line)
-    c.drawText(text)
+    cursor = x
+    for token in line:
+        scientific = re.fullmatch(r"(.+?10)([+−-]?\d+)", token.text) if token.kind in {"SCIENTIFIC", "STAT"} else None
+        pieces = (
+            [(scientific.group(1), font_size, 0.0), (scientific.group(2), font_size * 0.65, font_size * 0.32)]
+            if scientific else [(token.text, font_size * 0.65 if token.kind == "CITATION" else font_size,
+                                  font_size * 0.32 if token.kind == "CITATION" else 0.0)]
+        )
+        for piece, token_size, rise in pieces:
+            text = c.beginText()
+            if "italic" in str(frame.get("weight", "")):
+                text.setTextTransform(1, 0, 0.18, 1, cursor, baseline)
+            else:
+                text.setTextOrigin(cursor, baseline)
+            text.setFont("SimSun", token_size)
+            # Ts persists in the PDF text state across text objects; always reset
+            # it so a citation cannot lift the following prose above its frame.
+            text.setRise(rise)
+            if str(frame.get("weight", "")).startswith("bold"):
+                text.setTextRenderMode(2)
+                c.setLineWidth(max(0.2, font_size * 0.035))
+            text.textOut(piece)
+            c.drawText(text)
+            cursor += pdfmetrics.stringWidth(piece, "SimSun", token_size)
 
 
-def _draw_frame(c: Any, frame: dict[str, Any], text: str, scale: float, lines: list[str], work_dir: Path) -> None:
-    _set_background(c, frame, work_dir)
+def _draw_frame(c: Any, frame: dict[str, Any], text: str, scale: float, leading: float, lines: list[list[SemanticToken]], work_dir: Path) -> None:
     x0, y0, x1, y1 = [float(value) for value in frame["bbox_pt"]]
     rotation = int(frame.get("rotation", 0))
     c.saveState()
+    clip = c.beginPath()
+    clip.rect(x0, y0, x1 - x0, y1 - y0)
+    c.clipPath(clip, stroke=0, fill=0)
+    _set_background(c, frame, work_dir)
     if rotation == 90:
         c.translate(x1, y0)
         c.rotate(90)
@@ -198,13 +274,14 @@ def _draw_frame(c: Any, frame: dict[str, Any], text: str, scale: float, lines: l
         c.translate(x0, y0)
         local_width, local_height = x1 - x0, y1 - y0
     font_size = float(frame["source_font_size_pt"]) * scale
-    leading = float(frame["source_leading_pt"])
     color = frame.get("text_rgb", [0, 0, 0])
     if not isinstance(color, list) or len(color) != 3:
         raise ExactMirrorRenderError(f"Frame {frame['frame_id']} has invalid text_rgb.")
     c.setFillColorRGB(*(float(value) for value in color))
     c.setStrokeColorRGB(*(float(value) for value in color))
-    baseline = local_height - font_size
+    # SimSun's visual ascent is smaller than its nominal em square.  Using the
+    # full em as the top offset can push the last baseline below the frame.
+    baseline = local_height - font_size * 0.85
     for index, line in enumerate(lines):
         _draw_line(c, line, 0, baseline, local_width, font_size, frame, index == len(lines) - 1)
         baseline -= leading
@@ -290,22 +367,30 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
             if frame["translation_action"] != "TRANSLATE":
                 continue
             row = frame_to_ledger[frame_id]
-            fitted = _layout(row["translated_text"], frame)
+            row["translated_text"] = normalize_chinese_text(
+                normalize_inline_citations(row["translated_text"], row["source_text"])
+            )
+            fitted = _layout(row["translated_text"], row["source_text"], frame)
             if fitted is None:
                 row["fit_status"] = "OVERFLOW"
                 overflows.append(frame_id)
                 continue
-            scale, lines = fitted
-            _draw_frame(overlay_canvas, frame, row["translated_text"], scale, lines, work_dir)
+            scale, leading, lines, typography = fitted
+            _draw_frame(overlay_canvas, frame, row["translated_text"], scale, leading, lines, work_dir)
             row["font_scale_used"] = scale
             row["fit_status"] = "FIT"
+            frame["source_cleared"] = True
+            frame["target_rendered"] = True
+            frame["residual_checked"] = False
             rendered_frames.append(
                 {
                     "frame_id": frame_id,
                     "output_page": output_page,
                     "bbox_pt": frame["bbox_pt"],
                     "font_scale_used": scale,
+                    "leading_pt": leading,
                     "line_count": len(lines),
+                    **typography,
                 }
             )
             for region in page_plan[output_page]["replacement_regions"]:
@@ -330,6 +415,18 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
         writer.pages[-1].merge_page(overlay_reader.pages[0], over=True)
 
     _atomic_jsonl(ledger_path, ledger_rows)
+    _atomic_jsonl(work_dir / "text_frame_inventory.jsonl", frame_rows)
+    figure_path = work_dir / "figure_text_inventory.jsonl"
+    if figure_path.is_file():
+        figure_rows = load_jsonl(figure_path, "figure text inventory")
+        for figure_row in figure_rows:
+            figure_row["translated_text"] = normalize_chinese_text(
+                normalize_inline_citations(
+                    str(figure_row.get("translated_text", "")),
+                    str(figure_row.get("source_text", "")),
+                )
+            )
+        _atomic_jsonl(figure_path, figure_rows)
     if overflows:
         report = {
             "schema_version": 1,
@@ -351,6 +448,15 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
         temporary_output = Path(handle.name)
     temporary_output.replace(output)
     _atomic_json(plan_path, plan)
+    typography_report = {
+        "schema_version": 1,
+        "renderer": "render_exact_mirror.py",
+        "passed": all(item["occupancy_status"] in {"TARGET", "WARNING"} for item in rendered_frames),
+        "target_ratio_range": [0.90, 1.05],
+        "warning_below_ratio": 0.80,
+        "frames": rendered_frames,
+    }
+    _atomic_json(work_dir / "typography_fit.json", typography_report)
     report = {
         "schema_version": 1,
         "renderer": "render_exact_mirror.py",

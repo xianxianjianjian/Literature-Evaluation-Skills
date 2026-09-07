@@ -43,6 +43,8 @@ Translate all scientifically relevant content, including when present:
 
 References normally remain in the original language. Author names, journal names, DOI, formulas, code/variable identifiers and standard software names are preserved unless an established Chinese presentation is genuinely useful and does not create ambiguity.
 
+Before exact-mirror line wrapping, normalize Chinese academic typography semantically: remove only nonsemantic Chinese/punctuation/Latin boundary spaces, retain unit and statistical spacing, use the mathematical minus `−`, keep scientific notation and method/group codes atomic, and preserve explicit paragraph/heading breaks. Convert both bracketed citation lists and legacy Unicode superscripts into raised citation tokens with comma-separated items and en-dash ranges.
+
 ## Section-specific rules
 
 ### Methods

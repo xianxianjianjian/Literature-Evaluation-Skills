@@ -18,6 +18,7 @@ from typing import Any
 
 from exact_mirror import (
     EXACT_LAYOUT_FIDELITY,
+    EXPANDABLE_FRAME_KINDS,
     LEGACY_LAYOUT_FIDELITY,
     MINIMUM_FONT_SCALE,
     REQUIRED_CJK_FONT,
@@ -41,6 +42,12 @@ from translation_integrity import (
     validate_paper_terminology,
     validate_source_conflicts,
     write_json as write_integrity_json,
+)
+from audit_untranslated_residuals import (
+    REPORT_FILE as RESIDUAL_REPORT_FILE,
+    ResidualAuditError,
+    audit_residuals,
+    write_report as write_residual_report,
 )
 
 try:
@@ -66,6 +73,7 @@ PLAN_FILE = "mirror_layout_plan.json"
 ISSUES_FILE = "translation_issues.jsonl"
 FRAMES_FILE = "text_frame_inventory.jsonl"
 FONT_MAP_FILE = "font_map.json"
+TYPOGRAPHY_FIT_FILE = "typography_fit.json"
 LAYOUT_DIFF_FILE = "layout_diff.json"
 LAYOUT_FIDELITIES = {
     EXACT_LAYOUT_FIDELITY,
@@ -113,6 +121,16 @@ def _load_jsonl(path: Path, label: str, *, required: bool = True) -> list[dict[s
             raise TranslationPackageError(f"{label} line {line_number} must be an object")
         rows.append(row)
     return rows
+
+
+def _write_jsonl_atomic(path: Path, rows: list[dict[str, Any]]) -> None:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", newline="\n", delete=False, dir=path.parent
+    ) as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        temporary = Path(handle.name)
+    temporary.replace(path)
 
 
 def _nonempty_text(value: Any) -> bool:
@@ -795,8 +813,9 @@ def _validate_exact_package(
     except (ExactMirrorError, OSError) as exc:
         return [TranslationCheck("inventory:exact-schema", False, str(exc))], diff
     try:
+        frame_rows = load_exact_jsonl(work_dir / FRAMES_FILE, "text frame inventory")
         frames = validate_text_frames(
-            load_exact_jsonl(work_dir / FRAMES_FILE, "text frame inventory"), inventory
+            frame_rows, inventory
         )
         checks.append(TranslationCheck("layout:text-frame-schema", True, f"{len(frames)} reviewed frames"))
     except (ExactMirrorError, OSError) as exc:
@@ -861,13 +880,15 @@ def _validate_exact_package(
     scale_failures = sorted(
         row["unit_id"]
         for row in ledger.values()
-        if not MINIMUM_FONT_SCALE <= float(row.get("font_scale_used", 0)) <= 1.0
+        if not MINIMUM_FONT_SCALE <= float(row.get("font_scale_used", 0)) <= (
+            1.10 if frames[row["frame_ids"][0]]["kind"] in EXPANDABLE_FRAME_KINDS else 1.0
+        )
     )
     checks.append(
         TranslationCheck(
             "layout:frame-fit",
             not fit_failures and not scale_failures,
-            "all translated frames fit at 95%-100%"
+            "all translated frames fit within role-specific 95%-110% limits"
             if not fit_failures and not scale_failures
             else f"non-fitting={fit_failures}; invalid-scale={scale_failures}",
         )
@@ -976,6 +997,63 @@ def _validate_exact_package(
     if not a_path.is_file():
         checks.append(TranslationCheck("layout:a-pdf", False, f"A does not exist: {a_path}"))
         return checks, diff
+    try:
+        residual_passed, residual_report = audit_residuals(
+            work_dir, a_path, inventory, frames, ledger_rows
+        )
+        write_residual_report(work_dir / RESIDUAL_REPORT_FILE, residual_report)
+        audited_ids = {row["frame_id"] for row in residual_report["frames"]}
+        for frame in frame_rows:
+            if frame["translation_action"] == "TRANSLATE":
+                checked = residual_passed and frame["frame_id"] in audited_ids
+                frame["residual_checked"] = checked
+                frames[frame["frame_id"]]["residual_checked"] = checked
+        _write_jsonl_atomic(work_dir / FRAMES_FILE, frame_rows)
+        checks.append(TranslationCheck(
+            "semantic:visible-english-residual",
+            residual_passed,
+            "independent OCR found no unapproved four-word English run"
+            if residual_passed else f"visible English remains in: {residual_report['failed_frame_ids']}",
+        ))
+    except (ResidualAuditError, OSError, subprocess.SubprocessError) as exc:
+        checks.append(TranslationCheck("semantic:visible-english-residual", False, str(exc)))
+    closure_failures = sorted(
+        frame_id for frame_id, frame in frames.items()
+        if frame["translation_action"] == "TRANSLATE"
+        and not all(frame.get(field) is True for field in (
+            "source_cleared", "target_rendered", "residual_checked"
+        ))
+    )
+    checks.append(TranslationCheck(
+        "layout:frame-closure",
+        not closure_failures,
+        "every translated frame closes source clearing, target rendering and residual audit"
+        if not closure_failures else f"open translated frames: {closure_failures}",
+    ))
+    typography: dict[str, Any] = {}
+    try:
+        typography = _load_json(work_dir / TYPOGRAPHY_FIT_FILE, "typography fit")
+        records = typography.get("frames") if isinstance(typography, dict) else None
+        typography_ok = (
+            isinstance(records, list)
+            and {item.get("frame_id") for item in records} == set(expected_regions)
+            and all(
+                isinstance(item.get("target_source_height_ratio"), (int, float))
+                and item.get("occupancy_status") in {"TARGET", "WARNING"}
+                and 1.15 - 1e-6 <= float(item.get("leading_pt", 0)) / (
+                    float(frames[item["frame_id"]]["source_font_size_pt"]) * float(item["font_scale_used"])
+                ) <= 1.45 + 1e-6
+                for item in records
+            )
+        )
+        checks.append(TranslationCheck(
+            "layout:typography-fit",
+            typography_ok,
+            "typography fit evidence covers every translated frame"
+            if typography_ok else "typography fit evidence is missing or incomplete",
+        ))
+    except (TranslationPackageError, OSError, KeyError, TypeError, ZeroDivisionError) as exc:
+        checks.append(TranslationCheck("layout:typography-fit", False, str(exc)))
     try:
         output_reader = PdfReader(str(a_path))
     except Exception as exc:
@@ -1092,7 +1170,8 @@ def _validate_exact_package(
                         if "simsun" not in font_name.lower():
                             cjk_font_failures.append(frame_id)
                         ratio = float(char.get("size") or 0.0) / float(frame["source_font_size_pt"])
-                        if ratio < MINIMUM_FONT_SCALE - 0.005 or ratio > 1.005:
+                        maximum = 1.10 if frame["kind"] in EXPANDABLE_FRAME_KINDS else 1.0
+                        if ratio < MINIMUM_FONT_SCALE - 0.005 or ratio > maximum + 0.005:
                             actual_scale_failures.append(frame_id)
         except Exception as exc:
             checks.append(TranslationCheck("layout:text-geometry-read", False, str(exc)))
@@ -1123,11 +1202,16 @@ def _validate_exact_package(
             TranslationCheck(
                 "layout:actual-font-scale",
                 not actual_scale_failures,
-                "rendered CJK sizes remain within 95%-100%"
+                "rendered CJK sizes remain within role-specific 95%-110% limits"
                 if not actual_scale_failures
                 else f"out-of-range rendered sizes: {sorted(set(actual_scale_failures))}",
             )
         )
+        typography_records = {
+            item["frame_id"]: item
+            for item in (typography.get("frames", []) if isinstance(typography, dict) else [])
+            if isinstance(item, dict) and isinstance(item.get("frame_id"), str)
+        }
         leading_failures: list[str] = []
         for frame_id, positions in frame_line_positions.items():
             clustered = sorted({round(position * 2) / 2 for position in positions})
@@ -1140,15 +1224,20 @@ def _validate_exact_package(
             ]
             if not gaps:
                 continue
-            observed = min(gaps)
-            expected = float(frames[frame_id]["source_leading_pt"])
-            if abs(observed - expected) > 0.5:
+            expected = float(typography_records.get(frame_id, {}).get("leading_pt", frames[frame_id]["source_leading_pt"]))
+            plausible = [gap for gap in gaps if expected * 0.75 <= gap <= expected * 1.6]
+            if not plausible:
+                leading_failures.append(frame_id)
+                continue
+            plausible.sort()
+            observed = plausible[len(plausible) // 2]
+            if abs(observed - expected) > 0.75:
                 leading_failures.append(frame_id)
         checks.append(
             TranslationCheck(
                 "layout:leading",
                 not leading_failures,
-                "multi-line translated frames preserve source leading"
+                "multi-line translated frames match recorded typography leading"
                 if not leading_failures
                 else f"leading mismatch: {sorted(set(leading_failures))}",
             )
