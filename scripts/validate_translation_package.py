@@ -26,6 +26,7 @@ from exact_mirror import (
     ExactMirrorError,
     bbox_contains,
     contains_cjk,
+    frame_role,
     load_json as load_exact_json,
     load_jsonl as load_exact_jsonl,
     validate_exact_inventory,
@@ -49,6 +50,7 @@ from audit_untranslated_residuals import (
     audit_residuals,
     write_report as write_residual_report,
 )
+from style_fidelity import StyleFidelityError, validate_rendered_styles, audit_pdf_styles
 
 try:
     from pypdf import PdfReader
@@ -794,7 +796,7 @@ def _raster_outside_frames_unchanged(
 
 
 def _validate_exact_package(
-    work_dir: Path, a_path: Path
+    work_dir: Path, a_path: Path, *, contract_version: str = "1.4.1"
 ) -> tuple[list[TranslationCheck], dict[str, Any]]:
     checks: list[TranslationCheck] = []
     diff: dict[str, Any] = {
@@ -818,6 +820,13 @@ def _validate_exact_package(
             frame_rows, inventory
         )
         checks.append(TranslationCheck("layout:text-frame-schema", True, f"{len(frames)} reviewed frames"))
+        if contract_version == "1.4.2":
+            missing_roles = sorted(row["frame_id"] for row in frame_rows if "role" not in row or "preserve_english" not in row)
+            checks.append(TranslationCheck(
+                "layout:role-contract", not missing_roles,
+                "all frames have explicit v1.4.2 role/translatable/preserve-English semantics"
+                if not missing_roles else f"frames missing role contract: {missing_roles}",
+            ))
     except (ExactMirrorError, OSError) as exc:
         return checks + [TranslationCheck("layout:text-frame-schema", False, str(exc))], diff
     try:
@@ -839,6 +848,24 @@ def _validate_exact_package(
         checks.append(TranslationCheck("ledger:exact-schema", True, f"{len(ledger)} frame-level units"))
     except (ExactMirrorError, OSError) as exc:
         return checks + [TranslationCheck("ledger:exact-schema", False, str(exc))], diff
+    if contract_version == "1.4.2":
+        try:
+            style_map = _load_json(work_dir / "style_map.json", "style map")
+            style_report = validate_rendered_styles(frame_rows, style_map)
+            measured = audit_pdf_styles(a_path, inventory, frame_rows, style_map, work_dir)
+            style_report['independent_pdf_audit'] = measured
+            style_report['passed'] = style_report['passed'] and measured['passed']
+            style_report['failures'].extend(measured['failures'])
+            (work_dir / "style_fidelity.json").write_text(
+                json.dumps(style_report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            checks.append(TranslationCheck(
+                "style:fidelity", style_report["passed"],
+                "role-aware size/leading/weight/italic/color/alignment/superscript evidence passed"
+                if style_report["passed"] else str(style_report["failures"]),
+            ))
+        except (OSError, TranslationPackageError, StyleFidelityError, ValueError) as exc:
+            checks.append(TranslationCheck("style:fidelity", False, str(exc)))
     try:
         plan = validate_plan_data(_load_json(work_dir / PLAN_FILE, "mirror layout plan"))
         if plan.get("schema_version") != 2 or plan.get("layout_fidelity") != EXACT_LAYOUT_FIDELITY:
@@ -999,7 +1026,8 @@ def _validate_exact_package(
         return checks, diff
     try:
         residual_passed, residual_report = audit_residuals(
-            work_dir, a_path, inventory, frames, ledger_rows
+            work_dir, a_path, inventory, frames, ledger_rows,
+            contract_version=contract_version,
         )
         write_residual_report(work_dir / RESIDUAL_REPORT_FILE, residual_report)
         audited_ids = {row["frame_id"] for row in residual_report["frames"]}
@@ -1012,7 +1040,7 @@ def _validate_exact_package(
         checks.append(TranslationCheck(
             "semantic:visible-english-residual",
             residual_passed,
-            "independent OCR found no unapproved four-word English run"
+            "independent role-aware OCR found no unapproved source-matched English residual"
             if residual_passed else f"visible English remains in: {residual_report['failed_frame_ids']}",
         ))
     except (ResidualAuditError, OSError, subprocess.SubprocessError) as exc:
@@ -1157,7 +1185,14 @@ def _validate_exact_package(
                         owners = [
                             (frame_id, frame)
                             for frame_id, frame in page_frames.get(output_number, [])
-                            if bbox_contains([float(value) for value in frame["bbox_pt"]], bbox)
+                            # Synthetic bold strokes are clipped to the reviewed frame,
+                            # but pdfplumber reports the unclipped glyph box.  Account for
+                            # at most the renderer's stroke-scale envelope when assigning
+                            # an owner; raster comparison still rejects visible spill.
+                            if bbox_contains(
+                                [float(value) for value in frame["bbox_pt"]], bbox,
+                                tolerance=max(0.25, float(char.get("size") or 0.0) * 0.04),
+                            )
                         ]
                         if len(owners) != 1:
                             cjk_position_failures.append(output_number)
@@ -1167,7 +1202,16 @@ def _validate_exact_package(
                         if frame.get("rotation") not in {90, 270}:
                             frame_line_positions[frame_id].append(float(char["top"]))
                         font_name = str(char.get("fontname") or "")
-                        if "simsun" not in font_name.lower():
+                        expected_families = {
+                            style_map.get('roles', {}).get(frame_role(frame), {}).get('cjk_font_family', 'SimSun')
+                            if contract_version == '1.4.2' else 'SimSun'
+                        }
+                        if contract_version == '1.4.2':
+                            expected_families.update(
+                                str(run.get('font_family') or '')
+                                for run in frame.get('style_runs', [])
+                            )
+                        if not any(family and family.lower() in font_name.lower() for family in expected_families):
                             cjk_font_failures.append(frame_id)
                         ratio = float(char.get("size") or 0.0) / float(frame["source_font_size_pt"])
                         maximum = 1.10 if frame["kind"] in EXPANDABLE_FRAME_KINDS else 1.0
@@ -1193,9 +1237,9 @@ def _validate_exact_package(
             TranslationCheck(
                 "font:simsun-cjk",
                 not cjk_font_failures,
-                "every rendered CJK glyph uses SimSun"
+                "every rendered CJK glyph uses its approved CJK font mapping"
                 if not cjk_font_failures
-                else f"non-SimSun CJK frames: {sorted(set(cjk_font_failures))}",
+                else f"CJK font mapping mismatches: {sorted(set(cjk_font_failures))}",
             )
         )
         checks.append(
@@ -1309,6 +1353,7 @@ def validate_package_detailed(
     a_path: Path,
     scope: str,
     layout_fidelity: str | None = None,
+    contract_version: str = "1.4.1",
 ) -> tuple[list[TranslationCheck], dict[str, Any] | None, str]:
     work_dir = work_dir.resolve()
     a_path = a_path.resolve()
@@ -1331,7 +1376,9 @@ def validate_package_detailed(
     if layout_fidelity not in LAYOUT_FIDELITIES and layout_fidelity != "NONE":
         return [TranslationCheck("layout:fidelity", False, f"unsupported layout fidelity: {layout_fidelity}")], None, layout_fidelity
     if scope == "FULL_MIRROR" and layout_fidelity == EXACT_LAYOUT_FIDELITY:
-        exact_checks, diff = _validate_exact_package(work_dir, a_path)
+        exact_checks, diff = _validate_exact_package(
+            work_dir, a_path, contract_version=contract_version
+        )
         pdf_ok = a_path.is_file() and a_path.stat().st_size > 0
         combined = [
             TranslationCheck(
@@ -1399,9 +1446,10 @@ def validate_package(
     a_path: Path,
     scope: str,
     layout_fidelity: str | None = None,
+    contract_version: str = "1.4.1",
 ) -> list[TranslationCheck]:
     checks, _, _ = validate_package_detailed(
-        work_dir, a_path, scope, layout_fidelity
+        work_dir, a_path, scope, layout_fidelity, contract_version
     )
     return checks
 
@@ -1458,13 +1506,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(LAYOUT_FIDELITIES),
     )
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--contract-version", choices=("1.4.1", "1.4.2"), default="1.4.2")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     checks, layout_diff, resolved_fidelity = validate_package_detailed(
-        args.work_dir, args.a_path, args.scope, args.layout_fidelity
+        args.work_dir, args.a_path, args.scope, args.layout_fidelity, args.contract_version
     )
     if layout_diff is not None:
         write_layout_diff(args.work_dir.resolve() / LAYOUT_DIFF_FILE, layout_diff)

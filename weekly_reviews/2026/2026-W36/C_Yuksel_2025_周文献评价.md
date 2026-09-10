@@ -32,6 +32,10 @@ https://doi.org/10.1038/s42003-025-07868-5
 
 未配置
 
+## v1.4.2 复核状态
+
+已于 2026-09-10 对照 B v1.4.2 的 Main+SI 证据闭环、核心图解释、阴性结果及限制边界重新核验，并完成 A/B/C 术语一致性复核。C 的核心判断与新版 B 一致；正文统一采用“目标记忆再激活（TMR）”。
+
 ## Original Abstract
 
 Sleep supports memory consolidation, but the specific roles of different sleep stages in this process remain unclear. While rapid eye movement sleep (REM) has traditionally been linked to the processing of emotionally charged material, recent evidence suggests that slow wave sleep (SWS) also plays a role in strengthening emotional memories. Here, we use targeted memory reactivation (TMR) during REM and SWS in a daytime nap to directly examine which sleep stage is primarily involved in consolidating emotional declarative memories. Contrary to our hypothesis, reactivating emotional stimuli during REM impairs memory. Meanwhile, TMR benefit in SWS is strongly correlated with the product of time spent in REM and SWS. The emotional valence of cued items modulates both delta/theta power and sleep spindles. Furthermore, emotional memories benefit more from TMR than neutral ones. Our findings suggest that SWS and REM have complementary roles in consolidating emotional memories, with REM potentially involved in forgetting them. These results also expand on recent evidence highlighting a connection between sleep spindles and emotional processing.
@@ -42,7 +46,7 @@ Sleep supports memory consolidation, but the specific roles of different sleep s
 
 ## 评论
 
-本周焦点论文的真正价值，不是它已经证明了“慢波睡眠与 REM 协同巩固情绪记忆”，而是它用阶段锁定的靶向记忆再激活（TMR）把这一主张推进到了可实验检验的层面。研究最初纳入 185 名健康青年，123 人形成可用数据；再排除 1 名 E-REM 极端值后，五个分析组共 122 人。参与者学习声音—图片—网格位置联结，午睡期间在 SWS 或 REM 中重放一半项目的声音，醒后约 45 min 测试空间位置误差，并以 57 通道 EEG 分析提示诱发时频活动。
+本周焦点论文的真正价值，不是它已经证明了“慢波睡眠与 REM 协同巩固情绪记忆”，而是它用阶段锁定的目标记忆再激活（TMR）把这一主张推进到了可实验检验的层面。研究最初纳入 185 名健康青年，123 人形成可用数据；再排除 1 名 E-REM 极端值后，五个分析组共 122 人。参与者学习声音—图片—网格位置联结，午睡期间在 SWS 或 REM 中重放一半项目的声音，醒后约 45 min 测试空间位置误差，并以 57 通道 EEG 分析提示诱发时频活动。
 
 最清楚的结果与作者假设相反：E-REM 组中，再激活项目的误差增加 22%，未再激活项目增加 11%，再激活主效应 β=−.11、t(24)=2.13、p=.04。E-SWS 与 N-SWS 组内的 TMR 主效应都不显著。跨组比较则显示，情绪-SWS 相对中性-SWS 的组别×再激活交互显著（β=.39、t(49)=3.36、p=.002）。E-SWS 中提示获益与 SWS×REM 乘积高度相关（Spearman rₛ=.66、p=.0004），这是论文关于阶段互补的核心依据；但它仍是跨参与者相关，而不是两个阶段的直接因果交互。SWS 提示还诱发 δ–θ 与纺锤频段功率增加，声音效价分别与两类反应相关；然而纺锤波功率并不预测提示获益，δ–θ 与提示获益的相关也没有通过 Bonferroni 校正。
 

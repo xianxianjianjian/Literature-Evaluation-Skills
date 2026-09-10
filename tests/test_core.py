@@ -28,6 +28,7 @@ class WorkflowStateTests(unittest.TestCase):
     def test_initial_manifest_contains_v1_resume_fields(self) -> None:
         data = state.initial_manifest("2026-W34")
         self.assertEqual(data["workflow_id"], "2026-W34-weekly-literature-evaluation")
+        self.assertEqual(data["contract_version"], "1.4.2")
         self.assertEqual(data["blocking_issues"], [])
         for stage in state.STAGE_NAMES:
             self.assertFalse(data["stages"][stage]["needs_update"])

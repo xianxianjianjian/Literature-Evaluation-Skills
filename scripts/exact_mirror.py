@@ -27,6 +27,25 @@ GEOMETRY_AUTHORITIES = {"VERSION_OF_RECORD_PDF", "PUBLISHER_SUPPLEMENT_PDF"}
 FRAME_ACTIONS = {"TRANSLATE", "RETAIN_SOURCE"}
 REPLACEMENT_STATUSES = {"TRANSLATED", "INTENTIONAL_PRESERVE", "NON_TRANSLATABLE"}
 EXPANDABLE_FRAME_KINDS = {"abstract", "body", "caption", "footnote"}
+FRAME_ROLES = {
+    "TITLE", "ABSTRACT", "BODY", "H1", "H2", "H3", "CAPTION",
+    "TABLE_TEXT", "TABLE_NOTE", "FIGURE_INTERNAL", "REFERENCE", "DOI_URL",
+    "FORMULA", "STATISTIC", "FOOTNOTE", "AFFILIATION", "OTHER",
+}
+TRANSLATABLE_FRAME_ROLES = {
+    "TITLE", "ABSTRACT", "BODY", "H1", "H2", "H3", "CAPTION",
+    "TABLE_TEXT", "TABLE_NOTE", "FOOTNOTE", "AFFILIATION", "OTHER",
+}
+PRESERVE_ENGLISH_FRAME_ROLES = FRAME_ROLES - TRANSLATABLE_FRAME_ROLES
+DEFAULT_ROLE_BY_KIND = {
+    "title": "TITLE", "author": "OTHER", "affiliation": "AFFILIATION",
+    "heading": "H2", "abstract": "ABSTRACT", "body": "BODY",
+    "caption": "CAPTION", "footnote": "FOOTNOTE", "page_header": "OTHER",
+    "page_footer": "OTHER", "table_cell": "TABLE_TEXT",
+    "figure_label": "CAPTION", "reference": "REFERENCE",
+    "formula": "FORMULA", "identifier": "DOI_URL", "logo": "OTHER",
+    "other": "OTHER",
+}
 FRAME_KINDS = {
     "title",
     "author",
@@ -54,6 +73,8 @@ RETAIN_REASONS = {
     "JOURNAL_LOGO",
     "TRADEMARK",
     "SOURCE_GAP",
+    "FIGURE_INTERNAL",
+    "STATISTIC",
 }
 FIT_STATUSES = {"FIT", "OVERFLOW", "SOURCE_GAP", "RETAINED"}
 PAGE_BOX_FIELDS = ("media_box", "crop_box", "trim_box", "bleed_box", "art_box")
@@ -121,6 +142,15 @@ def source_key(source_id: Any, source_page: Any) -> tuple[str, int] | None:
     if not nonempty_text(source_id) or not positive_int(source_page):
         return None
     return source_id.strip(), source_page
+
+
+def frame_role(row: dict[str, Any]) -> str:
+    """Return the explicit v1.4.2 role, or a backward-readable v1.4.1 default."""
+    return str(row.get("role") or DEFAULT_ROLE_BY_KIND.get(row.get("kind"), "OTHER"))
+
+
+def role_is_translatable(role: str) -> bool:
+    return role in TRANSLATABLE_FRAME_ROLES
 
 
 def validate_exact_inventory(data: Any) -> dict[str, Any]:
@@ -269,6 +299,22 @@ def validate_text_frames(
             raise ExactMirrorError(f"text frame {frame_id} requires unit_id.")
         if row.get("kind") not in FRAME_KINDS:
             raise ExactMirrorError(f"text frame {frame_id} has invalid kind.")
+        role = frame_role(row)
+        if role not in FRAME_ROLES:
+            raise ExactMirrorError(f"text frame {frame_id} has invalid role.")
+        if "role" in row:
+            expected_translatable = role_is_translatable(role)
+            if role == "OTHER":
+                expected_translatable = bool(row.get("translatable"))
+            if row.get("translatable") is not expected_translatable:
+                raise ExactMirrorError(
+                    f"text frame {frame_id} has role/translatable conflict."
+                )
+            expected_preserve = not expected_translatable if role == "OTHER" else role in PRESERVE_ENGLISH_FRAME_ROLES
+            if row.get("preserve_english") is not expected_preserve:
+                raise ExactMirrorError(
+                    f"text frame {frame_id} has role/preserve_english conflict."
+                )
         validate_bbox(row.get("bbox_pt"), f"text frame {frame_id}.bbox_pt")
         if row.get("rotation") not in {0, 90, 180, 270}:
             raise ExactMirrorError(f"text frame {frame_id} has invalid rotation.")
@@ -280,6 +326,42 @@ def validate_text_frames(
         for field in ("source_font_size_pt", "source_leading_pt"):
             if not finite_number(row.get(field)) or float(row[field]) <= 0:
                 raise ExactMirrorError(f"text frame {frame_id} requires positive {field}.")
+        for field in (
+            "first_line_indent_pt", "paragraph_spacing_before_pt",
+            "paragraph_spacing_after_pt", "baseline_offset_pt",
+        ):
+            if field in row and not finite_number(row.get(field)):
+                raise ExactMirrorError(f"text frame {frame_id} has invalid {field}.")
+        style_runs = row.get("style_runs", [])
+        if not isinstance(style_runs, list):
+            raise ExactMirrorError(f"text frame {frame_id} style_runs must be a list.")
+        for run_index, run in enumerate(style_runs, 1):
+            if not isinstance(run, dict) or not nonempty_text(run.get("target_text")):
+                raise ExactMirrorError(
+                    f"text frame {frame_id} style run {run_index} requires target_text."
+                )
+            if run.get("font_family") not in {"SimSun", "SimHei"}:
+                raise ExactMirrorError(
+                    f"text frame {frame_id} style run {run_index} requires SimSun or SimHei."
+                )
+            if str(run.get("weight") or "regular").lower() not in {"regular", "bold"}:
+                raise ExactMirrorError(
+                    f"text frame {frame_id} style run {run_index} has invalid weight."
+                )
+            if "italic" in run and not isinstance(run.get("italic"), bool):
+                raise ExactMirrorError(
+                    f"text frame {frame_id} style run {run_index} has invalid italic flag."
+                )
+            ratio = run.get("size_ratio", 1.0)
+            if not finite_number(ratio) or not 0.95 <= float(ratio) <= 1.10:
+                raise ExactMirrorError(
+                    f"text frame {frame_id} style run {run_index} size_ratio must be 0.95-1.10."
+                )
+            occurrence = run.get("occurrence", 1)
+            if not positive_int(occurrence):
+                raise ExactMirrorError(
+                    f"text frame {frame_id} style run {run_index} has invalid occurrence."
+                )
         action = row.get("translation_action")
         if action not in FRAME_ACTIONS:
             raise ExactMirrorError(f"text frame {frame_id} has invalid translation_action.")

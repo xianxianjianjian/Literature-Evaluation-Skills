@@ -21,6 +21,8 @@ except ImportError:  # pragma: no cover - explicit dependency result
     PdfReader = None
 
 from sanitize_docx_metadata import validate_docx_metadata
+from deep_reading_evidence import DeepEvidenceError, validate_deep_evidence
+from psychology_method_router import MethodRoutingError, select_modules
 
 
 class DeepReadingValidationError(ValueError):
@@ -147,7 +149,7 @@ def _relationship_checks(path: Path) -> list[str]:
 
         for name in sorted(item for item in names if item.endswith(".xml")):
             raw = archive.read(name).decode("utf-8", errors="replace")
-            root_tag = raw.split(">", 1)[0]
+            root_tag = re.sub(r'^\s*<\?xml[^>]*\?>', '', raw).lstrip().split(">", 1)[0]
             match = re.search(r"mc:Ignorable\s*=\s*['\"]([^'\"]+)['\"]", root_tag)
             if match:
                 for prefix in match.group(1).split():
@@ -267,6 +269,7 @@ def validate_package(
     rendered_pdf: Path | None = None,
     png_dir: Path | None = None,
     visual_qa: Path | None = None,
+    contract_version: str = "1.4.1",
 ) -> list[DeepReadingCheck]:
     checks: list[DeepReadingCheck] = []
     if not b_path.is_file() or b_path.suffix.casefold() != ".docx":
@@ -305,6 +308,34 @@ def validate_package(
     audit_log = work_dir / "audit_log.jsonl"
     checks.append(DeepReadingCheck("B:evidence-map", evidence_map.is_file(), str(evidence_map)))
     checks.append(DeepReadingCheck("B:main-si-audit", audit_log.is_file(), str(audit_log)))
+
+    if contract_version == "1.4.2":
+        narrative_path = work_dir / "b_narrative_coverage.json"
+        figure_path = work_dir / "b_figure_inventory.json"
+        mapping_path = work_dir / "source_to_notebook_mapping.csv"
+        profile_path = work_dir / "study_design_profile.json"
+        try:
+            narrative = json.loads(narrative_path.read_text(encoding="utf-8-sig"))
+            figures = json.loads(figure_path.read_text(encoding="utf-8-sig"))
+            evidence = validate_deep_evidence(
+                narrative, figures, mapping_path, base_dir=work_dir, docx_path=b_path
+            )
+            checks.append(DeepReadingCheck(
+                "B:v142-evidence", evidence["passed"],
+                "narrative, core-figure and semantic source-mapping gates passed"
+                if evidence["passed"] else json.dumps(evidence, ensure_ascii=False),
+            ))
+        except (OSError, json.JSONDecodeError, DeepEvidenceError, ValueError) as exc:
+            checks.append(DeepReadingCheck("B:v142-evidence", False, str(exc)))
+        try:
+            profile = json.loads(profile_path.read_text(encoding="utf-8-sig"))
+            routing = select_modules(profile)
+            checks.append(DeepReadingCheck(
+                "B:study-design-router", bool(routing.get("modules")),
+                "study_design_profile.json routed to applicable method modules",
+            ))
+        except (OSError, json.JSONDecodeError, MethodRoutingError) as exc:
+            checks.append(DeepReadingCheck("B:study-design-router", False, str(exc)))
 
     render_dir = work_dir / "deep_reading_render"
     try:
@@ -346,6 +377,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rendered-pdf", type=Path)
     parser.add_argument("--png-dir", type=Path)
     parser.add_argument("--visual-qa", type=Path)
+    parser.add_argument("--contract-version", choices=("1.4.1", "1.4.2"), default="1.4.2")
     return parser
 
 
@@ -359,6 +391,7 @@ def main(argv: list[str] | None = None) -> int:
         rendered_pdf=args.rendered_pdf,
         png_dir=args.png_dir,
         visual_qa=args.visual_qa,
+        contract_version=args.contract_version,
     )
     payload = write_report(args.report, checks, args.b_path)
     print(json.dumps(payload, ensure_ascii=False, indent=2))

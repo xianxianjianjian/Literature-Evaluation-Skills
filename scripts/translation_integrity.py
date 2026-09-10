@@ -62,10 +62,16 @@ _PLAIN = re.compile(rf"(?<![A-Za-z0-9_.–—-]){_NUMBER}(?![A-Za-z0-9_.])")
 
 def _canon(value: str) -> str:
     value = value.translate(_SUPERSCRIPT)
+    value = re.sub(
+        r"((?:×|x|X|\*)\s*10)\s*(?!\^)([+\-−–]?\s*\d+)",
+        r"\1^\2",
+        value,
+    )
     value = value.replace("−", "-").replace("–", "-")
     value = value.replace("×", "x").replace("*", "x")
     value = value.replace("χ²", "chi2").replace("χ2", "chi2")
     value = value.replace("β", "beta").replace("²", "2")
+    value = re.sub(r"\br\s*\^\s*2\b", "r2", value, flags=re.IGNORECASE)
     value = re.sub(r"\s+", "", value.casefold())
     value = value.replace(",", "")
     return value

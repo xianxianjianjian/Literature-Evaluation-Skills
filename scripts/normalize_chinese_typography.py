@@ -21,13 +21,14 @@ _SUPERSCRIPT_MAP = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹˒", "0123456789,")
 _SCIENTIFIC = re.compile(
     r"(?<!\w)([+\-−]?\d+(?:\.\d+)?)\s*[×xX*]\s*10\s*(?:\^|\*\*)?\s*([+\-−]?\d+)"
 )
+_NUMBER = r"[+\-−]?(?:\d+(?:\.\d+)?|\.\d+)"
 _STAT_SCI = re.compile(
     r"(?i)(?<![A-Za-z0-9_])(?:p|t|f|z|r|rs|β|χ²)\s*(?:\([^)]*\))?\s*(?:=|<|>|≤|≥)\s*"
     r"[+\-−]?\d+(?:\.\d+)?\s*[×xX*]\s*10\s*(?:\^|\*\*)?\s*[+\-−]?\d+"
 )
 _STAT_GROUP = re.compile(
     r"(?i)(?<![A-Za-z0-9_])(?:β\s*\[\s*SE\s*\]|p|t|f|z|r|rs|χ²|df|95%\s*CI)"
-    r"\s*(?:\([^)]*\))?\s*(?:=|<|>|≤|≥)\s*[+\-−]?\d+(?:\.\d+)?(?!\s*[×xX*])"
+    rf"\s*(?:\([^)]*\))?\s*(?:=|<|>|≤|≥)\s*{_NUMBER}(?!\s*[×xX*])"
 )
 _UNIT_GROUP = re.compile(
     r"(?i)(?<!\w)([+\-−]?\d+(?:\.\d+)?)\s*(Hz|kHz|MHz|ms|s|min|h|dB|mV|μV|mm|cm|kg|g)\b"

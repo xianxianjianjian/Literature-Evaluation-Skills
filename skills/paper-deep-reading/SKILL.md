@@ -147,6 +147,14 @@ Use this as minimum required coverage:
 
 The Base Schema is not closed. Follow Dynamic Coverage for scientifically important paper-specific material.
 
+## v1.4.2 narrative and figure evidence
+
+B is narrative-first. Tables organize evidence but cannot substitute for connected explanatory prose in Introduction, Methods, Results, Discussion, Innovation, Limitations, Redesign and Research Transfer. Create `b_narrative_coverage.json`; every core `CLM / AN / AUD / Hypothesis` closure needs substantive prose and an auditable source anchor.
+
+Create `study_design_profile.json` and route only applicable method modules. Supported profiles include experimental/randomized/intervention, observational/cross-sectional/longitudinal/repeated-measures, EEG/PSG, MEG, MRI/fMRI, graph/network, mediation/SEM, machine learning, qualitative/mixed methods, animal and database studies. The 0–10 Base Schema remains the minimum, never a closed template.
+
+Create `b_figure_inventory.json` and classify each visual as design, method, core result, mechanism, robustness, null, supporting or nonessential. Every core visual must be embedded in B with a translated caption, source anchor and substantive interpretation. Validate `source_to_notebook_mapping.csv` semantically, not by file existence alone. Run `validate_deep_reading_package.py --contract-version 1.4.2`; technical DOCX/OOXML/independent-render/all-page visual QA remains mandatory.
+
 ## Introduction reconstruction
 
 Reconstruct:

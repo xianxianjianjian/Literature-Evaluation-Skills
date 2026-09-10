@@ -278,6 +278,7 @@ def _margin_identifier_frames(page: Any, source_id: str, page_number: int) -> li
                 "source_page": page_number,
                 "unit_id": frame_id.replace("TF-", "TU-", 1),
                 "kind": "identifier",
+                "role": "DOI_URL",
                 "bbox_pt": [x0, height - bottom, x1, height - top],
                 "rotation": rotation,
                 "reading_order": 1,
@@ -285,11 +286,13 @@ def _margin_identifier_frames(page: Any, source_id: str, page_number: int) -> li
                 "source_font_size_pt": size,
                 "source_leading_pt": max(size * 1.2, 0.1),
                 "weight": "regular",
+                "italic": False,
                 "alignment": "left",
                 "background": "UNREVIEWED",
                 "translation_action": "RETAIN_SOURCE",
                 "retain_reason": "IDENTIFIER",
                 "translatable": False,
+                "preserve_english": True,
                 "replacement_status": "INTENTIONAL_PRESERVE",
                 "source_cleared": False,
                 "target_rendered": False,
@@ -358,6 +361,7 @@ def _line_number_identifier_frames(
                 "source_page": page_number,
                 "unit_id": frame_id.replace("TF-", "TU-", 1),
                 "kind": "identifier",
+                "role": "DOI_URL",
                 "bbox_pt": [x0, height - bottom, x1, height - top],
                 "rotation": 0,
                 "reading_order": 1,
@@ -365,11 +369,13 @@ def _line_number_identifier_frames(
                 "source_font_size_pt": size,
                 "source_leading_pt": max(size * 1.2, 0.1),
                 "weight": "regular",
+                "italic": False,
                 "alignment": "left",
                 "background": "UNREVIEWED",
                 "translation_action": "RETAIN_SOURCE",
                 "retain_reason": "IDENTIFIER",
                 "translatable": False,
+                "preserve_english": True,
                 "replacement_status": "INTENTIONAL_PRESERVE",
                 "source_cleared": False,
                 "target_rendered": False,
@@ -414,6 +420,7 @@ def _blocks(lines: list[dict[str, Any]], page_width: float) -> list[list[dict[st
             indent = abs(float(line["x0"]) - float(previous["x0"])) > max(12.0, page_width * 0.025)
             maximum_size = max(float(previous["size"]), float(line["size"]), 1.0)
             style_change = abs(float(line["size"]) - float(previous["size"])) > max(1.0, maximum_size * 0.12)
+            style_change = style_change or font_emphasis(str(line.get('fontname', ''))) != font_emphasis(str(previous.get('fontname', '')))
             if _same_column(previous, line, page_width) and not indent and not style_change:
                 if best_gap is None or gap < best_gap:
                     best_index = index
@@ -439,7 +446,40 @@ def _kind(block: list[dict[str, Any]], page_height: float, body_size: float) -> 
         return "title"
     if size >= body_size * 1.15:
         return "heading"
+    if len(block) <= 2 and all(font_emphasis(line['fontname'])[0] for line in block):
+        return "heading"
     return "body"
+
+
+def font_emphasis(font: str) -> tuple[bool, bool]:
+    """Recognize journal PDF subset names as well as ordinary font names."""
+    name = font.lower()
+    return (bool(re.search(r'bold|semibold|demi|\.b(?:$|\+)', name)),
+            bool(re.search(r'italic|oblique|\.i(?:$|\+)', name)))
+
+
+def _role(kind: str, size: float, body_size: float, text: str) -> str:
+    """Assign the v1.4.2 semantic role independently from renderer behavior."""
+    folded = text.strip().casefold()
+    if kind == "title":
+        return "TITLE"
+    if kind == "heading":
+        if size >= body_size * 1.55:
+            return "H1"
+        if size >= body_size * 1.30:
+            return "H2"
+        return "H3"
+    if kind == "table_cell":
+        return "TABLE_TEXT"
+    if folded.startswith("abstract"):
+        return "ABSTRACT"
+    if re.match(r"^(fig(?:ure)?\.?|table|supplementary\s+(?:fig|table))\s*\d", folded):
+        return "CAPTION"
+    if re.fullmatch(r"(?:https?://\S+|(?:doi\s*:?\s*)?10\.\d{4,9}/\S+)", folded):
+        return "DOI_URL"
+    if kind in {"page_header", "page_footer"}:
+        return "OTHER"
+    return "BODY"
 
 
 def extract_frames(source_pdf: Path, source_id: str) -> list[dict[str, Any]]:
@@ -491,34 +531,44 @@ def extract_frames(source_pdf: Path, source_id: str) -> list[dict[str, Any]]:
                     else statistics.median(line["size"] for line in block) * 1.2
                 )
                 font = Counter(line["fontname"] for line in block).most_common(1)[0][0]
-                weight = "bold" if "bold" in font.lower() else "regular"
-                if "italic" in font.lower() or "oblique" in font.lower():
+                is_bold, is_italic = font_emphasis(font)
+                weight = "bold" if is_bold else "regular"
+                if is_italic:
                     weight = f"{weight}-italic"
                 frame_id = f"TF-{source_id}-P{page_number:03d}-{reading_order:03d}"
                 unit_id = f"TU-{source_id}-P{page_number:03d}-{reading_order:03d}"
+                kind = _kind(block, float(page.height), body_size)
+                source_size = statistics.median(line["size"] for line in block)
+                source_text = "\n".join(line["text"] for line in block)
+                role = _role(kind, source_size, body_size, source_text)
+                translatable = role not in {"FIGURE_INTERNAL", "REFERENCE", "DOI_URL", "FORMULA", "STATISTIC"}
                 rows.append(
                     {
                         "frame_id": frame_id,
                         "source_id": source_id,
                         "source_page": page_number,
                         "unit_id": unit_id,
-                        "kind": _kind(block, float(page.height), body_size),
+                        "kind": kind,
+                        "role": role,
                         "bbox_pt": [x0, float(page.height) - bottom, x1, float(page.height) - top],
                         "rotation": int(page.rotation or 0) % 360,
                         "reading_order": reading_order,
                         "source_font": font,
-                        "source_font_size_pt": statistics.median(line["size"] for line in block),
+                        "source_font_size_pt": source_size,
                         "source_leading_pt": float(leading),
                         "weight": weight,
+                        "italic": "italic" in weight,
                         "alignment": "left",
                         "background": "UNREVIEWED",
-                        "translation_action": "TRANSLATE",
-                        "translatable": True,
-                        "replacement_status": "TRANSLATED",
+                        "translation_action": "TRANSLATE" if translatable else "RETAIN_SOURCE",
+                        "retain_reason": "IDENTIFIER" if not translatable else None,
+                        "translatable": translatable,
+                        "preserve_english": not translatable,
+                        "replacement_status": "TRANSLATED" if translatable else "INTENTIONAL_PRESERVE",
                         "source_cleared": False,
                         "target_rendered": False,
                         "residual_checked": False,
-                        "source_text": "\n".join(line["text"] for line in block),
+                        "source_text": source_text,
                         "reviewed": False,
                     }
                 )

@@ -1,5 +1,13 @@
 # Translation Evidence Contract
 
+## v1.4.2 required evidence
+
+- `source_cross_reference.json`: Main/SI/correction/protocol/data/code discovery and Source Archive status.
+- `text_frame_inventory.jsonl`: explicit `role`, `translatable`, `preserve_english`, source style fingerprint fields and rendered-style evidence.
+- `style_map.json` and validator-owned `style_fidelity.json`.
+- role-aware `untranslated_residual_audit.json`: one unapproved source-matched English token in a translatable role is a failure; preserve-English roles are excluded by policy, not by word-count heuristic.
+- validator-owned `numeric_integrity.json`: signs, exponents and statistic tokens remain hard-gated.
+
 Use inventory, ledger and issue evidence for every translation scope. `FULL_MIRROR` defaults to `EXACT_TEXT_FRAME` and activates the schema-v2 geometry/font contract below. These files answer different questions and cannot be replaced by a hand-written “QC passed” statement.
 
 ## 1. `source_inventory.json`

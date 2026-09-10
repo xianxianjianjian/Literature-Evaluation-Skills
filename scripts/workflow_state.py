@@ -27,7 +27,10 @@ ALLOWED_STATUSES = {
     "COMPLETE",
 }
 NON_GATE_STATUSES = ALLOWED_STATUSES - {"WAITING_USER"}
-STAGE_NAMES = ("topic", "search", "translation", "deep_reading")
+STAGE_NAMES = (
+    "topic", "search", "source_package", "source_archive", "translation",
+    "deep_reading", "output_archive",
+)
 OUTPUT_NAMES = ("A", "B", "C")
 GATE_STAGES = {"topic", "search"}
 TRANSLATION_SCOPES = {"FULL_MIRROR", "MAIN_ONLY", "ABSTRACT_ONLY"}
@@ -66,6 +69,7 @@ def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any
         )
     return {
         "schema_version": 1,
+        "contract_version": "1.4.2",
         "workflow_id": workflow_id or f"{week}-weekly-literature-evaluation",
         "week": week,
         "paper_id": None,
@@ -92,6 +96,16 @@ def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any
             "required_si_source_ids": [],
             "zotero_si_attachment_keys": {},
             "metadata_only_fallback": False,
+            "source_archive": {
+                "status": "NOT_STARTED",
+                "source_ids": [],
+                "verified_date": None,
+            },
+            "output_archive": {
+                "status": "NOT_STARTED",
+                "output_attachment_keys": {},
+                "verified_date": None,
+            },
         },
         "pending_zotero_actions": [],
         "blocking_issues": [],
@@ -105,7 +119,7 @@ def normalize_manifest(data: object) -> dict[str, Any]:
     stages = data.get("stages")
     if isinstance(stages, dict):
         for name in STAGE_NAMES:
-            stage = stages.get(name)
+            stage = stages.setdefault(name, _stage_record())
             if isinstance(stage, dict):
                 stage.setdefault("needs_update", False)
                 stage.setdefault("update_reason", [])
@@ -118,6 +132,7 @@ def normalize_manifest(data: object) -> dict[str, Any]:
                 translation.setdefault("minimum_font_scale", None)
             translation.setdefault("user_selected_layout", False)
     data.setdefault("blocking_issues", [])
+    data.setdefault("contract_version", "1.4.1")
     archive_defaults = {
         "zotero_parent_key": data.get("zotero_parent_key"),
         "zotero_collection_key": data.get("zotero_collection_key"),
@@ -125,6 +140,12 @@ def normalize_manifest(data: object) -> dict[str, Any]:
         "required_si_source_ids": [],
         "zotero_si_attachment_keys": {},
         "metadata_only_fallback": False,
+        "source_archive": {
+            "status": "NOT_STARTED", "source_ids": [], "verified_date": None,
+        },
+        "output_archive": {
+            "status": "NOT_STARTED", "output_attachment_keys": {}, "verified_date": None,
+        },
     }
     archive = data.setdefault("archive", {})
     if isinstance(archive, dict):
@@ -138,6 +159,8 @@ def validate_manifest(data: object) -> dict[str, Any]:
     data = normalize_manifest(data)
     if data.get("schema_version") != 1:
         raise WorkflowStateError("Manifest schema_version must be 1.")
+    if data.get("contract_version") not in {"1.4.1", "1.4.2"}:
+        raise WorkflowStateError("Manifest contract_version must be 1.4.1 or 1.4.2.")
 
     workflow_id = data.get("workflow_id")
     if not isinstance(workflow_id, str) or not workflow_id.strip():
@@ -287,6 +310,22 @@ def validate_manifest(data: object) -> dict[str, Any]:
         raise WorkflowStateError("archive.zotero_si_attachment_keys must map source IDs to keys.")
     if not isinstance(archive.get("metadata_only_fallback"), bool):
         raise WorkflowStateError("archive.metadata_only_fallback must be true or false.")
+    source_archive = archive.get("source_archive")
+    output_archive = archive.get("output_archive")
+    for label, record in (("source_archive", source_archive), ("output_archive", output_archive)):
+        if not isinstance(record, dict) or record.get("status") not in NON_GATE_STATUSES:
+            raise WorkflowStateError(f"archive.{label}.status must be a non-gate workflow status.")
+        verified_date = record.get("verified_date")
+        if verified_date is not None:
+            if not isinstance(verified_date, str):
+                raise WorkflowStateError(f"archive.{label}.verified_date must be null or YYYY-MM-DD.")
+            validate_iso_date(verified_date, f"archive.{label}.verified_date")
+    if not isinstance(source_archive.get("source_ids"), list) or not all(
+        isinstance(item, str) and item.strip() for item in source_archive.get("source_ids", [])
+    ):
+        raise WorkflowStateError("archive.source_archive.source_ids must be a list of source IDs.")
+    if not isinstance(output_archive.get("output_attachment_keys"), dict):
+        raise WorkflowStateError("archive.output_archive.output_attachment_keys must be an object.")
 
     pending = data.get("pending_zotero_actions")
     if not isinstance(pending, list) or not all(isinstance(item, dict) for item in pending):

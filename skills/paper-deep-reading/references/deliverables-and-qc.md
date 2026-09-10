@@ -1,5 +1,7 @@
 # Deliverables and QC
 
+For v1.4.2 B, use `validate_deep_reading_package.py --contract-version 1.4.2`. It adds semantic checks for narrative coverage, design routing, core-figure embedding/caption/interpretation and source-to-notebook mappings while retaining DOCX metadata sanitation, OOXML validation, independent office rendering and all-page visual QA.
+
 Deep Reading produces B as the full research archive and, in weekly context or on explicit request, C as the concise weekly evaluation submission. C is derived from B; it is not an independent second reading that may introduce unsupported claims.
 
 ## B — Complete Research Notes DOCX

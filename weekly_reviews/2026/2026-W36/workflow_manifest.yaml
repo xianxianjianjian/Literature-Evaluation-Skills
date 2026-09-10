@@ -1,16 +1,17 @@
 {
   "schema_version": 1,
+  "contract_version": "1.4.2",
   "workflow_id": "2026-W36-weekly-literature-evaluation",
   "week": "2026-W36",
   "paper_id": "10.1038-s42003-025-07868-5",
   "zotero_parent_key": "BHX9LWRZ",
   "zotero_collection_key": "CXGQF4XF",
   "zotero_main_attachment_key": "NQSZH9AA",
-  "zotero_archive_status": "PARENT_VERIFIED_MAIN_SI_A_B_ATTACHED",
+  "zotero_archive_status": "SOURCE_ARCHIVE_COMPLETE_OUTPUT_ARCHIVE_PENDING_AUTHORIZATION",
   "zotero_last_live_check": {
-    "checked_date": "2026-09-07",
-    "status": "MAIN_SI_A_B_VERIFIED",
-    "reason": "Zotero 10.0.1 Local API and Connector were available. Parent BHX9LWRZ remained in SLEEPY with Main NQSZH9AA. A v1.4.1 HMZ78SCI, B v1.4.1 RBPXH2K2 and SI 2IQ74JYZ were verified by parent relation, title, stored file URL, MD5 and byte length; obsolete A v1.4.0 C3YDZ6JF was moved to Zotero Trash."
+    "checked_date": "2026-09-09",
+    "status": "MAIN_SI_AND_V1.4.1_OUTPUTS_VERIFIED_V1.4.2_OUTPUTS_PENDING_AUTHORIZATION",
+    "reason": "Zotero 10.0.1 Local API and Connector returned HTTP 200. Parent BHX9LWRZ remained in SLEEPY with Main NQSZH9AA, SI 2IQ74JYZ, A v1.4.1 HMZ78SCI and B v1.4.1 RBPXH2K2 verified. Two v1.4.2 full-upload attempts stopped at the Zotero Desktop authorization timeout before any child was created; old outputs remain preserved."
   },
   "archive": {
     "zotero_parent_key": "BHX9LWRZ",
@@ -22,7 +23,17 @@
     "zotero_si_attachment_keys": {
       "SRC-S1": "2IQ74JYZ"
     },
-    "metadata_only_fallback": false
+    "metadata_only_fallback": false,
+    "source_archive": {
+      "status": "COMPLETE",
+      "source_ids": ["SRC-M1", "SRC-S1"],
+      "verified_date": "2026-09-07"
+    },
+    "output_archive": {
+      "status": "PROVISIONAL",
+      "output_attachment_keys": {"A_v1.4.1": "HMZ78SCI", "B_v1.4.1": "RBPXH2K2"},
+      "verified_date": null
+    }
   },
   "stages": {
     "topic": {
@@ -35,23 +46,33 @@
       "needs_update": false,
       "update_reason": []
     },
+    "source_package": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "source_archive": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
     "translation": {
       "status": "COMPLETE",
       "needs_update": false,
       "update_reason": [],
-      "skill_version": "1.4.1",
+      "skill_version": "1.4.2",
       "scope": "FULL_MIRROR",
       "layout_fidelity": "EXACT_TEXT_FRAME",
       "user_selected_layout": false,
       "cjk_font_family": "SimSun",
       "minimum_font_scale": 0.95,
-      "profile_change_reason": "Rebuilt and validated under literature-evaluation v1.4.1. Publisher JATS supplied language authority; the Version of Record PDF and publisher supplement supplied geometry authority. Independent exact-package validation passed all 30 checks."
+      "profile_change_reason": "Rebuilt under v1.4.2 with role-aware residual auditing, style fingerprints and mapping, numeric/sign preservation, exact Main+SI 21-page geometry, 32/32 machine validation and all-page visual QA."
     },
     "deep_reading": {
       "status": "COMPLETE",
       "needs_update": false,
       "update_reason": [],
-      "skill_version": "1.4.1",
+      "skill_version": "1.4.2",
       "scope": "MAIN_SI_FULL_RESEARCH_AUDIT",
       "evidence_classes": [
         "原文直接内容",
@@ -59,36 +80,64 @@
         "评译者分析",
         "外部依据"
       ],
-      "profile_change_reason": "Rebuilt under literature-evaluation v1.4.1 with exact 0-10 heading schema, complete Methods/Results/Discussion routing, Main+SI claim anchors, Word independent rendering, 21-page all-page visual QA, and sanitized DOCX metadata."
+      "profile_change_reason": "Rebuilt under v1.4.2 with narrative-first coverage across eight core areas, design-profile routing, semantic Source-to-Notebook closure, six reviewed and interpreted source figures, Main+SI audit, 16/16 validation, 28-page independent rendering, all-page visual QA and sanitized DOCX metadata."
+    },
+    "output_archive": {
+      "status": "PROVISIONAL",
+      "needs_update": false,
+      "update_reason": []
     }
   },
   "outputs": {
     "A": {
       "status": "COMPLETE",
-      "local_path": "work/10.1038-s42003-025-07868-5/v141_exact/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.1.pdf",
-      "zotero_attachment_key": "HMZ78SCI",
-      "archive_label": "[A] 中文全文翻译·精确镜像版 v1.4.1",
-      "validation_report": "work/10.1038-s42003-025-07868-5/v141_exact/translation_validation.json",
-      "validation_note": "FULL_MIRROR / EXACT_TEXT_FRAME; 21 pages; independent validation passed all 30 checks; Zotero-stored MD5 d4ceabc4c1c7d7c1f9848d9fbf605192 and length 4205657 bytes matched the local artifact."
+      "local_path": "work/10.1038-s42003-025-07868-5/v142_exact/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.2.pdf",
+      "zotero_attachment_key": null,
+      "archive_label": "[A] 中文全文翻译·精确镜像版 v1.4.2",
+      "validation_report": "work/10.1038-s42003-025-07868-5/v142_exact/translation_validation.json",
+      "visual_qa_report": "work/10.1038-s42003-025-07868-5/v142_exact/a_visual_qa.json",
+      "validation_note": "FULL_MIRROR / EXACT_TEXT_FRAME; Main 10 + SI 11 pages; role-aware content, style, numeric and geometry gates passed 32/32; all 21 pages visually reviewed; A/B/C terminology consistency passed; local MD5 c9f9dc1df99aaeb46ca31b8b54a6d451 and length 4444848 bytes. Zotero attachment pending authorization."
     },
     "B": {
       "status": "COMPLETE",
-      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025_v1.4.1.docx",
-      "zotero_attachment_key": "RBPXH2K2",
-      "archive_label": "[B] 文献研究笔记·完整精读版 v1.4.1",
-      "validation_report": "work/10.1038-s42003-025-07868-5/deep_reading_validation_v141.json",
-      "validation_note": "Main+SI complete; 21 Word-rendered pages; exact 0-10 schema and 14/14 validation checks passed; all pages visually reviewed; metadata sanitized; Zotero-stored MD5 4db820dfbf3a23f0a79f9374bdbba104 and length 73445 bytes matched the local artifact."
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025_v1.4.2.docx",
+      "zotero_attachment_key": null,
+      "archive_label": "[B] 文献研究笔记·完整精读版 v1.4.2",
+      "validation_report": "work/10.1038-s42003-025-07868-5/v142_deep_reading/b_validation.json",
+      "rendered_pdf": "work/10.1038-s42003-025-07868-5/v142_deep_reading/render/B_Yuksel_2025_v1.4.2.pdf",
+      "validation_note": "Main+SI narrative-first complete; eight prose areas, 34 claim closures and six source figures; 16/16 validation passed; independent 28-page render and all-page visual QA passed; A/B/C terminology consistency passed; DOCX metadata sanitized; local MD5 e03024475d420816badba8590d0449c8 and length 1468531 bytes. Zotero attachment pending authorization."
     },
     "C": {
       "status": "COMPLETE",
       "git_path": "weekly_reviews/2026/2026-W36/C_Yuksel_2025_周文献评价.md",
       "git_repository": "https://github.com/xianxianjianjian/Literature-Evaluation-Skills.git",
       "git_commit": "38e3509"
+      ,"reviewed_against_B_v1.4.2": true
+      ,"reviewed_date": "2026-09-10"
     }
   },
-  "pending_zotero_actions": [],
+  "pending_zotero_actions": [
+    {
+      "action": "ATTACH_OUTPUT",
+      "output": "A",
+      "parent_key": "BHX9LWRZ",
+      "expected_attachment_name": "[A] 中文全文翻译·精确镜像版 v1.4.2",
+      "local_path": "work/10.1038-s42003-025-07868-5/v142_exact/[A] 中文全文翻译·精确镜像版_Yuksel_2025_v1.4.2.pdf",
+      "md5": "c9f9dc1df99aaeb46ca31b8b54a6d451",
+      "reason": "Zotero Desktop local-write authorization timed out before item creation."
+    },
+    {
+      "action": "ATTACH_OUTPUT",
+      "output": "B",
+      "parent_key": "BHX9LWRZ",
+      "expected_attachment_name": "[B] 文献研究笔记·完整精读版 v1.4.2",
+      "local_path": "work/10.1038-s42003-025-07868-5/handoff/[B] 文献研究笔记·完整精读版_Yuksel_2025_v1.4.2.docx",
+      "md5": "e03024475d420816badba8590d0449c8",
+      "reason": "Wait for successful A authorization/upload, then attach B and verify before replacing v1.4.1."
+    }
+  ],
   "blocking_issues": [],
   "source_change": {
-    "last_checked": "2026-09-07"
+    "last_checked": "2026-09-09"
   }
 }

@@ -9,6 +9,7 @@ import json
 import re
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,7 @@ from exact_mirror import (
     validate_font_map,
     validate_text_frames,
 )
+from exact_mirror import frame_role
 from mirror_pdf import MirrorPlanError, validate_plan_data
 from normalize_chinese_typography import (
     SemanticToken,
@@ -42,6 +44,12 @@ from normalize_chinese_typography import (
 
 class ExactMirrorRenderError(ValueError):
     """Raised when exact replacement cannot be rendered within the contract."""
+
+
+@dataclass(frozen=True)
+class StyledToken:
+    token: SemanticToken
+    style: dict[str, Any]
 
 
 def _require_dependencies() -> None:
@@ -76,7 +84,123 @@ def _token_width(token: SemanticToken, font_name: str, font_size: float) -> floa
                 pdfmetrics.stringWidth(match.group(1), font_name, font_size)
                 + pdfmetrics.stringWidth(match.group(2), font_name, font_size * 0.65)
             )
-    return pdfmetrics.stringWidth(token.text, font_name, size)
+    # SimSun's PDF cmap does not expose U+2212 reliably.  Keep the semantic
+    # minus in the ledger, but measure and paint its visible ASCII equivalent.
+    return pdfmetrics.stringWidth(token.text.replace("−", "-"), font_name, size)
+
+
+def _reviewed_style_spans(text: str, frame: dict[str, Any]) -> list[tuple[int, int, dict[str, Any]]]:
+    """Resolve reviewed target-text style runs to non-overlapping character spans."""
+    spans: list[tuple[int, int, dict[str, Any]]] = []
+    for index, run in enumerate(frame.get("style_runs", []), 1):
+        target = normalize_chinese_text(str(run.get("target_text") or ""))
+        if not target:
+            raise ExactMirrorRenderError(f"Frame {frame['frame_id']} style run {index} has no target_text.")
+        occurrence = int(run.get("occurrence", 1))
+        if occurrence < 1:
+            raise ExactMirrorRenderError(f"Frame {frame['frame_id']} style run {index} has invalid occurrence.")
+        start = -1
+        cursor = 0
+        for _ in range(occurrence):
+            start = text.find(target, cursor)
+            if start < 0:
+                raise ExactMirrorRenderError(
+                    f"Frame {frame['frame_id']} style run target is absent: {target!r}."
+                )
+            cursor = start + len(target)
+        end = start + len(target)
+        if any(start < old_end and end > old_start for old_start, old_end, _ in spans):
+            raise ExactMirrorRenderError(f"Frame {frame['frame_id']} has overlapping style runs.")
+        spans.append((start, end, run))
+    return sorted(spans)
+
+
+def _styled_tokens(text: str, frame: dict[str, Any]) -> list[StyledToken]:
+    text = normalize_chinese_text(text)
+    spans = _reviewed_style_spans(text, frame)
+    result: list[StyledToken] = []
+    cursor = 0
+    for token in semantic_tokens(text):
+        if token.kind == "BREAK":
+            start, end = cursor, cursor + 1
+        else:
+            start = text.find(token.text, cursor)
+            if start < 0:
+                start = cursor
+            end = start + len(token.text)
+        # Scientific/statistical notation is intentionally tokenized atomically.
+        # A reviewed run that selects its leading symbol (for example ``p =``)
+        # therefore styles the complete semantic token.
+        style = next((run for left, right, run in spans if start < right and end > left), {})
+        result.append(StyledToken(token, style))
+        cursor = end
+    return result
+
+
+def _styled_font(item: StyledToken, frame: dict[str, Any], base_size: float) -> tuple[str, float]:
+    family = str(item.style.get("font_family") or frame.get("render_font_name", "SimSun"))
+    size_ratio = float(item.style.get("size_ratio", 1.0))
+    return family, base_size * size_ratio
+
+
+def _styled_token_width(item: StyledToken, frame: dict[str, Any], base_size: float) -> float:
+    family, size = _styled_font(item, frame, base_size)
+    return _token_width(item.token, family, size)
+
+
+def _wrap_styled_paragraph(text: str, frame: dict[str, Any], font_size: float, width: float) -> list[list[StyledToken]]:
+    if not text:
+        return [[]]
+    lines: list[list[StyledToken]] = []
+    current: list[StyledToken] = []
+    current_width = 0.0
+    for item in _styled_tokens(text, frame):
+        token = item.token
+        if token.kind == "BREAK":
+            while current and current[-1].token.kind == "SPACE":
+                current.pop()
+            lines.append(current)
+            current = []
+            current_width = 0.0
+            continue
+        token_width = _styled_token_width(item, frame, font_size)
+        if current and current_width + token_width > width:
+            if token.kind == "PUNCTUATION" and token.text in "，。；：！？、）】》":
+                carry: list[StyledToken] = []
+                while current and current[-1].token.kind == "SPACE":
+                    current_width -= _styled_token_width(current.pop(), frame, font_size)
+                while (
+                    current
+                    and current[-1].token.kind == "PUNCTUATION"
+                    and current[-1].token.text in "，。；：！？、）】》"
+                ):
+                    carry.insert(0, current.pop())
+                if current:
+                    carry.insert(0, current.pop())
+                lines.append(current)
+                current = carry + [item]
+                current_width = sum(_styled_token_width(value, frame, font_size) for value in current)
+                continue
+            if current[-1].token.kind == "PUNCTUATION" and current[-1].token.text in "（【《":
+                opener = current.pop()
+                current_width -= _styled_token_width(opener, frame, font_size)
+                lines.append(current)
+                current = [opener, item]
+                current_width = _styled_token_width(opener, frame, font_size) + token_width
+                continue
+            while current and current[-1].token.kind == "SPACE":
+                current_width -= _styled_token_width(current.pop(), frame, font_size)
+            lines.append(current)
+            current = [] if token.kind == "SPACE" else [item]
+            current_width = 0.0 if token.kind == "SPACE" else token_width
+            continue
+        if not current and token.kind == "SPACE":
+            continue
+        current.append(item)
+        current_width += token_width
+    if current or not lines:
+        lines.append(current)
+    return lines
 
 
 def _wrap_paragraph(text: str, font_name: str, font_size: float, width: float) -> list[list[SemanticToken]]:
@@ -99,6 +223,12 @@ def _wrap_paragraph(text: str, font_name: str, font_size: float, width: float) -
                 carry: list[SemanticToken] = []
                 while current and current[-1].kind == "SPACE":
                     current_width -= _token_width(current.pop(), font_name, font_size)
+                while (
+                    current
+                    and current[-1].kind == "PUNCTUATION"
+                    and current[-1].text in "，。；：！？、）】》"
+                ):
+                    carry.insert(0, current.pop())
                 if current:
                     carry.insert(0, current.pop())
                 lines.append(current)
@@ -127,11 +257,11 @@ def _wrap_paragraph(text: str, font_name: str, font_size: float, width: float) -
     return lines
 
 
-def _used_height(lines: list[list[SemanticToken]], font_size: float, leading: float) -> float:
+def _used_height(lines: list[list[Any]], font_size: float, leading: float) -> float:
     return font_size + max(0, len(lines) - 1) * leading
 
 
-def _layout(text: str, source_text: str, frame: dict[str, Any]) -> tuple[float, float, list[list[SemanticToken]], dict[str, Any]] | None:
+def _layout(text: str, source_text: str, frame: dict[str, Any]) -> tuple[float, float, list[list[StyledToken]], dict[str, Any]] | None:
     x0, y0, x1, y1 = [float(value) for value in frame["bbox_pt"]]
     if frame.get("rotation") in {90, 270}:
         width = y1 - y0
@@ -144,12 +274,12 @@ def _layout(text: str, source_text: str, frame: dict[str, Any]) -> tuple[float, 
     source_lines = _wrap_paragraph(source_text, "SimSun", source_size, width)
     source_used_height = _used_height(source_lines, source_size, source_leading)
     scales = FONT_SCALE_STEPS if frame.get("kind", "body") in EXPANDABLE_FRAME_KINDS else tuple(scale for scale in FONT_SCALE_STEPS if scale <= 1.0)
-    candidates: list[tuple[float, float, list[list[SemanticToken]], float]] = []
+    candidates: list[tuple[float, float, list[list[StyledToken]], float]] = []
     for scale in scales:
         font_size = source_size * scale
         for leading_ratio in (1.25, 1.20, 1.30, 1.15, 1.35, 1.40, 1.45):
             leading = font_size * leading_ratio
-            lines = _wrap_paragraph(text, "SimSun", font_size, width)
+            lines = _wrap_styled_paragraph(text, frame, font_size, width)
             required_height = _used_height(lines, font_size, leading)
             if required_height <= height + 0.01:
                 target_ratio = required_height / source_used_height if source_used_height else 1.0
@@ -210,7 +340,7 @@ def _set_background(c: Any, frame: dict[str, Any], work_dir: Path) -> None:
 
 def _draw_line(
     c: Any,
-    line: list[SemanticToken],
+    line: list[StyledToken],
     x: float,
     baseline: float,
     width: float,
@@ -218,39 +348,48 @@ def _draw_line(
     frame: dict[str, Any],
     is_last: bool,
 ) -> None:
-    measured = sum(_token_width(token, "SimSun", font_size) for token in line)
+    measured = sum(_styled_token_width(item, frame, font_size) for item in line)
     alignment = frame["alignment"]
     if alignment == "center":
         x += max(0.0, (width - measured) / 2)
     elif alignment == "right":
         x += max(0.0, width - measured)
     cursor = x
-    for token in line:
+    for item in line:
+        token = item.token
+        font_name, styled_size = _styled_font(item, frame, font_size)
+        weight = str(item.style.get("weight") or frame.get("weight", "regular")).lower()
+        italic = bool(item.style.get("italic", frame.get("italic", False)))
         scientific = re.fullmatch(r"(.+?10)([+−-]?\d+)", token.text) if token.kind in {"SCIENTIFIC", "STAT"} else None
         pieces = (
-            [(scientific.group(1), font_size, 0.0), (scientific.group(2), font_size * 0.65, font_size * 0.32)]
-            if scientific else [(token.text, font_size * 0.65 if token.kind == "CITATION" else font_size,
-                                  font_size * 0.32 if token.kind == "CITATION" else 0.0)]
+            [(scientific.group(1), styled_size, 0.0), (scientific.group(2), styled_size * 0.65, styled_size * 0.32)]
+            if scientific else [(token.text, styled_size * 0.65 if token.kind == "CITATION" else styled_size,
+                                  styled_size * 0.32 if token.kind == "CITATION" else 0.0)]
         )
         for piece, token_size, rise in pieces:
+            visible_piece = piece.replace("−", "-")
+            c.saveState()
+            if frame.get('superscript'):
+                rise += font_size * 0.32
             text = c.beginText()
-            if "italic" in str(frame.get("weight", "")):
+            if italic or "italic" in weight:
                 text.setTextTransform(1, 0, 0.18, 1, cursor, baseline)
             else:
                 text.setTextOrigin(cursor, baseline)
-            text.setFont("SimSun", token_size)
+            text.setFont(font_name, token_size)
             # Ts persists in the PDF text state across text objects; always reset
             # it so a citation cannot lift the following prose above its frame.
             text.setRise(rise)
-            if str(frame.get("weight", "")).startswith("bold"):
-                text.setTextRenderMode(2)
+            text.setTextRenderMode(2 if weight.startswith("bold") else 0)
+            if weight.startswith("bold"):
                 c.setLineWidth(max(0.2, font_size * 0.035))
-            text.textOut(piece)
+            text.textOut(visible_piece)
             c.drawText(text)
-            cursor += pdfmetrics.stringWidth(piece, "SimSun", token_size)
+            c.restoreState()
+            cursor += pdfmetrics.stringWidth(visible_piece, font_name, token_size)
 
 
-def _draw_frame(c: Any, frame: dict[str, Any], text: str, scale: float, leading: float, lines: list[list[SemanticToken]], work_dir: Path) -> None:
+def _draw_frame(c: Any, frame: dict[str, Any], text: str, scale: float, leading: float, lines: list[list[StyledToken]], work_dir: Path) -> None:
     x0, y0, x1, y1 = [float(value) for value in frame["bbox_pt"]]
     rotation = int(frame.get("rotation", 0))
     c.saveState()
@@ -314,6 +453,14 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
     inventory = validate_exact_inventory(load_json(work_dir / "source_inventory.json", "source inventory"))
     frame_rows = load_jsonl(work_dir / "text_frame_inventory.jsonl", "text frame inventory")
     frames = validate_text_frames(frame_rows, inventory)
+    style_map_path = work_dir / "style_map.json"
+    style_map = (
+        json.loads(style_map_path.read_text(encoding="utf-8-sig"))
+        if style_map_path.is_file() else {"roles": {}}
+    )
+    if style_map.get("roles"):
+        from style_fidelity import validate_style_map
+        validate_style_map(style_map, frame_rows)
     ledger_path = work_dir / "translation_ledger.jsonl"
     ledger_rows = load_jsonl(ledger_path, "translation ledger")
     ledger = validate_exact_ledger(ledger_rows, frames)
@@ -334,6 +481,17 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
         )
     try:
         pdfmetrics.registerFont(TTFont("SimSun", str(font_path), subfontIndex=0))
+        if (
+            any(rule.get('cjk_font_family') == 'SimHei' for rule in style_map.get('roles', {}).values())
+            or any(
+                run.get('font_family') == 'SimHei'
+                for frame in frame_rows for run in frame.get('style_runs', [])
+            )
+        ):
+            hei_path = Path(font_map.get('simhei_path') or font_path.with_name('simhei.ttf'))
+            if not hei_path.is_file():
+                raise ExactMirrorRenderError(f'Required SimHei font missing: {hei_path}')
+            pdfmetrics.registerFont(TTFont('SimHei', str(hei_path)))
     except Exception as exc:  # reportlab exposes several font-parser exception types
         raise ExactMirrorRenderError(f"Cannot register/embed SimSun: {exc}") from exc
 
@@ -367,6 +525,7 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
             if frame["translation_action"] != "TRANSLATE":
                 continue
             row = frame_to_ledger[frame_id]
+            frame['render_font_name'] = style_map.get('roles', {}).get(frame_role(frame), {}).get('cjk_font_family', 'SimSun')
             row["translated_text"] = normalize_chinese_text(
                 normalize_inline_citations(row["translated_text"], row["source_text"])
             )
@@ -382,6 +541,34 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
             frame["source_cleared"] = True
             frame["target_rendered"] = True
             frame["residual_checked"] = False
+            mapped_family = style_map.get("roles", {}).get(
+                frame_role(frame), {}
+            ).get("cjk_font_family", "SimSun")
+            frame["rendered_style"] = {
+                "font_family": frame['render_font_name'],
+                "font_size_pt": round(float(frame["source_font_size_pt"]) * scale, 3),
+                "leading_pt": round(float(leading), 3),
+                "weight": str(frame.get("weight") or "regular").lower(),
+                "italic": bool(frame.get("italic", "italic" in str(frame.get("weight", "")).lower())),
+                "color_rgb": [float(value) for value in frame.get("text_rgb", [0, 0, 0])],
+                "alignment": str(frame.get("alignment") or "left").lower(),
+                "superscript": bool(frame.get("superscript", False)),
+                "first_line_indent_pt": float(frame.get("first_line_indent_pt", 0.0)),
+                "paragraph_spacing_before_pt": float(frame.get("paragraph_spacing_before_pt", 0.0)),
+                "paragraph_spacing_after_pt": float(frame.get("paragraph_spacing_after_pt", 0.0)),
+                "baseline_offset_pt": float(frame.get("baseline_offset_pt", 0.0)),
+                "style_runs": [
+                    {
+                        "target_text": str(run.get("target_text") or ""),
+                        "occurrence": int(run.get("occurrence", 1)),
+                        "font_family": str(run.get("font_family") or frame['render_font_name']),
+                        "weight": str(run.get("weight") or frame.get("weight", "regular")).lower(),
+                        "italic": bool(run.get("italic", frame.get("italic", False))),
+                        "size_ratio": float(run.get("size_ratio", 1.0)),
+                    }
+                    for run in frame.get("style_runs", [])
+                ],
+            }
             rendered_frames.append(
                 {
                     "frame_id": frame_id,

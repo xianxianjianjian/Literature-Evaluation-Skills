@@ -309,6 +309,38 @@ class TerminologyConsistencyTests(unittest.TestCase):
             self.assertFalse(result["passed"])
             self.assertTrue(any(item["artifact"] == "B" for item in result["failures"]))
 
+    def test_exact_mirror_uses_reviewed_target_ledger_instead_of_hidden_source_layer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            paper_terms, registry, evidence, artifacts = self._package(root, "睡眠纺锤波")
+            artifacts["A"].write_text("sleep spindle", encoding="utf-8")
+            ledger = root / "translation_ledger.jsonl"
+            write_jsonl(ledger, [{"unit_id": "F1", "translated_text": "睡眠纺锤波"}])
+            result = term_consistency.validate_consistency(
+                paper_terms,
+                registry,
+                evidence,
+                artifacts,
+                artifact_text_overrides={
+                    "A": term_consistency.translation_ledger_text(ledger)
+                },
+            )
+            self.assertTrue(result["passed"], result)
+
+    def test_docx_term_split_across_runs_is_reconstructed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "B.docx"
+            document = (
+                '<?xml version="1.0" encoding="UTF-8"?>'
+                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                '<w:body><w:p><w:r><w:t>目标记忆再激活（</w:t></w:r>'
+                '<w:r><w:t>TMR</w:t></w:r><w:r><w:t>）</w:t></w:r>'
+                '</w:p></w:body></w:document>'
+            )
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr("word/document.xml", document)
+            self.assertIn("目标记忆再激活（TMR）", term_consistency.artifact_text(path))
+
 
 def make_docx(path: Path, text: str, *, dangling: bool = False) -> None:
     document = (

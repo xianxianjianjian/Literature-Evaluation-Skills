@@ -1,5 +1,9 @@
 # Mirror Layout
 
+## v1.4.2 three-fidelity rule
+
+`EXACT_TEXT_FRAME` is accepted only when Geometry, Content and Style all pass independently. Each source frame carries a formal role and style fingerprint. Translate prose/caption/table roles; preserve `FIGURE_INTERNAL`, reference, DOI/URL, formula and locked statistic roles. Figure internals are immutable source pixels—never cover an axis label or scientific annotation merely to remove English. Preserve heading hierarchy, weight, italic, color, alignment and superscript/subscript intent through `style_map.json` and validator-owned `style_fidelity.json`.
+
 `FULL_MIRROR` controls translation coverage. Its default layout fidelity is `EXACT_TEXT_FRAME`: preserve the publisher page as a fixed canvas and replace only reviewed source text frames with Chinese.
 
 ## Exact text-frame invariant

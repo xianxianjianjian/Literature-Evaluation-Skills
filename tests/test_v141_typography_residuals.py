@@ -48,6 +48,11 @@ class ChineseTypographyTests(unittest.TestCase):
         self.assertIn("β[SE] = −0.11", stats)
         self.assertIn("p = 4 × 10−4", stats)
 
+    def test_leading_decimal_p_value_is_atomic(self) -> None:
+        tokens = typography.semantic_tokens("分别p = .36、p = .09。")
+        stats = [token.text for token in tokens if token.kind == "STAT"]
+        self.assertEqual(stats, ["p = .36", "p = .09"])
+
     def test_heading_break_is_a_hard_semantic_boundary(self) -> None:
         tokens = typography.semantic_tokens("结果\n\n在这里，我们展示结果。")
         self.assertEqual(sum(token.kind == "BREAK" for token in tokens), 2)

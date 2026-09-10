@@ -4,7 +4,7 @@
 
 V1 的核心目标不是生成普通摘要，而是形成可核验、可追溯、可恢复的研究档案：重要结论回到原文位置，作者解释与评译者分析分离，Main/SI 一体审计，Translation/Methods/Results/Discussion 都有明确完成与 QC 规则。
 
-当前插件版本：`1.4.1`。`FULL_MIRROR` 默认执行闭环原位文本框替换，并新增中文语义排版、真实上标引文、独立可见英文残留审计和源文高度相对排版优化；B 必须通过 DOCX、独立渲染与逐页视觉验收；Zotero 默认采用 PDF-first 自动识别工作流。旧自适应布局仅作为用户显式选择的结构镜像。
+当前插件版本：`1.4.2`。`FULL_MIRROR` 默认执行 Geometry + Content + Style 三重保真：文本框使用显式区域角色，正文可译区的任何未批准源文英文残留都会失败，图内科学标注保持原样，图注翻译；字号、行距、粗斜体、颜色、上下标和对齐由 `style_map.json` 与 `style_fidelity.json` 独立核验。Main/SI 来源包、Source Archive 与 A/B Output Archive 分层记录；B 采用 narrative-first，并对核心图及来源映射做语义门禁。
 
 ## 四 Skill 架构
 
@@ -383,4 +383,4 @@ V1 核心于 2026-08-21 合并到 `main`；`v1.0.0` tag 固定核心发布点。
 
 长期分支仍以 `main` 为稳定主线。功能分支在验证和合并后可删除，历史由 Git commits/tags 保留。
 
-详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)、[`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md)、[`docs/releases/v1.2.0.md`](docs/releases/v1.2.0.md)、[`docs/releases/v1.3.0.md`](docs/releases/v1.3.0.md)、[`docs/releases/v1.4.0.md`](docs/releases/v1.4.0.md)、[`docs/releases/v1.4.1.md`](docs/releases/v1.4.1.md) 和 [`docs/implementation-notes-v1.4.1.md`](docs/implementation-notes-v1.4.1.md)。
+详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)、[`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md)、[`docs/releases/v1.2.0.md`](docs/releases/v1.2.0.md)、[`docs/releases/v1.3.0.md`](docs/releases/v1.3.0.md)、[`docs/releases/v1.4.0.md`](docs/releases/v1.4.0.md)、[`docs/releases/v1.4.1.md`](docs/releases/v1.4.1.md)、[`docs/releases/v1.4.2.md`](docs/releases/v1.4.2.md)、[`docs/implementation-notes-v1.4.1.md`](docs/implementation-notes-v1.4.1.md) 和 [`docs/implementation-notes-v1.4.2.md`](docs/implementation-notes-v1.4.2.md)。

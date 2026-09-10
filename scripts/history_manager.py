@@ -379,6 +379,70 @@ def command_reconcile(args: argparse.Namespace) -> None:
     print(json.dumps(correction, ensure_ascii=False, indent=2))
 
 
+def append_lifecycle_correction(
+    corrections_path: Path,
+    *,
+    correction_id: str,
+    paper_id: str,
+    week: str,
+    old_status: str,
+    new_status: str,
+    reason: str,
+    corrected_date: str,
+    evidence: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Append a state-only correction without mutating completed-reading CSV facts."""
+    if not re.fullmatch(r"HISTCOR-\d{4,}", correction_id):
+        raise HistoryError("Correction_ID must use HISTCOR-0001 format.")
+    if not WEEK_PATTERN.fullmatch(week):
+        raise HistoryError("Lifecycle correction week must use YYYY-Wxx ISO format.")
+    validate_iso_date(corrected_date, "Corrected_Date")
+    allowed = {"PROVISIONAL", "COMPLETE", "BLOCKED"}
+    if old_status not in allowed or new_status not in allowed or old_status == new_status:
+        raise HistoryError("Lifecycle correction requires two different lifecycle statuses.")
+    if not paper_id.strip() or not reason.strip():
+        raise HistoryError("Lifecycle correction requires paper_id and reason.")
+    existing: list[dict[str, object]] = []
+    if corrections_path.is_file():
+        existing = [json.loads(line) for line in corrections_path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
+    if any(item.get("correction_id") == correction_id for item in existing):
+        raise HistoryError(f"Correction_ID already exists: {correction_id}")
+    prior = [item for item in existing if item.get("paper_id") == paper_id and item.get("record_type") == "workflow_lifecycle"]
+    if prior:
+        prior_status = str(prior[-1].get("new_values", {}).get("status") or prior[-1].get("new_values", {}).get("translation") or "")
+        if prior_status and prior_status != old_status:
+            raise HistoryError(f"Lifecycle chain mismatch: latest={prior_status}, requested old={old_status}.")
+    correction = {
+        "schema_version": 2,
+        "correction_id": correction_id,
+        "record_type": "workflow_lifecycle",
+        "paper_id": paper_id.strip(),
+        "week": week,
+        "old_values": {"status": old_status},
+        "new_values": {"status": new_status},
+        "reason": reason.strip(),
+        "corrected_date": corrected_date,
+        "evidence": evidence or {},
+    }
+    corrections_path.parent.mkdir(parents=True, exist_ok=True)
+    with corrections_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(correction, ensure_ascii=False) + "\n")
+    return correction
+
+
+def command_lifecycle_correction(args: argparse.Namespace) -> None:
+    try:
+        evidence = json.loads(args.evidence_json) if args.evidence_json else {}
+    except json.JSONDecodeError as exc:
+        raise HistoryError(f"--evidence-json is invalid JSON: {exc}") from exc
+    correction = append_lifecycle_correction(
+        args.corrections, correction_id=args.correction_id, paper_id=args.paper_id,
+        week=args.week, old_status=args.old_status, new_status=args.new_status,
+        reason=args.reason, corrected_date=args.corrected_date, evidence=evidence,
+    )
+    print(json.dumps(correction, ensure_ascii=False, indent=2))
+
+
 def add_common_record_arguments(parser: argparse.ArgumentParser) -> None:
     """Add concise append arguments; JSON supports the complete schema."""
     parser.add_argument("--file", type=Path, required=True)
@@ -439,6 +503,20 @@ def build_parser() -> argparse.ArgumentParser:
         reconcile.add_argument("--reason", required=True)
         reconcile.add_argument("--corrected-date", required=True)
         reconcile.set_defaults(handler=command_reconcile)
+    lifecycle = subparsers.add_parser(
+        "record-lifecycle-correction",
+        help="Append a state-only correction without rewriting reading-history facts.",
+    )
+    lifecycle.add_argument("--corrections", type=Path, required=True)
+    lifecycle.add_argument("--paper-id", required=True)
+    lifecycle.add_argument("--week", required=True)
+    lifecycle.add_argument("--old-status", required=True)
+    lifecycle.add_argument("--new-status", required=True)
+    lifecycle.add_argument("--correction-id", required=True)
+    lifecycle.add_argument("--reason", required=True)
+    lifecycle.add_argument("--corrected-date", required=True)
+    lifecycle.add_argument("--evidence-json")
+    lifecycle.set_defaults(handler=command_lifecycle_correction)
     return parser
 
 

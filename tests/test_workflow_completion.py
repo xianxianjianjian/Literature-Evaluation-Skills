@@ -41,6 +41,16 @@ class FullWorkflowCompletionTests(unittest.TestCase):
                     "zotero_main_attachment_key": "MAIN",
                 }
             )
+            data["archive"]["source_archive"] = {
+                "status": "COMPLETE",
+                "source_ids": ["SRC-M1"],
+                "verified_date": "2026-08-21",
+            }
+            data["archive"]["output_archive"] = {
+                "status": "COMPLETE",
+                "output_attachment_keys": {"A": "AKEY", "B": "BKEY"},
+                "verified_date": "2026-08-21",
+            }
         return data
 
     def _check(

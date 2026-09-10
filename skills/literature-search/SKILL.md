@@ -125,6 +125,8 @@ After confirmation, ordinary identity matching, legal-access Main/SI retrieval, 
 
 ## Source package and archive handoff
 
+For v1.4.2 handoff, create `source_cross_reference.json` with stable IDs and explicit availability/required status for Main, SI, corrections, protocol/preregistration, data and code when discoverable. Validate it with `source_package.py`. A required missing SI yields `READY_WITH_GAPS` or `BLOCKED`; do not mark the package READY by omitting the missing source. Record Source Archive as `VERIFIED`, `PENDING`, or `NOT_AVAILABLE` separately from later A/B Output Archive.
+
 Only the final selected paper is formally handed off. Do not bulk-import the candidate pool.
 
 The downstream academic requirement is an identified, usable source package—not a particular storage backend. Record Main/SI/version identity and known gaps in `selected_paper.yaml` / `source_manifest.json`.

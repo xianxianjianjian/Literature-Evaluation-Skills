@@ -1,5 +1,9 @@
 # State Contract
 
+## v1.4.2 archive separation and corrections
+
+Record `source_package`, `source_archive` and `output_archive` separately. Source Archive covers Main/SI and precedes Translation when available; Output Archive covers verified A/B attachments. When upgraded acceptance evidence invalidates an earlier completion claim, append an immutable lifecycle correction, set affected stages/outputs to `PROVISIONAL` with `needs_update`, preserve old attachments, and append a second correction only after replacements pass.
+
 当周唯一工作流事实来源是：
 
 ```text

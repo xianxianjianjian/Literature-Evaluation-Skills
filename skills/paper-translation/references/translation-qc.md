@@ -1,5 +1,7 @@
 # Translation QC
 
+For v1.4.2, run `validate_translation_package.py --contract-version 1.4.2`. Completion requires role closure, `style_fidelity.json`, one-token source-matched residual rejection in translatable roles, preserved figure-internal pixels, translated captions and numeric integrity. A manual “looks correct” statement cannot replace these reports.
+
 A may be described as academically `COMPLETE` only after four QC passes. Translation QC checks fidelity of the translation artifact; it does not replace the later research audit or the optional archive-completion check.
 
 Read [`translation-evidence-contract.md`](translation-evidence-contract.md). For every manifest scope, the final inventory/ledger result must be recomputed by `validate_translation_package.py`; `FULL_MIRROR` also activates its layout checks. Do not accept a hand-authored QC manifest or a PDF-signature-only check as completion evidence.

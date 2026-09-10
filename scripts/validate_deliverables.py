@@ -218,8 +218,9 @@ def check_foundation(
 def _academic_completion_checks(data: dict) -> list[Check]:
     stages, outputs = data["stages"], data["outputs"]
     checks: list[Check] = []
-    all_stages = all(stage["status"] == "COMPLETE" for stage in stages.values())
-    checks.append(Check("academic:stages-complete", all_stages, "all four stages COMPLETE" if all_stages else "academic workflow requires all four stages COMPLETE"))
+    academic_names = ("topic", "search", "source_package", "translation", "deep_reading")
+    all_stages = all(stages[name]["status"] == "COMPLETE" for name in academic_names)
+    checks.append(Check("academic:stages-complete", all_stages, "all academic stages COMPLETE" if all_stages else "academic workflow requires topic/search/source-package/translation/deep-reading COMPLETE"))
     all_outputs = all(output["status"] == "COMPLETE" for output in outputs.values())
     checks.append(Check("academic:outputs-complete", all_outputs, "A/B/C COMPLETE" if all_outputs else "academic workflow requires A/B/C COMPLETE"))
     paper_ok = bool(data.get("paper_id"))
@@ -254,6 +255,16 @@ def _archive_completion_checks(data: dict) -> list[Check]:
     checks.append(Check("archive:B-zotero-key", b_key, "B attachment key present" if b_key else "archive completion requires verified B Zotero key"))
     no_pending = not data.get("pending_zotero_actions")
     checks.append(Check("workflow:no-pending-zotero", no_pending, "no pending Zotero actions" if no_pending else "archive completion has pending_zotero_actions"))
+    if data.get("contract_version") == "1.4.2":
+        source_record = archive.get("source_archive", {})
+        output_record = archive.get("output_archive", {})
+        source_ok = source_record.get("status") == "COMPLETE" and bool(source_record.get("source_ids"))
+        output_keys = output_record.get("output_attachment_keys", {})
+        output_ok = output_record.get("status") == "COMPLETE" and all(
+            str(output_keys.get(name) or "").strip() for name in ("A", "B")
+        )
+        checks.append(Check("archive:source-archive", source_ok, "Source Archive verified" if source_ok else "v1.4.2 archive completion requires Source Archive COMPLETE"))
+        checks.append(Check("archive:output-archive", output_ok, "Output Archive verified" if output_ok else "v1.4.2 archive completion requires A/B Output Archive COMPLETE"))
     return checks
 
 
@@ -330,6 +341,7 @@ def check_translation_package(
     required: bool,
     report_path: Path | None = None,
     layout_fidelity: str | None = None,
+    contract_version: str = "1.4.1",
 ) -> list[Check]:
     if work_dir is None:
         return [
@@ -344,7 +356,7 @@ def check_translation_package(
     if scope is None:
         return [Check("translation-package", False, "translation package validation requires translation scope")]
     translated, layout_diff, resolved_fidelity = translation_validator.validate_package_detailed(
-        work_dir, a_path, scope, layout_fidelity
+        work_dir, a_path, scope, layout_fidelity, contract_version
     )
     checks = [
         Check(f"translation:{item.code}", item.passed, item.detail)
@@ -420,6 +432,7 @@ def check_deep_reading_package(
     rendered_pdf: Path | None = None,
     png_dir: Path | None = None,
     visual_qa: Path | None = None,
+    contract_version: str = "1.4.1",
 ) -> list[Check]:
     if not required and work_dir is None:
         return []
@@ -432,6 +445,7 @@ def check_deep_reading_package(
         rendered_pdf=rendered_pdf,
         png_dir=png_dir,
         visual_qa=visual_qa,
+        contract_version=contract_version,
     )
     converted = [Check(f"deep-reading:{item.code}", item.passed, item.detail) for item in checks]
     if report_path is None:
@@ -661,6 +675,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     translation_scope = args.translation_scope or manifest_scope
+    contract_version = manifest_data.get("contract_version", "1.4.1") if manifest_data else "1.4.2"
     if (
         args.translation_layout_fidelity
         and manifest_layout_fidelity
@@ -692,6 +707,7 @@ def main(argv: list[str] | None = None) -> int:
             translation_complete or args.translation_work_dir is not None,
             args.translation_report,
             translation_layout_fidelity,
+            contract_version=contract_version,
         )
     )
     deep_reading_complete = bool(
@@ -711,6 +727,7 @@ def main(argv: list[str] | None = None) -> int:
             rendered_pdf=args.deep_reading_rendered_pdf,
             png_dir=args.deep_reading_png_dir,
             visual_qa=args.deep_reading_visual_qa,
+            contract_version=contract_version,
         )
     )
     checks.extend(check_c(data_root, args.c_path, args.require_c, args.canonical_abstract))
@@ -738,6 +755,11 @@ def main(argv: list[str] | None = None) -> int:
                     args.terminology_registry,
                     args.terminology_evidence,
                     {"A": args.a_path, "B": args.b_path, "C": args.c_path},
+                    artifact_text_overrides={
+                        "A": terminology_consistency_validator.translation_ledger_text(
+                            args.translation_work_dir / "translation_ledger.jsonl"
+                        )
+                    } if args.translation_work_dir is not None else None,
                 )
                 args.terminology_report.parent.mkdir(parents=True, exist_ok=True)
                 args.terminology_report.write_text(
