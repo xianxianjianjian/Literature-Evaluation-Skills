@@ -195,13 +195,15 @@ def plan_attachment(
 
     filename = candidate["filename"]
     md5 = candidate["md5"]
-    if filename == expected_filename and md5 == expected_md5:
+    if local.zotero_filename_matches(filename, expected_filename) and md5 == expected_md5:
         return {"action": "ALREADY_VERIFIED", "candidate": candidate}
 
     # A correctly created attachment-template child already contains filename,
     # contentType, etc. before file registration. The resumable signal is an
     # empty MD5 with no conflicting filename.
-    if not md5 and filename in {"", expected_filename}:
+    if not md5 and (
+        not filename or local.zotero_filename_matches(filename, expected_filename)
+    ):
         return {"action": "REUSE_PARTIAL", "candidate": candidate}
 
     return {
