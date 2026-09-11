@@ -58,6 +58,8 @@ research context/history
 → Integrity Check + Primary/Alternatives
 → Gate 2: user confirms final paper
 → selected-paper/source handoff
+→ Source Package cross-reference
+→ Source Archive verified or explicit PENDING
 → terminology + Canonical Abstract
 → Main/SI translation + A
 → Full Research Audit
@@ -65,7 +67,7 @@ research context/history
 → B
 → C
 → knowledge/history verification
-→ optional Zotero archive closure
+→ A/B Output Archive closure
 ```
 
 The specialists own every academic decision inside those stages.
@@ -95,6 +97,10 @@ Use only:
 Never create `STALE`; use `needs_update: true/false` plus explicit `update_reason`.
 
 Stage/output states describe the **academic work and artifact itself**. Zotero transport is tracked separately through verified keys and `pending_zotero_actions`.
+
+For v1.4.2 manifests, keep `source_package`, `source_archive` and `output_archive` as separate stage records. `archive.source_archive` owns Main/SI keys and `archive.output_archive` owns A/B keys. Never let a later Output Archive overwrite the evidence that Source Archive was complete before Translation.
+
+If stricter release criteria invalidate an earlier completion claim, append a lifecycle correction event before rebuilding, set affected stages/outputs to `PROVISIONAL` with `needs_update: true`, and retain the old verified attachments until replacements pass. Restore `COMPLETE` only through a second correction event after independent evidence and archive verification.
 
 ## Dependency-aware dispatch
 
@@ -227,7 +233,7 @@ The weekly **academic workflow** may be declared `COMPLETE` when the applicable 
 
 ## Archive completion
 
-Report archive closure separately. A fully closed Zotero archive additionally requires the desired Main/SI/A/B parent/attachments to be verified and the applicable pending actions cleared.
+Report archive closure separately. A fully closed Zotero archive additionally requires the target collection, bibliographic parent, Main PDF child, every required scientific SI child, A and B to be verified, `metadata_only_fallback: false`, and the applicable pending actions cleared.
 
 Do not describe the Zotero archive as complete merely because the academic workflow is complete. Conversely, do not call the academic workflow incomplete merely because automatic Zotero writing is unavailable.
 

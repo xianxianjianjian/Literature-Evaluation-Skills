@@ -66,21 +66,31 @@ Prefer Version of Record for identity and page mapping. A legal author manuscrip
 
 ## Translation workflow
 
+### v1.4.2 acceptance contract
+
+Exact mirror means **Geometry + Content + Style fidelity**. Before rendering, every text frame must declare one role from `TITLE / ABSTRACT / BODY / H1 / H2 / H3 / CAPTION / TABLE_TEXT / TABLE_NOTE / FIGURE_INTERNAL / REFERENCE / DOI_URL / FORMULA / STATISTIC / FOOTNOTE / AFFILIATION / OTHER`, plus consistent `translatable` and `preserve_english` flags. Translate captions and prose roles. Preserve `FIGURE_INTERNAL`, references, DOI/URL, formulas and locked statistic tokens in English/source form; never mask or redraw scientific figure internals.
+
+Build `style_map.json` from source-frame fingerprints and require validator-owned `style_fidelity.json`. Preserve hierarchy, relative sizes, leading, bold, italic, color, superscript/subscript intent and alignment, using SimSun/SimHei only as declared by the role map. In translatable roles, any unapproved English token visibly matching the source fails the residual gate; the former four-word threshold is not a v1.4.2 completion rule. Numeric/sign/exponent/statistic integrity remains an independent hard gate.
+
+Before Translation, require `source_cross_reference.json` covering Main, required SI, corrections, protocols, data and code when discoverable. A required missing SI makes the package `READY_WITH_GAPS` or `BLOCKED`. If Zotero is available, Source Archive must be verified before Translation; if unavailable, record Source Archive `PENDING` without fabricating a key. A/B archive is a later Output Archive and must not overwrite source-archive state.
+
 For `FULL_MIRROR`:
 
 1. Minimal Intake and source identity check.
-2. Fix-render paginated sources as needed, then build schema-v2 `source_inventory.json` and reviewed `text_frame_inventory.jsonl` before translation. Inventory PDF pages visually and inspect DOCX drawings/relationships; paragraph-only extraction is insufficient.
-3. Run terminology preflight and create/update `paper_terminology.csv`.
-4. Translate the Abstract through two translation passes plus an alignment pass and write `canonical_abstract.md`.
-5. Translate Main Article by stable Translation Units and record `translation_ledger.jsonl`.
-6. Translate/verify tables, figures, captions, notes and Supporting Information.
-7. Record translation-specific issues in `translation_issues.jsonl` using `TRI-xxx`.
-8. Create `font_map.json` for the locally installed `simsun.ttc`, then create the schema-v2 `mirror_layout_plan.json`; do not bypass the mirror helper with reflow or page-wide overlay panels.
-9. Render A through `render_exact_mirror.py`, visually compare every source/output page, and record object/table/text-frame placement and render notes.
-10. Run Coverage, Semantic and Numeric QC, then run `validate_translation_package.py` to generate `translation_validation.json`.
-11. Only after the independent validator passes, verify A as `[A] 中文全文翻译镜像版` and set Translation/A `COMPLETE`.
-12. Archive A to Zotero when available; otherwise stage a handoff/pending action without changing the academic completion state.
-13. Propose evidence-backed terminology-registry updates where warranted.
+2. Separate authority roles: use publisher XML/JATS/HTML first for language when clean and complete, then selectable PDF, another legal official source, and OCR only last; always use the Version-of-Record PDF as the visual/geometry authority. Record both choices in `source_inventory.json`.
+3. Fix-render paginated sources as needed, then build schema-v2 `source_inventory.json`, reviewed `text_frame_inventory.jsonl`, `figure_text_inventory.jsonl`, and `source_conflicts.jsonl` before translation. Inventory PDF pages visually and inspect DOCX drawings/relationships; paragraph-only extraction is insufficient.
+4. Run terminology preflight and create/update `paper_terminology.csv`.
+5. Translate the Abstract through two translation passes plus an alignment pass and write `canonical_abstract.md`.
+6. Translate Main Article by stable Translation Units and record `translation_ledger.jsonl`.
+7. Translate/verify tables, captions, notes and Supporting Information. Preserve figure-internal scientific labels/data as `FIGURE_INTERNAL`; translate the external caption and record both lifecycles.
+8. Preserve every Main/SI disagreement verbatim and record it in `source_conflicts.jsonl` with `AUD-xxx`; never normalize one source to the other.
+9. Record translation-specific issues in `translation_issues.jsonl` using `TRI-xxx`.
+10. Create `font_map.json` and role-aware `style_map.json`, then create the schema-v2 `mirror_layout_plan.json`; do not bypass the mirror helper with reflow or page-wide overlay panels.
+11. Normalize Chinese typography into semantic text/citation/formula/unit tokens, render A through `render_exact_mirror.py`, visually compare every source/output page, and record object/table/text-frame placement and render notes.
+12. Run Coverage, Semantic and Numeric QC, then run `validate_translation_package.py --contract-version 1.4.2` to generate validator-owned `numeric_integrity.json`, `untranslated_residual_audit.json`, `style_fidelity.json`, `typography_fit.json`, `layout_diff.json`, and `translation_validation.json`.
+13. Only after the independent validator passes, verify A as `[A] 中文全文翻译镜像版` and set Translation/A `COMPLETE`.
+14. Archive A to Zotero when available; otherwise stage a handoff/pending action without changing the academic completion state.
+15. Propose evidence-backed terminology-registry updates where warranted.
 
 ## Canonical Abstract
 
@@ -100,7 +110,7 @@ Original conceptual figures may be localized only without changing structure and
 
 ## Mirror PDF production
 
-For ordinary `FULL_MIRROR`, keep each source page as the immutable base and replace only reviewed text frames, table cells, or figure-label regions. Preserve page count, page boxes, rotation, columns, headers/footers, figures, tables and all non-text pixels. Chinese glyphs must use embedded SimSun with no fallback. Keep source font size first; try only `100%, 99%, 98%, 97%, 96%, 95%` without changing frame geometry or leading. If 95% still overflows, keep Translation/A `PROVISIONAL`; do not move the frame, add a page, compress tracking, or switch layout modes.
+For ordinary `FULL_MIRROR`, keep each source page as the immutable base and replace only reviewed text frames, table cells, or figure-label regions. Preserve page count, page boxes, rotation, columns, headers/footers, figures, tables and all non-text pixels. Every frame must close as `TRANSLATED`, `INTENTIONAL_PRESERVE`, or `NON_TRANSLATABLE`; a translated frame must record source clearing, target rendering, and independent residual checking. Chinese glyphs must use embedded SimSun with no fallback. Body/abstract/caption/footnote frames may fit from 95% through 110% with leading from 1.15 through 1.45 times the rendered font size; excluded roles remain at 95%-100%. Optimize translated used height against source used height inside the unchanged source frame. If 95% still overflows, keep Translation/A `PROVISIONAL`; do not move the frame, add a page, compress tracking, or switch layout modes.
 
 The former `Strict Mirror → Adaptive Mirror → Readable Extension` sequence belongs only to user-requested `STRUCTURAL_MIRROR` and the artifact/report must use that name rather than claiming exact mirror fidelity.
 
@@ -139,7 +149,7 @@ For any manifest scope, Translation `COMPLETE` requires:
 - `translation_validation.json` was generated by the validator and passed for the active A;
 - A generated and verified as the correct artifact for the active `paper_id`/source version.
 
-`FULL_MIRROR` with `EXACT_TEXT_FRAME` additionally requires schema-v2 `source_inventory.json`, `text_frame_inventory.jsonl`, `font_map.json`, `mirror_layout_plan.json`, validator-generated `layout_diff.json`, one-to-one pages, exact table cells, embedded SimSun, 95%-100% frame sizing and zero rendered changes outside reviewed replacement regions. Do not apply these exact-layout requirements to `MAIN_ONLY` or `ABSTRACT_ONLY`.
+`FULL_MIRROR` with `EXACT_TEXT_FRAME` additionally requires schema-v2 `source_inventory.json`, explicit-role closed `text_frame_inventory.jsonl`, `font_map.json`, `style_map.json`, `mirror_layout_plan.json`, validator-generated `numeric_integrity.json`, `untranslated_residual_audit.json`, `style_fidelity.json`, `typography_fit.json`, and `layout_diff.json`, one-to-one pages, exact table cells, mapped embedded CJK fonts, role-specific 95%-110% frame sizing, semantic Chinese punctuation/citations, zero unapproved source-matched English residuals in translatable roles, unchanged figure internals, and zero rendered changes outside reviewed replacement regions. Do not apply these exact-layout requirements to `MAIN_ONLY` or `ABSTRACT_ONLY`.
 
 **A verified Zotero attachment key is not required for Translation academic completion.** Pending Zotero work belongs to the archive layer.
 
@@ -151,6 +161,7 @@ Use `PROVISIONAL` when a named source/SI/content/layout gap affects the requeste
 - Do not intensify or weaken causal language beyond the source.
 - If authors themselves overstate causality, translate faithfully; criticism belongs to Deep Reading.
 - Preserve all numbers, statistics, equations, parameters, software names and data.
+- Preserve scientific notation, signs, percentages, statistic labels/values, df/CI/effect sizes, units, superscripts/subscripts, DOI and software versions exactly. Any non-whitelisted discrepancy blocks `COMPLETE`.
 - Do not add unreported experimental steps or parameter values.
 - Preserve non-significant findings and uncertainty language.
 - Do not silently correct source errors or inconsistencies.

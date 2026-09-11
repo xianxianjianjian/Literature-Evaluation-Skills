@@ -61,6 +61,18 @@ class AttachmentPlanningTests(unittest.TestCase):
         self.assertEqual(plan["action"], "ALREADY_VERIFIED")
         self.assertEqual(plan["candidate"]["key"], "ATCH0001")
 
+    def test_plus_normalized_existing_file_is_idempotent(self) -> None:
+        descriptor = self._descriptor()
+        descriptor["filename"] = "paper translation.pdf"
+        plan = archive.plan_attachment(
+            [self._child(filename="paper+translation.pdf", md5="ABCD")],
+            parent_key="PARENT01",
+            title="[A] Translation",
+            descriptor=descriptor,
+        )
+        self.assertEqual(plan["action"], "ALREADY_VERIFIED")
+        self.assertEqual(plan["candidate"]["key"], "ATCH0001")
+
     def test_template_child_with_filename_and_null_md5_is_reused(self) -> None:
         plan = archive.plan_attachment(
             [self._child(filename="paper.pdf", md5=None)],

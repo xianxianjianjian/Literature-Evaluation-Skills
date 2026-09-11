@@ -15,11 +15,15 @@ KNOWN_DESIGNS = {
     "observational",
     "cross_sectional",
     "longitudinal",
+    "repeated_measures",
+    "intervention",
+    "animal",
+    "database",
     "qualitative",
     "mixed_methods",
 }
-KNOWN_MODALITIES = {"mri", "fmri"}
-KNOWN_ANALYSES = {"mediation", "sem"}
+KNOWN_MODALITIES = {"eeg", "psg", "meg", "mri", "fmri", "behavioral"}
+KNOWN_ANALYSES = {"mediation", "sem", "graph_network", "machine_learning"}
 
 
 class MethodRoutingError(ValueError):
@@ -61,6 +65,10 @@ def select_modules(profile: dict[str, Any]) -> dict[str, Any]:
             "observational",
             "cross_sectional",
             "longitudinal",
+            "repeated_measures",
+            "intervention",
+            "animal",
+            "database",
         }
     )
     if quantitative:
@@ -73,18 +81,40 @@ def select_modules(profile: dict[str, Any]) -> dict[str, Any]:
         add("APA-JARS-QUANT", "mixed-methods quantitative component")
     if "randomized_intervention" in designs:
         add("CONSORT-SPI", "randomized social or psychological intervention")
+    if "intervention" in designs:
+        add("INTERVENTION-FIDELITY", "non-randomized intervention, adherence and contamination")
     if designs & {"observational", "cross_sectional", "longitudinal"}:
         add("STROBE", "observational study reporting prompts")
     if modalities & {"mri", "fmri"}:
         add("COBIDAS-MRI", "MRI/fMRI acquisition, processing and modeling")
+    if modalities & {"eeg", "psg"}:
+        add("EEG-PSG", "electrode montage, referencing, sleep staging, artifact handling and event physiology")
+    if "meg" in modalities:
+        add("MEG", "sensor/head-position handling, source model and leakage control")
     if analyses & {"mediation", "sem"}:
         add("MEDIATION-SEM-TEMPORALITY", "mediation/SEM temporal and alternative-model audit")
+    if "graph_network" in analyses:
+        add("GRAPH-NETWORK", "node/edge definition, thresholding, null model and multiplicity")
+    if "machine_learning" in analyses:
+        add("MACHINE-LEARNING", "leakage-safe splits, nested validation, calibration and external generalization")
+    if "repeated_measures" in designs:
+        add("REPEATED-MEASURES", "within-person dependency, order, carryover and missing visits")
+    if "longitudinal" in designs:
+        add("LONGITUDINAL", "time metric, attrition, within/between-person effects and temporal ordering")
+    if "animal" in designs:
+        add("ARRIVE", "animal model, randomization/blinding, exclusions and translational boundary")
+    if "database" in designs:
+        add("DATABASE-PROVENANCE", "cohort construction, coding provenance, missingness and dataset shift")
 
     warnings: list[str] = []
     if "cross_sectional" in designs and analyses & {"mediation", "sem"}:
         warnings.append(
             "Cross-sectional mediation/SEM does not establish a longitudinal or causal mechanism."
         )
+    if modalities & {"eeg", "psg"} and not profile.get("event_definitions"):
+        warnings.append("EEG/PSG profile should state scoring and event-definition authorities.")
+    if "machine_learning" in analyses and not profile.get("validation_strategy"):
+        warnings.append("Machine-learning profile should state validation and test-set separation.")
     interpretation_requirements: list[str] = []
     if quantitative or "mixed_methods" in designs:
         interpretation_requirements.extend(
@@ -108,12 +138,33 @@ def select_modules(profile: dict[str, Any]) -> dict[str, Any]:
         )
     if "mixed_methods" in designs:
         interpretation_requirements.append("integration-point and joint-inference consistency")
+    if modalities & {"eeg", "psg", "meg"}:
+        interpretation_requirements.extend(
+            ["channel/sensor and reference definition", "artifact/exclusion denominator", "time-frequency or event window"]
+        )
+    if modalities & {"mri", "fmri"}:
+        interpretation_requirements.extend(
+            ["contrast and analysis-specific N", "space/smoothing/threshold", "ROI or whole-brain multiplicity"]
+        )
+    if analyses & {"mediation", "sem"}:
+        interpretation_requirements.extend(
+            ["temporal order", "direct/indirect/total effects", "alternative-model sensitivity"]
+        )
+    if "machine_learning" in analyses:
+        interpretation_requirements.extend(
+            ["train/validation/test separation", "performance uncertainty", "calibration and external validity"]
+        )
 
     return {
         "modules": modules,
         "warnings": warnings,
         "interpretation_requirements": interpretation_requirements,
         "scoring": "NONE",
+        "profile": {
+            "designs": sorted(designs),
+            "modalities": sorted(modalities),
+            "analyses": sorted(analyses),
+        },
         "note": "Reporting completeness and validity judgments must remain separate.",
     }
 

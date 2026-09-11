@@ -2,7 +2,7 @@
 
 Zotero is the preferred long-term archive after the user confirms the final focal paper, but V1 Search completion does not depend on a specific Zotero write transport. Final-paper confirmation authorizes ordinary identity matching, legal-access source retrieval, normal archive actions, and selected-paper/source records without repeated permission prompts.
 
-## 1. Match before creating
+## 1. PDF-first default and duplicate precheck
 
 Prefer parent matching in this order:
 
@@ -10,7 +10,7 @@ Prefer parent matching in this order:
 2. exact/near-exact title plus author/year context;
 3. other stable bibliographic fields when DOI is absent.
 
-Use `<plugin-root>/scripts/zotero_bridge.py find` and `children` for safe checks when Zotero Desktop is available.
+Use `<plugin-root>/scripts/zotero_bridge.py find` and `children` for safe checks when Zotero Desktop is available. For a new focal paper, use `zotero_bridge.py ingest-pdf`: import the legal Main PDF into the selected collection, allow Zotero Desktop to recognize metadata, then rerun verification with the recognized parent key. Verify DOI/title/year, collection membership and the Main PDF child.
 
 Stop for user/operator resolution when there is:
 
@@ -51,9 +51,9 @@ After any automatic or manual write, verify the actual parent/attachment identit
 
 The repository retains Zotero automation as an optional enhancement.
 
-### Parent create
+### Metadata-only parent fallback
 
-`<plugin-root>/scripts/zotero_bridge.py create` currently uses the verified Connector `/connector/saveItems` route with duplicate checks and post-write identity verification. Its group-library/target-unification limitations are documented future optimizations, not Search release blockers.
+`<plugin-root>/scripts/zotero_bridge.py create` is retained only as a reasoned fallback. Record the fallback reason, attach the Main PDF afterward, and leave archive status incomplete until a verified parent/Main-child relationship exists. A metadata-only parent can never satisfy archive completion.
 
 ### Zotero 10+ durable attachment
 

@@ -4,7 +4,7 @@
 
 V1 的核心目标不是生成普通摘要，而是形成可核验、可追溯、可恢复的研究档案：重要结论回到原文位置，作者解释与评译者分析分离，Main/SI 一体审计，Translation/Methods/Results/Discussion 都有明确完成与 QC 规则。
 
-当前插件版本：`1.3.0`。`FULL_MIRROR` 现在默认执行原位文本框替换：页面、分栏、图表和非文本区域保持不变，中文强制嵌入宋体 SimSun，字号只能在原字号的 100%–95% 内适配。旧自适应布局仅作为用户显式选择的结构镜像。
+当前插件版本：`1.4.2`。`FULL_MIRROR` 默认执行 Geometry + Content + Style 三重保真：文本框使用显式区域角色，正文可译区的任何未批准源文英文残留都会失败，图内科学标注保持原样，图注翻译；字号、行距、粗斜体、颜色、上下标和对齐由 `style_map.json` 与 `style_fidelity.json` 独立核验。Main/SI 来源包、Source Archive 与 A/B Output Archive 分层记录；B 采用 narrative-first，并对核心图及来源映射做语义门禁。
 
 ## 四 Skill 架构
 
@@ -31,6 +31,8 @@ weekly-literature-evaluation
 - `literature-evaluation:paper-deep-reading`
 
 ## 构建本地 Plugin bundle
+
+后续源码同步、插件更新、新任务验证及恢复步骤见 [本地插件更新与部署](docs/local-plugin-updates.md)。
 
 仓库根目录本身是 `literature-evaluation` 插件源码。构建脚本生成本地 marketplace 安装包，不在 Git 中维护第二份 Skill 源码。
 
@@ -129,7 +131,7 @@ python <plugin-root>/scripts/init_workspace.py \
 
 C 中的评论正文默认至少 500 个有效中文字符；原文摘要与中文摘要不计入这 500 字。
 
-### A 的 v1.3.0 原位镜像证据
+### A 的 v1.4.0 原位镜像证据
 
 新的 `FULL_MIRROR` 默认写入 `layout_fidelity: EXACT_TEXT_FRAME`、`cjk_font_family: SimSun` 和 `minimum_font_scale: 0.95`。每个 work directory 必须包含 schema-v2 inventory、逐框 ledger、`text_frame_inventory.jsonl`、`font_map.json`、精确 layout plan 和 issue 记录。先创建字体映射并生成 A：
 
@@ -383,4 +385,4 @@ V1 核心于 2026-08-21 合并到 `main`；`v1.0.0` tag 固定核心发布点。
 
 长期分支仍以 `main` 为稳定主线。功能分支在验证和合并后可删除，历史由 Git commits/tags 保留。
 
-详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)、[`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md)、[`docs/releases/v1.2.0.md`](docs/releases/v1.2.0.md) 和 [`docs/releases/v1.3.0.md`](docs/releases/v1.3.0.md)。
+详见 [`docs/branch-strategy.md`](docs/branch-strategy.md)、[`docs/releases/v1.0.0.md`](docs/releases/v1.0.0.md)、[`docs/releases/v1.2.0.md`](docs/releases/v1.2.0.md)、[`docs/releases/v1.3.0.md`](docs/releases/v1.3.0.md)、[`docs/releases/v1.4.0.md`](docs/releases/v1.4.0.md)、[`docs/releases/v1.4.1.md`](docs/releases/v1.4.1.md)、[`docs/releases/v1.4.2.md`](docs/releases/v1.4.2.md)、[`docs/implementation-notes-v1.4.1.md`](docs/implementation-notes-v1.4.1.md) 和 [`docs/implementation-notes-v1.4.2.md`](docs/implementation-notes-v1.4.2.md)。

@@ -1,5 +1,9 @@
 # Dynamic Coverage
 
+## v1.4.2 evidence files
+
+The 0–10 schema is a minimum. Create `study_design_profile.json`, `b_narrative_coverage.json`, `b_figure_inventory.json` and `source_to_notebook_mapping.csv`. Important paper-specific methods and results extend the notebook. Tables may summarize, but core claim closure must also appear as substantive connected prose with source anchors.
+
 The Deep Reading Base Schema defines **minimum required coverage**, not a closed template. The notebook must follow the scientific content of the paper when important material falls outside the expected Introduction/Methods/Results/Discussion structure.
 
 ## Start with Paper Structure Inventory

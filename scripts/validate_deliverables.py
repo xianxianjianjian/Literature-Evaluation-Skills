@@ -19,6 +19,8 @@ from xml.etree import ElementTree as ET
 
 from runtime_paths import resolve_data_root
 from sanitize_docx_metadata import validate_docx_metadata
+import validate_deep_reading_package as deep_reading_validator
+import validate_terminology_consistency as terminology_consistency_validator
 import validate_translation_package as translation_validator
 from workflow_state import WorkflowStateError, load_manifest
 
@@ -82,8 +84,14 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/mirror_pdf.py",
     "scripts/exact_mirror.py",
     "scripts/extract_text_frames.py",
+    "scripts/normalize_chinese_typography.py",
+    "scripts/audit_untranslated_residuals.py",
+    "scripts/migrate_exact_mirror_v141.py",
     "scripts/render_exact_mirror.py",
     "scripts/validate_translation_package.py",
+    "scripts/translation_integrity.py",
+    "scripts/validate_deep_reading_package.py",
+    "scripts/validate_terminology_consistency.py",
     "scripts/sanitize_docx_metadata.py",
     "scripts/psychology_method_router.py",
     "scripts/runtime_paths.py",
@@ -104,6 +112,7 @@ WORKSPACE_REQUIRED_FILES = [
     "knowledge/terminology_evidence.jsonl",
     "knowledge/reading_history.csv",
     "knowledge/selection_log.csv",
+    "knowledge/history_corrections.jsonl",
 ]
 CSV_HEADERS = {
     "journal_registry.csv": "Journal,Field,Scope,Publisher,Peer_Reviewed,Priority,Strength,Caution,Status,Verified_Date".split(","),
@@ -209,8 +218,9 @@ def check_foundation(
 def _academic_completion_checks(data: dict) -> list[Check]:
     stages, outputs = data["stages"], data["outputs"]
     checks: list[Check] = []
-    all_stages = all(stage["status"] == "COMPLETE" for stage in stages.values())
-    checks.append(Check("academic:stages-complete", all_stages, "all four stages COMPLETE" if all_stages else "academic workflow requires all four stages COMPLETE"))
+    academic_names = ("topic", "search", "source_package", "translation", "deep_reading")
+    all_stages = all(stages[name]["status"] == "COMPLETE" for name in academic_names)
+    checks.append(Check("academic:stages-complete", all_stages, "all academic stages COMPLETE" if all_stages else "academic workflow requires topic/search/source-package/translation/deep-reading COMPLETE"))
     all_outputs = all(output["status"] == "COMPLETE" for output in outputs.values())
     checks.append(Check("academic:outputs-complete", all_outputs, "A/B/C COMPLETE" if all_outputs else "academic workflow requires A/B/C COMPLETE"))
     paper_ok = bool(data.get("paper_id"))
@@ -227,12 +237,34 @@ def _academic_completion_checks(data: dict) -> list[Check]:
 def _archive_completion_checks(data: dict) -> list[Check]:
     outputs = data["outputs"]
     checks = _academic_completion_checks(data)
+    archive = data.get("archive", {})
+    parent_key = bool(str(archive.get("zotero_parent_key") or "").strip())
+    collection_key = bool(str(archive.get("zotero_collection_key") or "").strip())
+    main_key = bool(str(archive.get("zotero_main_attachment_key") or "").strip())
+    required_si = set(archive.get("required_si_source_ids") or [])
+    observed_si = set((archive.get("zotero_si_attachment_keys") or {}).keys())
+    metadata_fallback = bool(archive.get("metadata_only_fallback"))
+    checks.append(Check("archive:parent-key", parent_key, "parent verified" if parent_key else "archive completion requires verified parent key"))
+    checks.append(Check("archive:collection-key", collection_key, "collection verified" if collection_key else "archive completion requires verified collection key"))
+    checks.append(Check("archive:main-key", main_key, "Main PDF child verified" if main_key else "archive completion requires verified Main PDF child"))
+    checks.append(Check("archive:required-si", required_si.issubset(observed_si), "required SI children verified" if required_si.issubset(observed_si) else f"missing SI keys: {sorted(required_si-observed_si)}"))
+    checks.append(Check("archive:no-metadata-fallback", not metadata_fallback, "PDF-first parent verified" if not metadata_fallback else "metadata-only fallback cannot close archive"))
     a_key = bool(outputs["A"].get("zotero_attachment_key"))
     checks.append(Check("archive:A-zotero-key", a_key, "A attachment key present" if a_key else "archive completion requires verified A Zotero key"))
     b_key = bool(outputs["B"].get("zotero_attachment_key"))
     checks.append(Check("archive:B-zotero-key", b_key, "B attachment key present" if b_key else "archive completion requires verified B Zotero key"))
     no_pending = not data.get("pending_zotero_actions")
     checks.append(Check("workflow:no-pending-zotero", no_pending, "no pending Zotero actions" if no_pending else "archive completion has pending_zotero_actions"))
+    if data.get("contract_version") == "1.4.2":
+        source_record = archive.get("source_archive", {})
+        output_record = archive.get("output_archive", {})
+        source_ok = source_record.get("status") == "COMPLETE" and bool(source_record.get("source_ids"))
+        output_keys = output_record.get("output_attachment_keys", {})
+        output_ok = output_record.get("status") == "COMPLETE" and all(
+            str(output_keys.get(name) or "").strip() for name in ("A", "B")
+        )
+        checks.append(Check("archive:source-archive", source_ok, "Source Archive verified" if source_ok else "v1.4.2 archive completion requires Source Archive COMPLETE"))
+        checks.append(Check("archive:output-archive", output_ok, "Output Archive verified" if output_ok else "v1.4.2 archive completion requires A/B Output Archive COMPLETE"))
     return checks
 
 
@@ -309,6 +341,7 @@ def check_translation_package(
     required: bool,
     report_path: Path | None = None,
     layout_fidelity: str | None = None,
+    contract_version: str = "1.4.1",
 ) -> list[Check]:
     if work_dir is None:
         return [
@@ -323,7 +356,7 @@ def check_translation_package(
     if scope is None:
         return [Check("translation-package", False, "translation package validation requires translation scope")]
     translated, layout_diff, resolved_fidelity = translation_validator.validate_package_detailed(
-        work_dir, a_path, scope, layout_fidelity
+        work_dir, a_path, scope, layout_fidelity, contract_version
     )
     checks = [
         Check(f"translation:{item.code}", item.passed, item.detail)
@@ -387,6 +420,46 @@ def check_docx_b(
         passed,
         "base schema and metadata valid" if passed else " | ".join(details),
     )
+
+
+def check_deep_reading_package(
+    work_dir: Path | None,
+    b_path: Path | None,
+    required: bool,
+    report_path: Path | None,
+    *,
+    expected_author: str | None = None,
+    rendered_pdf: Path | None = None,
+    png_dir: Path | None = None,
+    visual_qa: Path | None = None,
+    contract_version: str = "1.4.1",
+) -> list[Check]:
+    if not required and work_dir is None:
+        return []
+    if work_dir is None or b_path is None:
+        return [Check("deep-reading-package", False, "B completion requires --deep-reading-work-dir and --b-path")]
+    checks = deep_reading_validator.validate_package(
+        b_path,
+        work_dir,
+        expected_author=expected_author,
+        rendered_pdf=rendered_pdf,
+        png_dir=png_dir,
+        visual_qa=visual_qa,
+        contract_version=contract_version,
+    )
+    converted = [Check(f"deep-reading:{item.code}", item.passed, item.detail) for item in checks]
+    if report_path is None:
+        converted.append(Check("deep-reading:validation-report", False, "B completion requires --deep-reading-report"))
+    else:
+        payload = deep_reading_validator.write_report(report_path, checks, b_path)
+        converted.append(
+            Check(
+                "deep-reading:validation-report",
+                bool(payload.get("passed")),
+                f"validator report written: {report_path}",
+            )
+        )
+    return converted
 
 
 def parse_markdown_sections(markdown: str) -> dict[str, str]:
@@ -508,6 +581,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override translation layout fidelity when no workflow manifest supplies it.",
     )
     parser.add_argument("--translation-report", type=Path)
+    parser.add_argument("--deep-reading-work-dir", type=Path)
+    parser.add_argument("--deep-reading-report", type=Path)
+    parser.add_argument("--deep-reading-rendered-pdf", type=Path)
+    parser.add_argument("--deep-reading-png-dir", type=Path)
+    parser.add_argument("--deep-reading-visual-qa", type=Path)
+    parser.add_argument("--paper-terminology", type=Path)
+    parser.add_argument("--terminology-registry", type=Path)
+    parser.add_argument("--terminology-evidence", type=Path)
+    parser.add_argument("--terminology-report", type=Path)
     parser.add_argument("--require-a", action="store_true")
     parser.add_argument("--require-b", action="store_true")
     parser.add_argument("--require-c", action="store_true")
@@ -593,6 +675,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     translation_scope = args.translation_scope or manifest_scope
+    contract_version = manifest_data.get("contract_version", "1.4.1") if manifest_data else "1.4.2"
     if (
         args.translation_layout_fidelity
         and manifest_layout_fidelity
@@ -624,10 +707,67 @@ def main(argv: list[str] | None = None) -> int:
             translation_complete or args.translation_work_dir is not None,
             args.translation_report,
             translation_layout_fidelity,
+            contract_version=contract_version,
         )
     )
-    checks.append(check_docx_b(args.b_path, args.require_b))
+    deep_reading_complete = bool(
+        manifest_data
+        and (
+            manifest_data["stages"]["deep_reading"]["status"] == "COMPLETE"
+            or manifest_data["outputs"]["B"]["status"] == "COMPLETE"
+        )
+    )
+    checks.append(check_docx_b(args.b_path, args.require_b or deep_reading_complete))
+    checks.extend(
+        check_deep_reading_package(
+            args.deep_reading_work_dir,
+            args.b_path,
+            args.require_b or deep_reading_complete,
+            args.deep_reading_report,
+            rendered_pdf=args.deep_reading_rendered_pdf,
+            png_dir=args.deep_reading_png_dir,
+            visual_qa=args.deep_reading_visual_qa,
+            contract_version=contract_version,
+        )
+    )
     checks.extend(check_c(data_root, args.c_path, args.require_c, args.canonical_abstract))
+    all_artifacts_complete = bool(
+        manifest_data
+        and all(manifest_data["outputs"][name]["status"] == "COMPLETE" for name in ("A", "B", "C"))
+    )
+    if all_artifacts_complete:
+        required_paths = {
+            "paper terminology": args.paper_terminology,
+            "terminology registry": args.terminology_registry,
+            "terminology evidence": args.terminology_evidence,
+            "A": args.a_path,
+            "B": args.b_path,
+            "C": args.c_path,
+            "terminology report": args.terminology_report,
+        }
+        missing = [name for name, path in required_paths.items() if path is None]
+        if missing:
+            checks.append(Check("terminology:A-B-C", False, f"complete A/B/C require: {', '.join(missing)}"))
+        else:
+            try:
+                payload = terminology_consistency_validator.validate_consistency(
+                    args.paper_terminology,
+                    args.terminology_registry,
+                    args.terminology_evidence,
+                    {"A": args.a_path, "B": args.b_path, "C": args.c_path},
+                    artifact_text_overrides={
+                        "A": terminology_consistency_validator.translation_ledger_text(
+                            args.translation_work_dir / "translation_ledger.jsonl"
+                        )
+                    } if args.translation_work_dir is not None else None,
+                )
+                args.terminology_report.parent.mkdir(parents=True, exist_ok=True)
+                args.terminology_report.write_text(
+                    json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+                )
+                checks.append(Check("terminology:A-B-C", bool(payload.get("passed")), f"report written: {args.terminology_report}"))
+            except Exception as exc:
+                checks.append(Check("terminology:A-B-C", False, str(exc)))
     for check in checks:
         print(f"[{'PASS' if check.passed else 'FAIL'}] {check.name}: {check.detail}")
     failures = sum(not check.passed for check in checks)

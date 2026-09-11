@@ -1,5 +1,9 @@
 # State Contract
 
+## v1.4.2 archive separation and corrections
+
+Record `source_package`, `source_archive` and `output_archive` separately. Source Archive covers Main/SI and precedes Translation when available; Output Archive covers verified A/B attachments. When upgraded acceptance evidence invalidates an earlier completion claim, append an immutable lifecycle correction, set affected stages/outputs to `PROVISIONAL` with `needs_update`, preserve old attachments, and append a second correction only after replacements pass.
+
 当周唯一工作流事实来源是：
 
 ```text
@@ -78,9 +82,11 @@ pending_zotero_actions:
 
 `pending_zotero_actions` 可以与学术阶段 `COMPLETE` 共存。
 
+`archive` 独立记录 `zotero_parent_key`、`zotero_collection_key`、`zotero_main_attachment_key`、`required_si_source_ids`、`zotero_si_attachment_keys` 与 `metadata_only_fallback`。这些字段不得由仅提交请求或仅创建 metadata parent 推定为已验证。
+
 ### Archive completion
 
-归档完成是比学术完成更严格的额外闭环。若用户要求“完整 Zotero 归档”，还需确认所需 Main/SI/A/B parent/attachment 实际存在并验证，且相应 `pending_zotero_actions` 已清空。
+归档完成是比学术完成更严格的额外闭环。若用户要求“完整 Zotero 归档”，还需确认目标 collection、parent、Main、全部 `required_si_source_ids`、A、B 实际存在并验证，`metadata_only_fallback` 为 false，且相应 `pending_zotero_actions` 已清空。
 
 不得因为学术工作已完成就声称“Zotero 归档已完成”；两者必须分别报告。
 

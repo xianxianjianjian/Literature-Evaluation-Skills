@@ -9,7 +9,7 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
-from xml.etree import ElementTree as ET
+from lxml import etree as ET
 
 CORE_NS = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
 DC_NS = "http://purl.org/dc/elements/1.1/"

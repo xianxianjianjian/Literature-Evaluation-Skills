@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -123,6 +124,34 @@ def initialize_workspace(
     return len(pending), identical, preserved
 
 
+def configure_workspace_marker(
+    data_root: Path,
+    *,
+    plugin_path: Path,
+    research_git_root: Path | None = None,
+    zotero_collection: str | None = None,
+) -> None:
+    """Add path/archive routing without discarding user-owned marker fields."""
+    marker = data_root / "workspace.json"
+    try:
+        payload = json.loads(marker.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise WorkspaceInitError(f"Cannot configure workspace marker: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise WorkspaceInitError("workspace.json root must be an object.")
+    payload["plugin_root"] = str(plugin_path.resolve())
+    payload["data_root"] = str(data_root.resolve())
+    if research_git_root is not None:
+        payload["research_git_root"] = str(research_git_root.resolve())
+    else:
+        payload.setdefault("research_git_root", None)
+    if zotero_collection is not None:
+        payload["zotero_collection"] = zotero_collection.strip() or None
+    else:
+        payload.setdefault("zotero_collection", None)
+    marker.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -136,6 +165,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Legacy root containing knowledge/, weekly_reviews/, and optional work/.",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--research-git-root", type=Path)
+    parser.add_argument("--zotero-collection")
     return parser
 
 
@@ -150,6 +181,13 @@ def main(argv: list[str] | None = None) -> int:
             migrate_from=args.migrate_from,
             dry_run=args.dry_run,
         )
+        if not args.dry_run:
+            configure_workspace_marker(
+                data_root,
+                plugin_path=plugin_root(),
+                research_git_root=args.research_git_root,
+                zotero_collection=args.zotero_collection,
+            )
     except (WorkspaceInitError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

@@ -23,6 +23,8 @@ FIELDS = [
 ]
 CONFIDENCE_VALUES = {"HIGH", "MEDIUM", "LOW"}
 STATUS_VALUES = {"ACTIVE", "CONTEXTUAL", "DEPRECATED"}
+EVIDENCE_ROLES = {"Translation Evidence", "Definition Evidence", "Methodological Evidence"}
+EVIDENCE_ID_PATTERN = re.compile(r"^TERMEV-\d{4,}$")
 TERM_ID_PATTERN = re.compile(r"^TERM-\d{4}$")
 EVIDENCE_LEVEL_PATTERN = re.compile(r"^TE[1-7]$")
 
@@ -374,6 +376,179 @@ def command_export(args: argparse.Namespace) -> None:
     print(f"Exported {len(rows)} terminology records to {args.output}")
 
 
+def read_evidence_events(path: Path) -> list[dict[str, object]]:
+    if not path.is_file():
+        raise TerminologyError(f"Evidence registry does not exist: {path}")
+    events: list[dict[str, object]] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise TerminologyError(f"Invalid evidence JSONL line {line_number}: {exc}") from exc
+        if not isinstance(value, dict):
+            raise TerminologyError(f"Evidence JSONL line {line_number} must be an object.")
+        events.append(value)
+    return events
+
+
+def evidence_state(events: list[dict[str, object]]) -> dict[str, dict[str, object]]:
+    state: dict[str, dict[str, object]] = {}
+    for event in events:
+        event_type = event.get("event_type")
+        if event_type in {"DEPRECATE", "UNLINK", "UPDATE_SUPPORTS"}:
+            target = str(event.get("target_evidence_id") or "")
+            if event_type == "DEPRECATE" and target in state:
+                state[target]["status"] = "DEPRECATED"
+            elif event_type == "UPDATE_SUPPORTS" and target in state:
+                replacement = event.get("new_supports")
+                if isinstance(replacement, list):
+                    state[target]["supports"] = list(replacement)
+                    reported = event.get("reported_terms")
+                    if isinstance(reported, list):
+                        state[target]["reported_terms"] = list(reported)
+                    roles = event.get("roles")
+                    if isinstance(roles, list):
+                        state[target]["roles"] = list(roles)
+            continue
+        evidence_id = str(event.get("evidence_id") or "")
+        if evidence_id:
+            record = dict(event)
+            record.setdefault("status", "ACTIVE")
+            state[evidence_id] = record
+    return state
+
+
+def append_evidence_event(path: Path, event: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+
+def _parse_roles(value: str) -> list[str]:
+    roles = [item.strip() for item in re.split(r"[;,]", value) if item.strip()]
+    unknown = sorted(set(roles) - EVIDENCE_ROLES)
+    if not roles or unknown:
+        raise TerminologyError(
+            "Evidence role must be one or more of: " + ", ".join(sorted(EVIDENCE_ROLES))
+        )
+    return roles
+
+
+def command_add_evidence(args: argparse.Namespace) -> None:
+    events = read_evidence_events(args.evidence)
+    if not EVIDENCE_ID_PATTERN.fullmatch(args.evidence_id):
+        raise TerminologyError("Evidence_ID must use TERMEV-0001 format.")
+    if args.evidence_id in evidence_state(events):
+        raise TerminologyError(f"Evidence_ID already exists: {args.evidence_id}")
+    validate_iso_date(args.verified_date, "verified_date")
+    supports = [item.strip() for item in args.supports.split(";") if item.strip()]
+    if not supports:
+        raise TerminologyError("Evidence must support at least one explicit term.")
+    event = {
+        "schema_version": 2,
+        "event_type": "ADD",
+        "evidence_id": args.evidence_id,
+        "roles": _parse_roles(args.roles),
+        "type": args.type,
+        "source": args.source.strip(),
+        "url": args.url,
+        "supports": supports,
+        "reported_terms": [item.strip() for item in (args.reported_terms or "").split(";") if item.strip()],
+        "paper_id": args.paper_id,
+        "verified_date": args.verified_date,
+        "status": "ACTIVE",
+    }
+    append_evidence_event(args.evidence, event)
+    print(f"Added terminology evidence: {args.evidence_id}")
+
+
+def command_deprecate_evidence(args: argparse.Namespace) -> None:
+    state = evidence_state(read_evidence_events(args.evidence))
+    if args.evidence_id not in state:
+        raise TerminologyError(f"Unknown evidence ID: {args.evidence_id}")
+    validate_iso_date(args.verified_date, "verified_date")
+    append_evidence_event(
+        args.evidence,
+        {
+            "schema_version": 2,
+            "event_type": "DEPRECATE",
+            "target_evidence_id": args.evidence_id,
+            "reason": args.reason.strip(),
+            "verified_date": args.verified_date,
+        },
+    )
+    print(f"Deprecated terminology evidence: {args.evidence_id}")
+
+
+def command_unlink_evidence(args: argparse.Namespace) -> None:
+    rows = read_registry(args.registry)
+    row = find_term(rows, args.term_id)
+    ids = [item.strip() for item in re.split(r"[;,]", row["Evidence_IDs"]) if item.strip()]
+    if args.evidence_id not in ids:
+        raise TerminologyError(f"{args.term_id} is not linked to {args.evidence_id}.")
+    validate_iso_date(args.verified_date, "verified_date")
+    row["Evidence_IDs"] = "; ".join(item for item in ids if item != args.evidence_id)
+    row["Last_Verified"] = args.verified_date
+    row["Notes"] = append_note(row["Notes"], f"Unlinked {args.evidence_id}: {args.reason.strip()}")
+    write_registry(args.registry, rows)
+    append_evidence_event(
+        args.evidence,
+        {
+            "schema_version": 2,
+            "event_type": "UNLINK",
+            "target_evidence_id": args.evidence_id,
+            "term_id": args.term_id,
+            "reason": args.reason.strip(),
+            "verified_date": args.verified_date,
+        },
+    )
+    print(f"Unlinked {args.evidence_id} from {args.term_id}.")
+
+
+def validate_evidence_links(
+    rows: list[dict[str, str]], events: list[dict[str, object]]
+) -> list[str]:
+    failures: list[str] = []
+    state = evidence_state(events)
+    for evidence_id, record in state.items():
+        if not EVIDENCE_ID_PATTERN.fullmatch(evidence_id):
+            failures.append(f"invalid evidence id: {evidence_id}")
+        if not re.fullmatch(r"TE[1-7]", str(record.get("type") or "")):
+            failures.append(f"{evidence_id}: invalid evidence type")
+        roles = record.get("roles")
+        if roles is None and isinstance(record.get("role"), str):
+            roles = [item.strip() for item in re.split(r"\band\b|[;,]", str(record["role"])) if item.strip()]
+        if not isinstance(roles, list) or not roles or not set(map(str, roles)).issubset(EVIDENCE_ROLES):
+            failures.append(f"{evidence_id}: invalid evidence role")
+        supports = record.get("supports")
+        if not isinstance(supports, list) or not supports or not all(str(item).strip() for item in supports):
+            failures.append(f"{evidence_id}: supports must be a non-empty list")
+        if str(record.get("type")) == "TE7" and "focal paper" in str(record.get("source", "")).casefold():
+            reported = record.get("reported_terms")
+            if not record.get("paper_id") or not isinstance(reported, list) or not set(map(str, supports or [])).issubset(set(map(str, reported or []))):
+                failures.append(f"{evidence_id}: focal-paper TE7 supports exceed reported_terms")
+    for row in rows:
+        for evidence_id in [item.strip() for item in re.split(r"[;,]", row["Evidence_IDs"]) if item.strip()]:
+            record = state.get(evidence_id)
+            if record is None:
+                failures.append(f"{row['Term_ID']}: unknown evidence {evidence_id}")
+            elif record.get("status") == "DEPRECATED":
+                failures.append(f"{row['Term_ID']}: deprecated evidence {evidence_id}")
+            elif row["English_Term"] not in [str(item) for item in record.get("supports", [])]:
+                failures.append(f"{row['Term_ID']}: {evidence_id} does not support English_Term")
+    return failures
+
+
+def command_validate_evidence(args: argparse.Namespace) -> None:
+    failures = validate_evidence_links(read_registry(args.registry), read_evidence_events(args.evidence))
+    payload = {"schema_version": 1, "passed": not failures, "failures": failures}
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if failures:
+        raise TerminologyError(f"Terminology evidence validation failed ({len(failures)} issue(s)).")
+
+
 def add_status_parser(
     subparsers: argparse._SubParsersAction, name: str, help_text: str
 ) -> None:
@@ -465,6 +640,40 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repeat to export selected lifecycle statuses only.",
     )
     export.set_defaults(handler=command_export)
+
+    add_evidence = subparsers.add_parser("add-evidence", help="Append a terminology evidence record.")
+    add_evidence.add_argument("--evidence", type=Path, required=True)
+    add_evidence.add_argument("--evidence-id", required=True)
+    add_evidence.add_argument("--roles", required=True)
+    add_evidence.add_argument("--type", choices=[f"TE{i}" for i in range(1, 8)], required=True)
+    add_evidence.add_argument("--source", required=True)
+    add_evidence.add_argument("--url")
+    add_evidence.add_argument("--supports", required=True, help="Semicolon-separated English terms.")
+    add_evidence.add_argument("--reported-terms", help="Semicolon-separated terms actually reported by a focal paper.")
+    add_evidence.add_argument("--paper-id")
+    add_evidence.add_argument("--verified-date", required=True)
+    add_evidence.set_defaults(handler=command_add_evidence)
+
+    deprecate_evidence = subparsers.add_parser("deprecate-evidence", help="Append a deprecation event.")
+    deprecate_evidence.add_argument("--evidence", type=Path, required=True)
+    deprecate_evidence.add_argument("--evidence-id", required=True)
+    deprecate_evidence.add_argument("--reason", required=True)
+    deprecate_evidence.add_argument("--verified-date", required=True)
+    deprecate_evidence.set_defaults(handler=command_deprecate_evidence)
+
+    unlink_evidence = subparsers.add_parser("unlink-evidence", help="Traceably unlink evidence from one term.")
+    unlink_evidence.add_argument("--registry", type=Path, required=True)
+    unlink_evidence.add_argument("--evidence", type=Path, required=True)
+    unlink_evidence.add_argument("--term-id", required=True)
+    unlink_evidence.add_argument("--evidence-id", required=True)
+    unlink_evidence.add_argument("--reason", required=True)
+    unlink_evidence.add_argument("--verified-date", required=True)
+    unlink_evidence.set_defaults(handler=command_unlink_evidence)
+
+    validate_evidence = subparsers.add_parser("validate-evidence", help="Validate term/evidence links and TE7 scope.")
+    validate_evidence.add_argument("--registry", type=Path, required=True)
+    validate_evidence.add_argument("--evidence", type=Path, required=True)
+    validate_evidence.set_defaults(handler=command_validate_evidence)
     return parser
 
 

@@ -1,5 +1,7 @@
 # Deliverables and QC
 
+For v1.4.2 B, use `validate_deep_reading_package.py --contract-version 1.4.2`. It adds semantic checks for narrative coverage, design routing, core-figure embedding/caption/interpretation and source-to-notebook mappings while retaining DOCX metadata sanitation, OOXML validation, independent office rendering and all-page visual QA.
+
 Deep Reading produces B as the full research archive and, in weekly context or on explicit request, C as the concise weekly evaluation submission. C is derived from B; it is not an independent second reading that may introduce unsupported claims.
 
 ## B — Complete Research Notes DOCX
@@ -155,7 +157,7 @@ Use `PROVISIONAL` when the academic archive is scientifically usable but a named
 
 Use `BLOCKED` when missing Main/SI/source identity prevents defensible reconstruction of a core part of the paper.
 
-Do not use `PROVISIONAL` merely because Zotero automatic writing is unavailable. Do not call a file `COMPLETE` merely because a DOCX exists; it still has to pass the academic gate above.
+Do not use `PROVISIONAL` merely because Zotero automatic writing is unavailable. Do not call a file `COMPLETE` merely because a DOCX exists; it must pass `validate_deep_reading_package.py`, including independent office rendering and all-page visual QA. Render failure is a B production gap and therefore keeps B/Deep Reading `PROVISIONAL` with `needs_update`.
 
 ## Final QC checklist
 
