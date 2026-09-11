@@ -32,6 +32,8 @@ weekly-literature-evaluation
 
 ## 构建本地 Plugin bundle
 
+后续源码同步、插件更新、新任务验证及恢复步骤见 [本地插件更新与部署](docs/local-plugin-updates.md)。
+
 仓库根目录本身是 `literature-evaluation` 插件源码。构建脚本生成本地 marketplace 安装包，不在 Git 中维护第二份 Skill 源码。
 
 最方便的仓库内生成方式是使用已经被 `.gitignore` 排除的 `dist/`：
