@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,15 @@ except ImportError:
 )
 class RealPaperBBoxFittingTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Earlier Windows tests register the real SimSun. ReportLab keeps the
+        # first dynamic font registered under a name, so this synthetic-width
+        # fixture needs isolated registries. Restore both after every test.
+        for registry in (pdfmetrics._fonts, pdfmetrics._dynFaceNames):
+            registry_patch = patch.dict(registry)
+            registry_patch.start()
+            self.addCleanup(registry_patch.stop)
+        pdfmetrics._fonts.pop("SimSun", None)
+        pdfmetrics._dynFaceNames.pop(b"SimSun", None)
         self._original_simsun = pdfmetrics._fonts.get("SimSun")
 
     def tearDown(self) -> None:
