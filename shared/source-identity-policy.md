@@ -1,5 +1,7 @@
 # Source Identity Policy
 
+v1.4.2 requires `source_cross_reference.json` to make Main, SI, corrections, protocols, data and code discovery auditable. A required missing SI must remain visible as `READY_WITH_GAPS` or `BLOCKED`; absence cannot be normalized away.
+
 每篇进入正式流程的论文都必须进行身份与版本审计。至少记录：Title、Authors、Journal、DOI、Year、Online Date、Volume、Issue、Article number/pages、Publication Status、Version、Correction、Retraction、Expression of Concern 和 Supplement Status。
 
 日期使用 ISO 8601；未知字段使用 `null`，不得猜测。

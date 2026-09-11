@@ -467,6 +467,11 @@ def read_item(
     )
 
 
+def zotero_filename_matches(observed: str, expected: str) -> bool:
+    """Accept Zotero's literal-plus normalization of spaces in stored filenames."""
+    return observed == expected or observed == expected.replace(" ", "+")
+
+
 def verify_attachment(
     api_base_url: str,
     library_prefix: str,
@@ -491,7 +496,9 @@ def verify_attachment(
         "item_type": data.get("itemType") == "attachment",
         "parent": str(data.get("parentItem", "")) == parent_key,
         "link_mode": data.get("linkMode") in {"imported_file", "imported_url"},
-        "filename": str(data.get("filename", "")) == descriptor["filename"],
+        "filename": zotero_filename_matches(
+            str(data.get("filename", "")), str(descriptor["filename"])
+        ),
         "md5": str(data.get("md5", "")).casefold() == descriptor["md5"].casefold(),
     }
     if not all(checks.values()):

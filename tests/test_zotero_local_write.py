@@ -292,6 +292,31 @@ class FileUploadTests(unittest.TestCase):
         self.assertEqual(verified, item)
         self.assertEqual(read.call_args.kwargs["server_id"], "SERVER123")
 
+    def test_verify_attachment_accepts_zotero_plus_normalized_spaces(self) -> None:
+        descriptor = {
+            "filename": "artifact translation.pdf",
+            "md5": "abcd",
+        }
+        item = {
+            "data": {
+                "itemType": "attachment",
+                "parentItem": "PARENT01",
+                "linkMode": "imported_file",
+                "filename": "artifact+translation.pdf",
+                "md5": "ABCD",
+            }
+        }
+        with patch.object(local, "read_item", return_value=item):
+            verified = local.verify_attachment(
+                local.DEFAULT_API_BASE_URL,
+                "users/0",
+                "ATCH1234",
+                parent_key="PARENT01",
+                descriptor=descriptor,
+                server_id="SERVER123",
+            )
+        self.assertEqual(verified, item)
+
     def test_upload_file_to_attachment_runs_three_phase_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = self._file(Path(tmp))

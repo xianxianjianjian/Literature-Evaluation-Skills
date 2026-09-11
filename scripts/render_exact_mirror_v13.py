@@ -23,7 +23,8 @@ def _draw_frame(
     frame: dict[str, Any],
     text: str,
     scale: float,
-    lines: list[str],
+    leading: float,
+    lines: list[Any],
     work_dir: Path,
 ) -> None:
     """Draw one replacement under an exact bbox clip.
@@ -56,7 +57,6 @@ def _draw_frame(
         local_width, local_height = x1 - x0, y1 - y0
 
     font_size = float(frame["source_font_size_pt"]) * scale
-    leading = float(frame["source_leading_pt"])
     color = frame.get("text_rgb", [0, 0, 0])
     if not isinstance(color, list) or len(color) != 3:
         raise core.ExactMirrorRenderError(
@@ -80,13 +80,16 @@ def _draw_frame(
     c.restoreState()
 
 
-# render() resolves this global at runtime, so patching the implementation keeps
-# all source-path, retain-only-page, fitting and reporting behavior unchanged.
-core._draw_frame = _draw_frame
-
-
 def main(argv: list[str] | None = None) -> int:
-    return core.main(argv)
+    # The legacy clipping entry point is selected only while this CLI runs.
+    # Importing the module must not mutate the current renderer used by tests or
+    # by callers that import both implementations in one process.
+    original = core._draw_frame
+    core._draw_frame = _draw_frame
+    try:
+        return core.main(argv)
+    finally:
+        core._draw_frame = original
 
 
 if __name__ == "__main__":

@@ -428,8 +428,9 @@ def validate_exact_plan_data(plan: dict[str, Any]) -> dict[str, Any]:
             ):
                 raise MirrorPlanError(f"V2 page {output_page} has an invalid replacement bbox.")
             scale = region.get("font_scale_used")
-            if scale is not None and not EXACT_MINIMUM_FONT_SCALE <= float(scale) <= 1.0:
-                raise MirrorPlanError(f"V2 page {output_page} has font scale outside 0.95-1.00.")
+            maximum = 1.10 if region.get("kind") in {"abstract", "body", "caption", "footnote"} else 1.0
+            if scale is not None and not EXACT_MINIMUM_FONT_SCALE <= float(scale) <= maximum:
+                raise MirrorPlanError(f"V2 page {output_page} has font scale outside 0.95-{maximum:.2f}.")
             region_ids.add(region["frame_id"])
         for field in ("placed_object_ids", "table_placements", "render_notes"):
             if not isinstance(page.get(field), list):
@@ -503,7 +504,7 @@ def command_show_strategies(args: argparse.Namespace) -> None:
                     "layout_fidelity": EXACT_LAYOUT_FIDELITY,
                     "strategy": "exact-text-frame",
                     "cjk_font_family": REQUIRED_CJK_FONT,
-                    "font_scale_steps": [1.0, 0.99, 0.98, 0.97, 0.96, 0.95],
+                    "font_scale_steps": [1.10, 1.08, 1.06, 1.04, 1.02, 1.0, 0.98, 0.96, 0.95],
                     "automatic_fallback": False,
                 },
                 "explicit_structural_mirror": {

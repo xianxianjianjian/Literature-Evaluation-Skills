@@ -1,5 +1,7 @@
 # Translation QC
 
+For v1.4.2, run `validate_translation_package.py --contract-version 1.4.2`. Completion requires role closure, `style_fidelity.json`, one-token source-matched residual rejection in translatable roles, preserved figure-internal pixels, translated captions and numeric integrity. A manual “looks correct” statement cannot replace these reports.
+
 A may be described as academically `COMPLETE` only after four QC passes. Translation QC checks fidelity of the translation artifact; it does not replace the later research audit or the optional archive-completion check.
 
 Read [`translation-evidence-contract.md`](translation-evidence-contract.md). For every manifest scope, the final inventory/ledger result must be recomputed by `validate_translation_package.py`; `FULL_MIRROR` also activates its layout checks. Do not accept a hand-authored QC manifest or a PDF-signature-only check as completion evidence.
@@ -46,6 +48,8 @@ Compare source versus translation tokens such as:
 - durations/times;
 - frequencies/sampling rates;
 - software versions;
+- scientific notation and positive/negative signs;
+- DOI and superscripts/subscripts;
 - table cells and significance markers.
 
 Do not replace author-reported values with recalculated values during Translation. If an apparent inconsistency is noticed, preserve the source and flag it for `AUD-xxx` review later.
@@ -57,7 +61,9 @@ Check:
 - exact page count, page boxes, rotation and one-to-one Main/SI mapping;
 - reviewed source/output text-frame containment;
 - embedded SimSun for every CJK glyph with no fallback;
-- 95%-100% font sizing with unchanged leading/frame geometry;
+- role-specific 95%-110% font sizing, recorded 1.15-1.45 leading, source-relative used-height evidence and unchanged frame geometry;
+- hard heading/paragraph separation, semantic Nature-style raised citations, Chinese punctuation/spacing, intact signs and scientific exponents;
+- frame closure plus independent source/output OCR residual audit with no unapproved surviving English run of four or more words;
 - exact table cells and figure-label replacement;
 - no extension page, adaptive layout or page-wide reflow panel;
 - zero same-renderer pixel changes outside reviewed replacement frames.
@@ -77,7 +83,7 @@ For any manifest scope, Translation/A can be `COMPLETE` when:
 - the independent translation-package validator passes and generates `translation_validation.json`;
 - A has been generated and verified against the active paper/source version.
 
-For `FULL_MIRROR/EXACT_TEXT_FRAME`, schema-v2 inventory/plan, `text_frame_inventory.jsonl`, `font_map.json` and validator-generated `layout_diff.json` must pass. A boolean render flag or notes cannot satisfy this gate. These exact checks are not imposed on `MAIN_ONLY` or `ABSTRACT_ONLY`; user-requested `STRUCTURAL_MIRROR` is reported separately and cannot be labeled exact.
+For `FULL_MIRROR/EXACT_TEXT_FRAME`, schema-v2 inventory/plan, closed `text_frame_inventory.jsonl`, `figure_text_inventory.jsonl`, `source_conflicts.jsonl`, `paper_terminology.csv`, `font_map.json`, and validator-generated `numeric_integrity.json`, `untranslated_residual_audit.json`, `typography_fit.json`, and `layout_diff.json` must pass. A boolean render flag or notes cannot satisfy this gate. These exact checks are not imposed on `MAIN_ONLY` or `ABSTRACT_ONLY`; user-requested `STRUCTURAL_MIRROR` is reported separately and cannot be labeled exact.
 
 A Zotero attachment key is **not** part of this academic Translation gate. If Zotero archive work is still pending, keep Translation/A `COMPLETE`, record the pending action, and report archive closure separately.
 

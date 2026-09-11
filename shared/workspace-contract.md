@@ -49,6 +49,8 @@ All operational paths are relative to `<data-root>`:
 
 `knowledge/submission_profile.yaml` intentionally uses a JSON-compatible YAML representation so the V1 helper layer can remain standard-library-only. Treat it as a structured configuration file rather than free-form YAML unless a future version adds a dedicated YAML parser.
 
+`workspace.json` also records routing explicitly: `plugin_root`, `data_root`, `research_git_root`, and `zotero_collection`. The initializer fills the first two and preserves existing user values; supply `--research-git-root` and `--zotero-collection` when those destinations are known. These fields are locators, not paper identity.
+
 ## Script invocation
 
 Resolve helper scripts from the plugin root, not from the current workspace. Pass data files explicitly, or pass `--plugin-root` and `--workspace-root` to repository-wide validation. The legacy `--repo-root` validator option remains compatible for development checkouts where plugin resources and data share one root.

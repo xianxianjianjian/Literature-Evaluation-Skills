@@ -1,5 +1,9 @@
 {
   "schema_version": 1,
   "plugin": "literature-evaluation",
-  "data_layout_version": 1
+  "data_layout_version": 1,
+  "plugin_root": null,
+  "data_root": null,
+  "research_git_root": null,
+  "zotero_collection": null
 }

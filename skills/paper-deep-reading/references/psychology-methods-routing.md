@@ -1,5 +1,7 @@
 # Psychology Methods Routing
 
+v1.4.2 routes experimental/randomized/intervention, observational/cross-sectional/longitudinal/repeated-measures, EEG/PSG, MEG, MRI/fMRI, graph/network, mediation/SEM, machine learning, qualitative/mixed-methods, animal and database profiles. Record why each selected module applies; do not turn reporting checklists into mechanical quality scores.
+
 Use this reference when the focal paper is in psychology, behavioral science, cognitive neuroscience or an adjacent field. Select only modules that match the actual design, measures and claims. Record the selection and its reason in B under **Research Design and Applicable Method Standards / 研究设计与适用方法规范**.
 
 When the design profile is clear, `scripts/psychology_method_router.py --profile <profile.json>` can produce a reproducible module list. Treat it as routing assistance only: it does not score the paper or replace academic judgment.

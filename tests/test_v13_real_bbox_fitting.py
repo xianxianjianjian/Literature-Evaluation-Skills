@@ -26,6 +26,15 @@ except ImportError:
     "exact-mirror font dependencies are unavailable",
 )
 class RealPaperBBoxFittingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._original_simsun = pdfmetrics._fonts.get("SimSun")
+
+    def tearDown(self) -> None:
+        if self._original_simsun is None:
+            pdfmetrics._fonts.pop("SimSun", None)
+        else:
+            pdfmetrics._fonts["SimSun"] = self._original_simsun
+
     def _fixture_font(self, root: Path) -> Path:
         # Non-copyright synthetic SimSun test double. Production SimSun is
         # validated separately on the Windows runner and is never redistributed.
@@ -90,18 +99,20 @@ class RealPaperBBoxFittingTests(unittest.TestCase):
     def test_real_bbox_can_require_intermediate_97_percent_scale(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             font_path = self._fixture_font(Path(temporary))
-            pdfmetrics.registerFont(TTFont("SimSun", str(font_path)))
-            fitted = render_exact_mirror._layout("中" * 11, self._frame())
+            # Other exact-mirror tests may have registered the host's real SimSun
+            # under the same ReportLab name. Isolate this synthetic metric test.
+            pdfmetrics._fonts["SimSun"] = TTFont("SyntheticSimSunBBox", str(font_path))
+            fitted = render_exact_mirror._layout("中" * 11, "中" * 11, self._frame())
             self.assertIsNotNone(fitted)
-            scale, lines = fitted
+            scale, _leading, lines, _typography = fitted
             self.assertEqual(scale, 0.97)
             self.assertEqual(len(lines), 1)
 
     def test_real_bbox_overflow_at_95_percent_is_not_silently_shrunk(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             font_path = self._fixture_font(Path(temporary))
-            pdfmetrics.registerFont(TTFont("SimSun", str(font_path)))
-            fitted = render_exact_mirror._layout("中" * 12, self._frame())
+            pdfmetrics._fonts["SimSun"] = TTFont("SyntheticSimSunOverflow", str(font_path))
+            fitted = render_exact_mirror._layout("中" * 12, "中" * 12, self._frame())
             self.assertIsNone(fitted)
 
 
