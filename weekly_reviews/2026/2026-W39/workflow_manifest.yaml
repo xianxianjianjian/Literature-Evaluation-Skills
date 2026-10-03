@@ -4,29 +4,39 @@
   "workflow_id": "2026-W39-weekly-literature-evaluation",
   "week": "2026-W39",
   "paper_id": "10.1093-sleep-zsaf409",
-  "zotero_parent_key": null,
+  "zotero_parent_key": "44MJZ7E5",
   "zotero_collection_key": "CXGQF4XF",
-  "zotero_main_attachment_key": null,
-  "zotero_archive_status": "PENDING",
+  "zotero_main_attachment_key": "7GJX2JBL",
+  "zotero_archive_status": "COMPLETE",
   "archive": {
-    "zotero_parent_key": null,
+    "zotero_parent_key": "44MJZ7E5",
     "zotero_collection_key": "CXGQF4XF",
-    "zotero_main_attachment_key": null,
+    "zotero_main_attachment_key": "7GJX2JBL",
     "required_si_source_ids": [
       "SRC-S1"
     ],
-    "zotero_si_attachment_keys": {},
+    "zotero_si_attachment_keys": {
+      "SRC-S1": "Y5Y4FS4V"
+    },
     "metadata_only_fallback": false,
     "source_archive": {
-      "status": "IN_PROGRESS",
-      "source_ids": [],
-      "verified_date": null
+      "status": "COMPLETE",
+      "source_ids": [
+        "SRC-M1",
+        "SRC-S1"
+      ],
+      "verified_date": "2026-10-03"
     },
     "output_archive": {
-      "status": "NOT_STARTED",
-      "output_attachment_keys": {},
-      "verified_date": null
-    }
+      "status": "COMPLETE",
+      "output_attachment_keys": {
+        "A": "FVX9DHRP",
+        "B": "KJPKPE4L"
+      },
+      "verified_date": "2026-10-03"
+    },
+    "b_pdf_export_report": "work/10.1093-sleep-zsaf409/b_pdf_export_report.json",
+    "verification_report_path": "work/10.1093-sleep-zsaf409/zotero_archive_verification.json"
   },
   "stages": {
     "topic": {
@@ -45,7 +55,7 @@
       "update_reason": []
     },
     "source_archive": {
-      "status": "IN_PROGRESS",
+      "status": "COMPLETE",
       "needs_update": false,
       "update_reason": []
     },
@@ -74,7 +84,7 @@
       "profile_change_reason": "Main+SI full audit; 12 claim/audit closures, five source figures, 14-page Word render and all-page visual QA passed."
     },
     "output_archive": {
-      "status": "IN_PROGRESS",
+      "status": "COMPLETE",
       "needs_update": false,
       "update_reason": []
     }
@@ -85,7 +95,7 @@
       "local_path": "work/10.1093-sleep-zsaf409/handoff/[A] 原文原版式中文镜像_Viselli_2026_v1.5.0.pdf",
       "validation_report": "work/10.1093-sleep-zsaf409/a_final_package/translation_validation_report.json",
       "visual_qa": "work/10.1093-sleep-zsaf409/a_final_package/a_visual_qa.json",
-      "zotero_attachment_key": null,
+      "zotero_attachment_key": "FVX9DHRP",
       "archive_label": "A翻译",
       "validation_note": "v1.5.0 FULL_MIRROR/EXACT_TEXT_FRAME validation passed 43/43 checks; all 37 Main+SI pages visually reviewed with no clipping, overflow, missing glyph, or geometry break."
     },
@@ -93,7 +103,7 @@
       "status": "COMPLETE",
       "local_path": "work/10.1093-sleep-zsaf409/handoff/[B] 文献研究笔记·完整精读版_Viselli_2026_v1.5.0.docx",
       "archive_pdf": "work/10.1093-sleep-zsaf409/handoff/[B] 文献研究笔记·完整精读版_Viselli_2026_v1.5.0.pdf",
-      "zotero_attachment_key": null,
+      "zotero_attachment_key": "KJPKPE4L",
       "archive_label": "B精读",
       "validation_report": "work/10.1093-sleep-zsaf409/b_validation.json",
       "pdf_export_report": "work/10.1093-sleep-zsaf409/b_pdf_export_report.json",
@@ -106,30 +116,7 @@
       "validation_note": "v1.5.0 C validation passed; 826 visible comment characters; four Main-anchored paragraphs."
     }
   },
-  "pending_zotero_actions": [
-    {
-      "action": "create_or_recognize_parent",
-      "source_id": "SRC-M1",
-      "expected_attachment_name": "pdf"
-    },
-    {
-      "action": "attach",
-      "source_id": "SRC-S1",
-      "expected_attachment_name": "SI"
-    },
-    {
-      "action": "attach",
-      "source_id": "OUTPUT-B",
-      "expected_attachment_name": "B精读",
-      "local_path": "work/10.1093-sleep-zsaf409/handoff/[B] 文献研究笔记·完整精读版_Viselli_2026_v1.5.0.pdf"
-    },
-    {
-      "action": "attach",
-      "source_id": "OUTPUT-A",
-      "expected_attachment_name": "A翻译",
-      "local_path": "work/10.1093-sleep-zsaf409/handoff/[A] 原文原版式中文镜像_Viselli_2026_v1.5.0.pdf"
-    }
-  ],
+  "pending_zotero_actions": [],
   "blocking_issues": [],
   "source_change": {
     "last_checked": "2026-09-17"

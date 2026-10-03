@@ -10,7 +10,7 @@
 | B deep-reading DOCX/PDF | `work/10.1093-sleep-zsaf409/handoff/` | academic COMPLETE |
 | C weekly evaluation | `weekly_reviews/2026/2026-W39/C_Viselli_2026_周文献评价.md` | COMPLETE |
 | A exact-mirror translation | `work/10.1093-sleep-zsaf409/handoff/` | academic COMPLETE |
-| Zotero source/output archive | manifest pending actions | PENDING |
+| Zotero source/output archive | `weekly_reviews/2026/2026-W39/archive_record.md` | COMPLETE |
 
 ## 周归属调整
 
