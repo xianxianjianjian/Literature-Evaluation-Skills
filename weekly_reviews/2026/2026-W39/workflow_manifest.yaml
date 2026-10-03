@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "contract_version": "1.5.0",
+  "workflow_id": "2026-W39-weekly-literature-evaluation",
+  "week": "2026-W39",
+  "paper_id": "10.1093-sleep-zsaf409",
+  "zotero_parent_key": null,
+  "zotero_collection_key": "CXGQF4XF",
+  "zotero_main_attachment_key": null,
+  "zotero_archive_status": "PENDING",
+  "archive": {
+    "zotero_parent_key": null,
+    "zotero_collection_key": "CXGQF4XF",
+    "zotero_main_attachment_key": null,
+    "required_si_source_ids": [
+      "SRC-S1"
+    ],
+    "zotero_si_attachment_keys": {},
+    "metadata_only_fallback": false,
+    "source_archive": {
+      "status": "IN_PROGRESS",
+      "source_ids": [],
+      "verified_date": null
+    },
+    "output_archive": {
+      "status": "NOT_STARTED",
+      "output_attachment_keys": {},
+      "verified_date": null
+    }
+  },
+  "stages": {
+    "topic": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "search": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "source_package": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "source_archive": {
+      "status": "IN_PROGRESS",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "translation": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": [],
+      "skill_version": "1.5.0",
+      "scope": "FULL_MIRROR",
+      "layout_fidelity": "EXACT_TEXT_FRAME",
+      "cjk_font_family": "SimSun",
+      "minimum_font_scale": 0.95
+    },
+    "deep_reading": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": [],
+      "skill_version": "1.5.0",
+      "scope": "MAIN_SI_FULL_RESEARCH_AUDIT",
+      "evidence_classes": [
+        "原文直接内容",
+        "作者解释",
+        "评译者分析",
+        "外部依据"
+      ],
+      "profile_change_reason": "Main+SI full audit; 12 claim/audit closures, five source figures, 14-page Word render and all-page visual QA passed."
+    },
+    "output_archive": {
+      "status": "IN_PROGRESS",
+      "needs_update": false,
+      "update_reason": []
+    }
+  },
+  "outputs": {
+    "A": {
+      "status": "COMPLETE",
+      "local_path": "work/10.1093-sleep-zsaf409/handoff/[A] 原文原版式中文镜像_Viselli_2026_v1.5.0.pdf",
+      "validation_report": "work/10.1093-sleep-zsaf409/a_final_package/translation_validation_report.json",
+      "visual_qa": "work/10.1093-sleep-zsaf409/a_final_package/a_visual_qa.json",
+      "zotero_attachment_key": null,
+      "archive_label": "A翻译",
+      "validation_note": "v1.5.0 FULL_MIRROR/EXACT_TEXT_FRAME validation passed 43/43 checks; all 37 Main+SI pages visually reviewed with no clipping, overflow, missing glyph, or geometry break."
+    },
+    "B": {
+      "status": "COMPLETE",
+      "local_path": "work/10.1093-sleep-zsaf409/handoff/[B] 文献研究笔记·完整精读版_Viselli_2026_v1.5.0.docx",
+      "archive_pdf": "work/10.1093-sleep-zsaf409/handoff/[B] 文献研究笔记·完整精读版_Viselli_2026_v1.5.0.pdf",
+      "zotero_attachment_key": null,
+      "archive_label": "B精读",
+      "validation_report": "work/10.1093-sleep-zsaf409/b_validation.json",
+      "pdf_export_report": "work/10.1093-sleep-zsaf409/b_pdf_export_report.json",
+      "validation_note": "v1.5.0 academic validation passed; 14/14 pages independently rendered with Microsoft Word and visually reviewed; DOCX metadata sanitized."
+    },
+    "C": {
+      "status": "COMPLETE",
+      "git_path": "weekly_reviews/2026/2026-W39/C_Viselli_2026_周文献评价.md",
+      "validation_report": "work/10.1093-sleep-zsaf409/c_validation.json",
+      "validation_note": "v1.5.0 C validation passed; 826 visible comment characters; four Main-anchored paragraphs."
+    }
+  },
+  "pending_zotero_actions": [
+    {
+      "action": "create_or_recognize_parent",
+      "source_id": "SRC-M1",
+      "expected_attachment_name": "pdf"
+    },
+    {
+      "action": "attach",
+      "source_id": "SRC-S1",
+      "expected_attachment_name": "SI"
+    },
+    {
+      "action": "attach",
+      "source_id": "OUTPUT-B",
+      "expected_attachment_name": "B精读",
+      "local_path": "work/10.1093-sleep-zsaf409/handoff/[B] 文献研究笔记·完整精读版_Viselli_2026_v1.5.0.pdf"
+    },
+    {
+      "action": "attach",
+      "source_id": "OUTPUT-A",
+      "expected_attachment_name": "A翻译",
+      "local_path": "work/10.1093-sleep-zsaf409/handoff/[A] 原文原版式中文镜像_Viselli_2026_v1.5.0.pdf"
+    }
+  ],
+  "blocking_issues": [],
+  "source_change": {
+    "last_checked": "2026-09-17"
+  }
+}
