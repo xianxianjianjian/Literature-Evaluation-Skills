@@ -1,6 +1,6 @@
 # Translation QC
 
-For v1.4.2, run `validate_translation_package.py --contract-version 1.4.2`. Completion requires role closure, `style_fidelity.json`, one-token source-matched residual rejection in translatable roles, preserved figure-internal pixels, translated captions and numeric integrity. A manual “looks correct” statement cannot replace these reports.
+For new v1.5.0 work, run `validate_translation_package.py --contract-version 1.5.0`. Completion requires role closure, `style_fidelity.json`, source-matched residual rejection in translatable roles, preserved figure-internal pixels, translated captions, numeric integrity and a real Chinese text layer. A manual “looks correct” statement cannot replace these reports.
 
 A may be described as academically `COMPLETE` only after four QC passes. Translation QC checks fidelity of the translation artifact; it does not replace the later research audit or the optional archive-completion check.
 
@@ -25,6 +25,7 @@ Any missing or unreadable source unit must be explicitly logged rather than sile
 Check:
 
 - terminology consistency and context match;
+- shared terminology-database lookup and Domain/Subdomain/Context match;
 - causal strength;
 - negation;
 - higher/lower and increase/decrease direction;
@@ -63,10 +64,15 @@ Check:
 - embedded SimSun for every CJK glyph with no fallback;
 - role-specific 95%-110% font sizing, recorded 1.15-1.45 leading, source-relative used-height evidence and unchanged frame geometry;
 - hard heading/paragraph separation, semantic Nature-style raised citations, Chinese punctuation/spacing, intact signs and scientific exponents;
-- frame closure plus independent source/output OCR residual audit with no unapproved surviving English run of four or more words;
+- Chinese body justification/2em indentation where geometry permits, no body indent on headings/captions/tables/references, and APA-style hanging indent only for Skill-generated reference lists;
+- frame closure plus independent source/output text-layer and visual residual audit with no unapproved source English in translatable roles; OCR is a fallback for source defects, not routine A verification;
 - exact table cells and figure-label replacement;
 - no extension page, adaptive layout or page-wide reflow panel;
 - zero same-renderer pixel changes outside reviewed replacement frames.
+
+For v1.5.0, sample Abstract, Introduction, Methods, Results, Discussion and captions: selecting and copying must return Chinese at the printed location, Chinese search must locate the same text, CJK fonts need ToUnicode, and translated English text objects must be absent. `validate_a_text_layer.py` checks extractability, search, reading order and stale-English evidence; reader selection alignment remains part of visual QA.
+
+Do not describe justified Chinese body prose as an APA requirement. It is the project Chinese-reading style. APA-oriented English prose is left aligned; Skill-generated reference entries use a 0.5-inch hanging indent. `validate_paragraph_styles.py` owns the corresponding role, alignment, indentation, bilingual-typography and reference-format gates.
 
 Layout QC requires actual render/visual inspection. A valid layout plan alone is not proof that the rendered PDF is visually correct.
 

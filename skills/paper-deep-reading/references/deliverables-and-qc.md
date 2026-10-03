@@ -1,10 +1,12 @@
 # Deliverables and QC
 
-For v1.4.2 B, use `validate_deep_reading_package.py --contract-version 1.4.2`. It adds semantic checks for narrative coverage, design routing, core-figure embedding/caption/interpretation and source-to-notebook mappings while retaining DOCX metadata sanitation, OOXML validation, independent office rendering and all-page visual QA.
+For new v1.5.0 B, use `validate_deep_reading_package.py --contract-version 1.5.0`. It preserves narrative, design, figure, source mapping, metadata, OOXML, independent render and all-page visual gates.
 
 Deep Reading produces B as the full research archive and, in weekly context or on explicit request, C as the concise weekly evaluation submission. C is derived from B; it is not an independent second reading that may introduce unsupported claims.
 
 ## B — Complete Research Notes DOCX
+
+Apply the shared paragraph roles from the Translation typography contract: generated Chinese body paragraphs are justified with a 2em first-line indent; English body paragraphs are left aligned with a 0.5-inch first-line indent when reformatting is intended; headings, captions, tables and footnotes do not inherit body indentation. Skill-generated references use a 0.5-inch hanging indent. These Chinese rules are project rules, while the English/reference choices are APA-oriented.
 
 ### Base Schema
 
@@ -80,20 +82,13 @@ C must contain at least:
 - review/comment body;
 - reviewer name from `<data-root>/knowledge/submission_profile.yaml` when configured.
 
-The configured minimum (default 500 Chinese characters) applies **only to the review/comment body**, not metadata, title, or Abstract sections.
+For new v1.5.0 C, the `## 评论` body must contain 800–1000 effective visible characters, targeting 850–950. The count excludes metadata and both Abstracts. Legacy pre-1.5.0 C keeps its original contract and is not rewritten or retroactively failed.
+
+When C is exported to DOCX/PDF rather than retained as Markdown, apply the same role engine: Chinese comment body uses the project body style, metadata headings remain unindented, and references, if explicitly requested, use the reference style rather than the body style.
 
 ## C as second-stage synthesis
 
-C should answer compactly:
-
-1. Why is this paper worth reading for the current research question?
-2. What did it actually do?
-3. What are the main results, including important null/mixed results?
-4. What is the paper's most transferable contribution?
-5. What requires caution?
-6. What does it change or suggest for the user's next research decision?
-
-C must not introduce a critique or factual claim that B cannot support. Internal working metadata may retain `CLM-xxx`, `AN-xxx`, `AUD-xxx`, or `EXT-xxx` links even if the clean submission text omits those IDs.
+C is a natural 3–5 paragraph submission review: background and gap; study design and 2–4 core results; innovation with author-acknowledged uncertainty; conclusion and field connection. Read [`c-submission.md`](c-submission.md) before writing or validating C. B informs selection and ordering, while each visible paper fact in default C must be supported by Main. SI-only results and independent evaluator criticism remain in B unless the user explicitly requests a different commentary mode. Internal working metadata retains source IDs and audit links; public C shows none.
 
 ## Knowledge updates
 
@@ -111,9 +106,7 @@ A Zotero-only pending action does not prevent the reading from entering complete
 
 ## B archive handoff
 
-Preferred Zotero attachment label:
-
-`[B] 文献研究笔记·完整精读版`
+Promote the independently rendered B PDF with `scripts/export_b_pdf.py` only after the DOCX academic report and visual QA pass. Keep the DOCX as editable source; Zotero receives the PDF with display title `B精读`. If PDF export fails, B academic status stays intact and Archive remains pending.
 
 When Zotero is writable, verify the parent item and attachment after writing. If Zotero is unavailable, stage under `<data-root>/work/<paper_id>/handoff/` and record a pending action. This archive pending state must not downgrade a B that already passed its academic/QC gate.
 
@@ -142,6 +135,7 @@ For `COMPLETE`, require all applicable items below:
 - every A3 audit issue prominently treated;
 - B generated and verified as the correct artifact for the active paper/source version;
 - B DOCX metadata sanitized and `docProps/core.xml` verified; no generator identifier or non-requested author/comments/keywords remain;
+- B DOCX remains the editable source; its independently rendered PDF is checked and promoted for Zotero archive after B academic validation;
 - C generated when weekly context requires it;
 - required knowledge/history update recorded.
 
@@ -149,7 +143,7 @@ A verified Zotero attachment is **not** part of this academic completion gate.
 
 ## Archive Completion Add-on
 
-If the user/workflow specifically requires closed Zotero archival status, additionally verify the applicable Main/SI/A/B parent and attachment keys and clear their pending actions. Manual Zotero attachment followed by verification is acceptable; full automation is not required by V1.
+If the user/workflow requires closed Zotero archival status, additionally require `B_PDF_EXPORT_PASS`, the role/title/MIME verification report for Main/SI/A/B, and `pending_zotero_actions = []`. Manual Zotero attachment followed by verification is acceptable.
 
 ## PROVISIONAL vs BLOCKED
 

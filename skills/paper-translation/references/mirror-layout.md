@@ -4,7 +4,7 @@
 
 `EXACT_TEXT_FRAME` is accepted only when Geometry, Content and Style all pass independently. Each source frame carries a formal role and style fingerprint. Translate prose/caption/table roles; preserve `FIGURE_INTERNAL`, reference, DOI/URL, formula and locked statistic roles. Figure internals are immutable source pixels—never cover an axis label or scientific annotation merely to remove English. Preserve heading hierarchy, weight, italic, color, alignment and superscript/subscript intent through `style_map.json` and validator-owned `style_fidelity.json`.
 
-`FULL_MIRROR` controls translation coverage. Its default layout fidelity is `EXACT_TEXT_FRAME`: preserve the publisher page as a fixed canvas and replace only reviewed source text frames with Chinese.
+`FULL_MIRROR` controls translation coverage. Its default layout fidelity is `EXACT_TEXT_FRAME`: preserve publisher page geometry and non-text content, remove text objects in reviewed translation frames, then insert searchable Chinese text objects. A visual cover over surviving English is never complete.
 
 ## Exact text-frame invariant
 
@@ -14,6 +14,8 @@ For each Main/SI page preserve:
 - columns, headers, footers, rules, backgrounds, figures, tables and object positions;
 - each source text-frame rectangle, alignment, color and visual weight; leading may be optimized only inside the same frame under the rules below;
 - one source page to one output page, with no extension pages.
+
+Chinese body justification and 2em first-line indentation are this project's frame-internal preference, not an APA rule. Apply them only when content still fits at the selected source-safe scale. If they would add a line or overflow, preserve the source-frame alignment/indentation and record `LAYOUT_EXCEPTION`; never alter a column, object position or page count. See [`academic-typography.md`](academic-typography.md).
 
 Do not treat a visually similar reflow, a page-wide white panel, a translated appendix, or a source-image-plus-translation-map as exact mirror output.
 
@@ -66,7 +68,7 @@ python scripts/render_exact_mirror.py --work-dir <work-dir> --output <A.pdf>
 Uniform backgrounds may use a frame-sized fill. Non-uniform backgrounds require a reviewed clean patch restricted to that frame. If a clean patch would erase a data mark, line, image or decoration, stop that frame as `PROVISIONAL`.
 
 8. Render and visually compare every page. Human notes help diagnose problems but do not satisfy validation.
-9. Run `validate_translation_package.py`; it independently generates `numeric_integrity.json`, `untranslated_residual_audit.json`, `typography_fit.json`, and `layout_diff.json`. It checks page geometry, SimSun embedding/CJK use, frame closure and containment, table cells, semantic typography, source/output OCR agreement for visible English residuals, and pixels outside replacement regions.
+9. Run `validate_translation_package.py`; it independently generates `numeric_integrity.json`, `untranslated_residual_audit.json`, `typography_fit.json`, and `layout_diff.json`. It checks page geometry, SimSun embedding/CJK use, frame closure and containment, table cells, paragraph-role formatting, bilingual typography, source/output OCR agreement for visible English residuals, and pixels outside replacement regions.
 
 ## Tables and figures
 

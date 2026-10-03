@@ -147,13 +147,13 @@ Use this as minimum required coverage:
 
 The Base Schema is not closed. Follow Dynamic Coverage for scientifically important paper-specific material.
 
-## v1.4.2 narrative and figure evidence
+## v1.5.0 narrative and figure evidence
 
 B is narrative-first. Tables organize evidence but cannot substitute for connected explanatory prose in Introduction, Methods, Results, Discussion, Innovation, Limitations, Redesign and Research Transfer. Create `b_narrative_coverage.json`; every core `CLM / AN / AUD / Hypothesis` closure needs substantive prose and an auditable source anchor.
 
 Create `study_design_profile.json` and route only applicable method modules. Supported profiles include experimental/randomized/intervention, observational/cross-sectional/longitudinal/repeated-measures, EEG/PSG, MEG, MRI/fMRI, graph/network, mediation/SEM, machine learning, qualitative/mixed methods, animal and database studies. The 0–10 Base Schema remains the minimum, never a closed template.
 
-Create `b_figure_inventory.json` and classify each visual as design, method, core result, mechanism, robustness, null, supporting or nonessential. Every core visual must be embedded in B with a translated caption, source anchor and substantive interpretation. Validate `source_to_notebook_mapping.csv` semantically, not by file existence alone. Run `validate_deep_reading_package.py --contract-version 1.4.2`; technical DOCX/OOXML/independent-render/all-page visual QA remains mandatory.
+Create `b_figure_inventory.json` and classify each visual as design, method, core result, mechanism, robustness, null, supporting or nonessential. Every core visual must be embedded in B with a translated caption, source anchor and substantive interpretation. Validate `source_to_notebook_mapping.csv` semantically, not by file existence alone. Run `validate_deep_reading_package.py --contract-version 1.5.0`; technical DOCX/OOXML/independent-render/all-page visual QA remains mandatory.
 
 ## Introduction reconstruction
 
@@ -243,7 +243,7 @@ Do not create headings for trivial details simply to make B longer.
 
 ### B
 
-Create `[B] 文献研究笔记·完整精读版` as a DOCX research archive when the environment supports document generation. Important conclusions must be traceable to source anchors/evidence IDs. Include a **研究设计与适用方法规范** subsection that identifies the applied method modules and separates reporting completeness from validity judgment.
+Create a descriptive B DOCX research archive when the environment supports document generation. Important conclusions must be traceable to source anchors/evidence IDs. Include a **研究设计与适用方法规范** subsection that identifies the applied method modules and separates reporting completeness from validity judgment.
 
 Before B is delivered, run `scripts/sanitize_docx_metadata.py`. Unless the user explicitly supplies an author name, author, last-modified-by, keywords and comments/description must be empty, Word comments removed, and generator identifiers absent from `docProps/core.xml` and other document properties.
 
@@ -251,7 +251,7 @@ Then run `scripts/validate_deep_reading_package.py`. `COMPLETE` requires valid O
 
 ### C
 
-Generate C in weekly context or on explicit request. It must include the required bibliographic fields, original Abstract, exact canonical Chinese Abstract, reviewer field, and review body meeting the configured minimum Chinese-character requirement. The character threshold applies only to the review/comment body.
+Generate C in weekly context or on explicit request. For new v1.5.0 work, follow [`references/c-submission.md`](references/c-submission.md): public submission fields, exact canonical Abstract, an 800–1000 visible-character `## 评论`, Main-visible evidence and author-acknowledged limitations by default. Keep the private C source map outside the public file.
 
 C is a second-stage synthesis of B and must not introduce unsupported critique or facts.
 
@@ -271,7 +271,7 @@ A `PROVISIONAL` Deep Reading caused by a real source/evidence gap must not enter
 
 ## Zotero archive handoff
 
-Preferred B label remains `[B] 文献研究笔记·完整精读版`. Verify the parent/attachment when written automatically or manually.
+Keep B DOCX as the editable academic source. After its independent academic render and visual QA pass, promote the rendered PDF with `scripts/export_b_pdf.py` and attach that PDF to Zotero as `B精读`. Verify parent, title, MIME and file; a PDF export failure blocks Archive closure, not a passed B academic gate.
 
 If Zotero is unavailable, stage B under `<data-root>/work/<paper_id>/handoff/` when possible, record a pending action, and continue to close the academic Deep Reading workflow. Archive completion is reported separately.
 

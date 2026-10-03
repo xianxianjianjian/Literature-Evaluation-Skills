@@ -21,7 +21,7 @@ CSV 使用 UTF-8、首行固定 Header 和 RFC 4180 兼容引用规则。脚本�
 
 ## JSONL
 
-JSONL 每行一个完整 JSON object，不允许跨行对象。空的 `terminology_evidence.jsonl` 是合法初始状态；后续每条记录必须包含其 Schema 版本和稳定 Evidence ID。
+JSONL 每行一个完整 JSON object，不允许跨行对象。空的 `terminology_evidence.jsonl` 和 `terminology_corrections.jsonl` 是合法初始状态；证据事件必须包含 Schema 版本和稳定 Evidence ID，术语纠错事件必须记录 TERM ID、旧译法、新译法、理由、证据和日期。
 
 ## Source-text reproduction and public Git
 

@@ -41,7 +41,7 @@ _SCI = re.compile(
     re.IGNORECASE,
 )
 _STAT = re.compile(
-    rf"(?<![A-Za-z0-9_])(p|t|f|z|χ\s*[²2]|chi\s*[- ]?square|β|beta|r\s*[s²2]?|r\s*\^\s*2|df|ci|icc|or|hr)\s*(?:\([^)]*\))?\s*(=|<|>|≤|≥|~=|≈)?\s*({_NUMBER})",
+    rf"(?<![A-Za-z0-9_])(p|t|f|z|χ\s*[²2]|chi\s*[- ]?square|β|beta|r\s*[s²2]?|r\s*\^\s*2|df|ci|icc|or|hr)\s*(?:\([^)]*\))?\s*(=|<|>|≤|≥||~=|≈)?\s*({_NUMBER})",
     re.IGNORECASE,
 )
 _STAT_SCI = re.compile(
@@ -53,7 +53,9 @@ _UNIT = re.compile(
     re.IGNORECASE,
 )
 _DOI = re.compile(r"\b10\.\d{4,9}/[-._;()/:a-z0-9]+", re.IGNORECASE)
-_VERSION = re.compile(r"\bv(?:ersion\s*)?\d+(?:\.\d+){1,4}\b", re.IGNORECASE)
+_VERSION = re.compile(r"(?:(?:\bv(?:ersion\s*)?)|版本\s*)(\d+(?:\.\d+){1,4})\b", re.IGNORECASE)
+_FIGURE_TABLE = re.compile(r"\b(?:figure|table)\s+(\d+)\b", re.IGNORECASE)
+_MONTH = re.compile(r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\b", re.IGNORECASE)
 _TIMEPOINT = re.compile(r"(?<![A-Za-z0-9_])T\d+(?![A-Za-z0-9_])", re.IGNORECASE)
 _BRACKET_CITATION = re.compile(r"\[\s*\d+(?:\s*[,;–—-]\s*\d+)*\s*\]")
 _SUPERSCRIPT_CITATION = re.compile(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+(?:[˒,，–—-][⁰¹²³⁴⁵⁶⁷⁸⁹]+)*")
@@ -68,11 +70,16 @@ def _canon(value: str) -> str:
         value,
     )
     value = value.replace("−", "-").replace("–", "-")
+    value = value.replace("", "≥")
     value = value.replace("×", "x").replace("*", "x")
     value = value.replace("χ²", "chi2").replace("χ2", "chi2")
     value = value.replace("β", "beta").replace("²", "2")
     value = re.sub(r"\br\s*\^\s*2\b", "r2", value, flags=re.IGNORECASE)
     value = re.sub(r"\s+", "", value.casefold())
+    value = re.sub(r"(seconds?|secs?)$", "s", value)
+    value = re.sub(r"minutes?$|mins$", "min", value)
+    value = re.sub(r"hours?$|hrs$", "h", value)
+    value = re.sub(r"days$", "day", value)
     value = value.replace(",", "")
     return value
 
@@ -87,7 +94,18 @@ def extract_numeric_tokens(text: str) -> list[str]:
         for match in pattern.finditer(text):
             if any(match.start() < end and match.end() > start for start, end in spans):
                 continue
-            tokens.append(_canon(match.group(0)))
+            tokens.append("version" + _canon(match.group(1)) if pattern is _VERSION else _canon(match.group(0)))
+            spans.append(match.span())
+    for pattern, mapping in (
+        (_FIGURE_TABLE, None),
+        (_MONTH, {name: str(index) for index, name in enumerate(
+            "january february march april may june july august september october november december".split(), 1)}),
+    ):
+        for match in pattern.finditer(text):
+            if any(match.start() < end and match.end() > start for start, end in spans):
+                continue
+            token = match.group(1).casefold()
+            tokens.append(mapping[token] if mapping is not None else _canon(token))
             spans.append(match.span())
     masked = list(text)
     for start, end in spans:
@@ -124,10 +142,17 @@ def validate_numeric_integrity(
 ) -> tuple[IntegrityResult, dict[str, Any]]:
     whitelist_rows = _read_jsonl(work_dir / NUMERIC_WHITELIST_FILE, required=False)
     whitelist: set[tuple[str, str, str]] = set()
+    one_sided_whitelist: set[tuple[str, str, str]] = set()
     invalid_whitelist: list[str] = []
     for index, row in enumerate(whitelist_rows, 1):
-        fields = ("unit_id", "source_token", "translated_token", "reason", "reviewer", "reviewed_date")
-        if not all(isinstance(row.get(field), str) and row[field].strip() for field in fields):
+        required = ("unit_id", "reason", "reviewer", "reviewed_date")
+        kind = str(row.get("kind") or "PAIR").upper()
+        if (
+            not all(isinstance(row.get(field), str) and row[field].strip() for field in required)
+            or kind not in {"PAIR", "MISSING", "ADDED"}
+            or (kind in {"PAIR", "MISSING"} and not str(row.get("source_token") or "").strip())
+            or (kind in {"PAIR", "ADDED"} and not str(row.get("translated_token") or "").strip())
+        ):
             invalid_whitelist.append(f"line-{index}")
             continue
         try:
@@ -135,12 +160,15 @@ def validate_numeric_integrity(
         except ValueError:
             invalid_whitelist.append(f"line-{index}")
             continue
-        whitelist.add(
-            (row["unit_id"].strip(), _canon(row["source_token"]), _canon(row["translated_token"]))
-        )
+        if kind == "PAIR":
+            whitelist.add((row["unit_id"].strip(), _canon(row["source_token"]), _canon(row["translated_token"])))
+        else:
+            token = row["source_token"] if kind == "MISSING" else row["translated_token"]
+            one_sided_whitelist.add((row["unit_id"].strip(), kind, _canon(token)))
 
     discrepancies: list[dict[str, Any]] = []
     unit_reports: list[dict[str, Any]] = []
+    residuals: dict[str, dict[str, Any]] = {}
     for unit_id, row in sorted(ledger.items()):
         source = Counter(extract_numeric_tokens(str(row.get("source_text", ""))))
         translated = Counter(extract_numeric_tokens(str(row.get("translated_text", ""))))
@@ -156,15 +184,53 @@ def validate_numeric_integrity(
                     unmatched_added.remove(translated_token)
                     added.remove(translated_token)
                     break
-        for token in unmatched_missing:
+        unmatched_missing = [
+            token for token in unmatched_missing
+            if (unit_id, "MISSING", token) not in one_sided_whitelist
+        ]
+        unmatched_added = [
+            token for token in unmatched_added
+            if (unit_id, "ADDED", token) not in one_sided_whitelist
+        ]
+        residuals[unit_id] = {
+            "page_key": (str(row.get("source_id", "")), int(row.get("source_page", 0) or 0)),
+            "missing": unmatched_missing,
+            "added": unmatched_added,
+            "source": list(source.elements()),
+            "translated": list(translated.elements()),
+        }
+
+    # Exact-frame extraction can split one sentence or statistical expression
+    # across adjacent frames. Reconcile identical tokens within the same source
+    # page while still rejecting every changed value.
+    for page_key in sorted({item["page_key"] for item in residuals.values()}):
+        added_pool = [
+            (unit_id, token)
+            for unit_id, item in residuals.items() if item["page_key"] == page_key
+            for token in list(item["added"])
+        ]
+        for missing_unit, item in residuals.items():
+            if item["page_key"] != page_key:
+                continue
+            for token in list(item["missing"]):
+                match = next(((unit_id, value) for unit_id, value in added_pool if value == token), None)
+                if match is None:
+                    continue
+                added_unit, _ = match
+                item["missing"].remove(token)
+                residuals[added_unit]["added"].remove(token)
+                added_pool.remove(match)
+
+    for unit_id, item in sorted(residuals.items()):
+        for token in item["missing"]:
             discrepancies.append({"unit_id": unit_id, "kind": "MISSING", "token": token})
-        for token in unmatched_added:
+        for token in item["added"]:
             discrepancies.append({"unit_id": unit_id, "kind": "ADDED", "token": token})
         unit_reports.append(
             {
                 "unit_id": unit_id,
-                "source_tokens": list(source.elements()),
-                "translated_tokens": list(translated.elements()),
+                "source_tokens": item["source"],
+                "translated_tokens": item["translated"],
                 "discrepancies": [item for item in discrepancies if item["unit_id"] == unit_id],
             }
         )
@@ -172,7 +238,7 @@ def validate_numeric_integrity(
         "schema_version": 1,
         "validator": "translation_integrity.py",
         "passed": not discrepancies and not invalid_whitelist,
-        "whitelist_count": len(whitelist),
+        "whitelist_count": len(whitelist) + len(one_sided_whitelist),
         "invalid_whitelist_rows": invalid_whitelist,
         "discrepancies": discrepancies,
         "units": unit_reports,

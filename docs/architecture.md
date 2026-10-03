@@ -21,11 +21,12 @@ weekly-literature-evaluation
 
 ## Current Release
 
-v1.4.2 is the current stable release.
+v1.5.0 is the current development contract; v1.4.2 remains the last tagged release.
 
 Major features:
 
 - FULL_MIRROR translation validation.
 - Main/SI source package management.
 - A/B/C deliverable workflow.
+- Shared psychology terminology memory and role-aware academic typography.
 - CI validation across Python versions and Windows production environments.

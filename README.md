@@ -2,7 +2,7 @@
 
 A research-oriented workflow framework for **literature search → full-text translation → systematic deep reading → weekly evaluation submission**.
 
-> Current stable release: **v1.4.2**
+> Current development version: **v1.5.0**
 >
 > Validated with:
 > - Python 3.11 CI
@@ -57,20 +57,32 @@ For detailed installation and update workflow, see:
 
 The workflow produces:
 
-- **A**: Chinese full-text mirror PDF.
-- **B**: Complete research reading document.
-- **C**: Weekly literature evaluation submission draft.
+- **A**: Chinese full-text mirror PDF with a real selectable, copyable and searchable Chinese text layer.
+- **B**: Complete DOCX research notes plus a validated PDF reading copy.
+- **C**: 800–1000-character Chinese submission review, with a private Main-source map.
 
 ## Validation
 
-v1.4.2 includes:
+v1.5.0 adds:
 
 - FULL_MIRROR validation.
 - Main/SI source package management.
 - A/B/C archive workflow.
 - Automated structural and regression validation.
+- Zotero role titles `pdf / SI / A翻译 / B精读` and separate academic/archive gates.
+- A cross-paper, evidence-linked psychology terminology database with Domain/Subdomain/Context matching, usage accumulation and correction history.
+- Shared paragraph roles for Chinese body formatting, APA-oriented English/reference formatting, bilingual typography and Exact-Mirror layout exceptions.
 
 ## Release History
+
+### v1.5.0 (development)
+
+- Replace translated English text objects with selectable/searchable Chinese PDF text and reject stale English layers.
+- Promote validated B DOCX renders to PDF for Zotero archive.
+- Use an 800–1000-character C submission contract with Main-visible evidence and author-acknowledged limitations.
+- Normalize Zotero attachment display titles while preserving original filenames and data SI.
+- Reuse verified psychology terminology by context across papers and keep usage/correction history.
+- Apply project Chinese body styling separately from APA-oriented English and reference formatting without weakening Exact Mirror geometry.
 
 ### v1.4.2
 

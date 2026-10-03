@@ -99,6 +99,10 @@ def read_paper_terms(path: Path) -> list[dict[str, str]]:
             "preferred": _value(row, "Preferred_Chinese", "chosen_chinese", "Chinese_Term", "中文术语"),
             "alternatives": _value(row, "Alternative_Chinese", "alternative_chinese", "备选译法"),
             "evidence_ids": _value(row, "Evidence_IDs", "evidence_id", "Evidence_ID"),
+            "domain": _value(row, "Domain", "Discipline", "domain", "discipline"),
+            "subdomain": _value(row, "Subdomain", "Subfield", "subdomain", "subfield"),
+            "context": _value(row, "Context", "context"),
+            "context_note": _value(row, "Context_Note", "context_note", "Context note"),
         }
         if not item["english"] or not item["preferred"] or not item["evidence_ids"]:
             raise TerminologyConsistencyError(f"paper terminology line {line} lacks English/preferred/evidence")
@@ -114,20 +118,41 @@ def validate_consistency(
     artifact_text_overrides: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     terms = read_paper_terms(paper_terms)
-    registry = {row["Term_ID"]: row for row in read_registry(registry_path)}
-    evidence_failures = validate_evidence_links(list(registry.values()), read_evidence_events(evidence_path))
+    registry_rows = read_registry(registry_path)
+    registry = {row["Term_ID"]: row for row in registry_rows}
+    evidence_failures = validate_evidence_links(registry_rows, read_evidence_events(evidence_path))
     overrides = artifact_text_overrides or {}
     texts = {
         name: overrides[name] if name in overrides else artifact_text(path)
         for name, path in artifacts.items()
     }
     failures: list[dict[str, str]] = []
+    lookup_failures: list[str] = []
+    context_failures: list[str] = []
+    consistency_failures: list[str] = []
     for term in terms:
         registry_row = registry.get(term["term_id"])
         if term["term_id"] and registry_row is None:
             failures.append({"term": term["english"], "artifact": "registry", "reason": "unknown TERM ID"})
+            lookup_failures.append(term["english"])
         elif registry_row is not None and registry_row["Preferred_Chinese"].strip() != term["preferred"]:
             failures.append({"term": term["english"], "artifact": "registry", "reason": "preferred Chinese mismatch"})
+            lookup_failures.append(term["english"])
+        if registry_row is not None:
+            same_english = [
+                row for row in registry_rows
+                if row["English_Term"].strip().casefold() == term["english"].casefold()
+                and row["Status"] != "DEPRECATED"
+            ]
+            if len(same_english) > 1 and not all(
+                term[field] for field in ("domain", "context")
+            ):
+                context_failures.append(f"{term['english']}: ambiguous registry term lacks Domain/Context")
+            for paper_field, registry_field in (
+                ("domain", "Domain"), ("subdomain", "Subdomain"), ("context", "Context")
+            ):
+                if term[paper_field] and term[paper_field].casefold() != registry_row[registry_field].strip().casefold():
+                    context_failures.append(f"{term['english']}: {paper_field} mismatch")
         alternatives = [item.strip() for item in re.split(r"[;；]", term["alternatives"]) if item.strip()]
         for artifact_name, text in texts.items():
             encountered = term["english"].casefold() in text.casefold() or term["preferred"] in text or any(
@@ -135,16 +160,30 @@ def validate_consistency(
             )
             if encountered and term["preferred"] not in text:
                 failures.append({"term": term["english"], "artifact": artifact_name, "reason": "preferred Chinese absent where term is used"})
+                consistency_failures.append(f"{term['english']}:{artifact_name}")
             for alternative in alternatives:
                 if alternative != term["preferred"] and alternative in text:
-                    failures.append({"term": term["english"], "artifact": artifact_name, "reason": f"non-preferred translation used: {alternative}"})
+                    if not term["context_note"]:
+                        failures.append({"term": term["english"], "artifact": artifact_name, "reason": f"non-preferred translation used without context note: {alternative}"})
+                        consistency_failures.append(f"{term['english']}:{artifact_name}")
+    checks = [
+        {"code": "TERMINOLOGY_DATABASE_LOOKUP_PASS", "passed": not lookup_failures,
+         "detail": "all paper terms resolve to registry records" if not lookup_failures else f"unresolved/mismatched: {sorted(set(lookup_failures))}"},
+        {"code": "TERMINOLOGY_CONTEXT_MATCH_PASS", "passed": not context_failures,
+         "detail": "Domain/Subdomain/Context match" if not context_failures else "; ".join(sorted(set(context_failures)))},
+        {"code": "TERMINOLOGY_CROSS_DOCUMENT_CONSISTENCY_PASS", "passed": not consistency_failures,
+         "detail": "A/B/C use the reviewed term choice" if not consistency_failures else f"inconsistent: {sorted(set(consistency_failures))}"},
+        {"code": "TRANSLATION_DOMAIN_TERMINOLOGY_PASS", "passed": not lookup_failures and not context_failures and not evidence_failures,
+         "detail": "domain terminology is context- and evidence-bound" if not lookup_failures and not context_failures and not evidence_failures else "domain/context/evidence gate failed"},
+    ]
     return {
         "schema_version": 1,
         "validator": "validate_terminology_consistency.py",
-        "passed": not failures and not evidence_failures,
+        "passed": not failures and not evidence_failures and all(item["passed"] for item in checks),
         "artifacts": {name: str(path.resolve()) for name, path in artifacts.items()},
         "failures": failures,
         "evidence_failures": evidence_failures,
+        "checks": checks,
     }
 
 

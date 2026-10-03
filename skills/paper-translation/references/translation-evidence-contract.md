@@ -5,6 +5,7 @@
 - `source_cross_reference.json`: Main/SI/correction/protocol/data/code discovery and Source Archive status.
 - `text_frame_inventory.jsonl`: explicit `role`, `translatable`, `preserve_english`, source style fingerprint fields and rendered-style evidence.
 - `style_map.json` and validator-owned `style_fidelity.json`.
+- shared paragraph-role evidence in `typography_fit.json`, including any `LAYOUT_EXCEPTION`.
 - role-aware `untranslated_residual_audit.json`: one unapproved source-matched English token in a translatable role is a failure; preserve-English roles are excluded by policy, not by word-count heuristic.
 - validator-owned `numeric_integrity.json`: signs, exponents and statistic tokens remain hard-gated.
 
@@ -57,6 +58,7 @@ Every source text frame, table cell and figure label requires:
 - `frame_id`, source page, `unit_id`, kind and reading order;
 - bottom-left PDF `bbox_pt` and rotation;
 - source font, font size, leading, weight, alignment and background;
+- resolved paragraph style, alignment, first-line indent, language, and exception reason when the preferred style cannot fit;
 - `translation_action: TRANSLATE | RETAIN_SOURCE`;
 - `translatable` and `replacement_status: TRANSLATED | INTENTIONAL_PRESERVE | NON_TRANSLATABLE`;
 - boolean `source_cleared`, `target_rendered`, and `residual_checked` lifecycle fields;
@@ -137,7 +139,7 @@ python scripts/validate_translation_package.py \
   --report <work-dir>/translation_validation.json
 ```
 
-The validator generates `numeric_integrity.json`, `untranslated_residual_audit.json`, `typography_fit.json`, and `layout_diff.json` itself and recomputes page boxes, rotations, one-to-one mapping, replacement-frame closure, table cells, figure-label closure, embedded/CJK SimSun use, role-specific 95%-110% glyph sizing, semantic English-token accounting, source/output frame OCR residuals and same-renderer pixels outside replacement frames. Do not edit validator reports.
+The validator generates `numeric_integrity.json`, `untranslated_residual_audit.json`, `typography_fit.json`, and `layout_diff.json` itself and recomputes page boxes, rotations, one-to-one mapping, replacement-frame closure, table cells, figure-label closure, embedded/CJK SimSun use, role-specific 95%-110% glyph sizing, paragraph-role/indent/alignment evidence, semantic English-token accounting, source/output frame OCR residuals and same-renderer pixels outside replacement frames. Do not edit validator reports.
 
 Use the existing `source_manifest.json` for source identity. Do not add per-unit, per-page, per-object or font hashes.
 

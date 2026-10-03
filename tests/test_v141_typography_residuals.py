@@ -53,6 +53,26 @@ class ChineseTypographyTests(unittest.TestCase):
         stats = [token.text for token in tokens if token.kind == "STAT"]
         self.assertEqual(stats, ["p = .36", "p = .09"])
 
+    def test_identifiers_dates_and_numeric_ranges_do_not_split(self) -> None:
+        tokens = typography.semantic_tokens(
+            "方案 49/2021，年龄 23.18 ± 3.94 岁，19–34 岁，5:00 开始，DASS–21 和 T0。"
+        )
+        groups = {(token.kind, token.text) for token in tokens}
+        for value in ("49/2021", "23.18", "3.94", "19–34", "5:00"):
+            self.assertIn(("NUMBER", value), groups)
+        self.assertIn(("CODE", "DASS–21"), groups)
+        self.assertIn(("CODE", "T0"), groups)
+
+    def test_latin_words_and_urls_remain_atomic_in_justified_chinese(self) -> None:
+        tokens = typography.semantic_tokens(
+            "使用BrainVision Recorder及https://wonambi-python.github.io/index.html记录PSG。"
+        )
+        groups = {(token.kind, token.text) for token in tokens}
+        self.assertIn(("LATIN_WORD", "BrainVision"), groups)
+        self.assertIn(("LATIN_WORD", "Recorder"), groups)
+        self.assertIn(("LATIN_WORD", "PSG"), groups)
+        self.assertIn(("URL", "https://wonambi-python.github.io/index.html"), groups)
+
     def test_heading_break_is_a_hard_semantic_boundary(self) -> None:
         tokens = typography.semantic_tokens("结果\n\n在这里，我们展示结果。")
         self.assertEqual(sum(token.kind == "BREAK" for token in tokens), 2)

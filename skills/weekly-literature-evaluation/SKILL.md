@@ -64,8 +64,8 @@ research context/history
 → Main/SI translation + A
 → Full Research Audit
 → Introduction/Methods/Results/Discussion reconstruction
-→ B
-→ C
+→ validated B DOCX → B PDF archive derivative
+→ private C source map → submission C
 → knowledge/history verification
 → A/B Output Archive closure
 ```
@@ -185,20 +185,17 @@ Zotero: Main / SI / A / B
 Git:    Skills / shared policies / knowledge registries / weekly Search decisions / C / workflow manifest
 ```
 
-Preferred Zotero child labels:
-
-- `[ORIGINAL] Main Article`
-- `[SUPPLEMENT] ...`
-- `[A] 中文全文翻译镜像版`
-- `[B] 文献研究笔记·完整精读版`
+Zotero child display titles for v1.5.0 are `pdf` (Main), `SI` or `SI-n` (reading SI), `A翻译` and `B精读`. Data SI keeps its original file and may use `SI-Data-n`. Attachment titles are separate from unique underlying filenames.
 
 If Zotero is unavailable, use `<data-root>/work/<paper_id>/handoff/` when a local runtime exists and preserve `pending_zotero_actions`. Manual Zotero handoff followed by verification is acceptable. Never claim an attachment was created until verified.
 
 ## A/B/C contract
 
-- **A**: Chinese exact text-frame mirror PDF by default, owned by Translation. A user-requested structural mirror must be named and reported as structural.
-- **B**: complete research-note DOCX, owned by Deep Reading.
-- **C**: weekly evaluation submission, derived from B in weekly context.
+- **A**: Chinese exact text-frame mirror PDF with a real selectable/searchable/copyable Chinese text layer by default, owned by Translation.
+- **B**: complete research-note DOCX as editable source; its validated PDF is the Zotero reading copy.
+- **C**: 800–1000-character weekly submission derived from B with Main-visible paper facts and author-acknowledged limitations by default.
+
+Generated Chinese B/C body paragraphs use the project style of justification plus a 2em first-line indent; headings, captions, tables and references use their own roles. This is separate from APA-oriented English and reference formatting. Exact A applies the body preference only inside unchanged frames when it fits without a smaller font or overflow.
 
 The router verifies required state/paths and reports archive status, but does not create academic content itself.
 
@@ -208,7 +205,7 @@ The router may coordinate updates to:
 
 - `<data-root>/knowledge/selection_log.csv`
 - `<data-root>/knowledge/reading_history.csv`
-- terminology registries through the Translation workflow
+- the context-aware psychology terminology database through the Translation workflow, including per-paper usage and correction history
 - weekly manifest and C path
 
 `<data-root>/knowledge/research_profile.md` may only change after explicit user approval. Specialist Skills may propose an update, but the router must not silently accept it.
@@ -233,7 +230,7 @@ The weekly **academic workflow** may be declared `COMPLETE` when the applicable 
 
 ## Archive completion
 
-Report archive closure separately. A fully closed Zotero archive additionally requires the target collection, bibliographic parent, Main PDF child, every required scientific SI child, A and B to be verified, `metadata_only_fallback: false`, and the applicable pending actions cleared.
+Report archive closure separately. For v1.5.0 a fully closed Zotero archive requires the target collection, bibliographic parent, Main PDF (`pdf`), required SI (`SI`/`SI-n`), A PDF (`A翻译`), validated B PDF (`B精读`), role/title/MIME verification, `metadata_only_fallback: false`, and `pending_zotero_actions = []`. Data SI originals remain available.
 
 Do not describe the Zotero archive as complete merely because the academic workflow is complete. Conversely, do not call the academic workflow incomplete merely because automatic Zotero writing is unavailable.
 

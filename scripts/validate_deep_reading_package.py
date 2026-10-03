@@ -309,7 +309,7 @@ def validate_package(
     checks.append(DeepReadingCheck("B:evidence-map", evidence_map.is_file(), str(evidence_map)))
     checks.append(DeepReadingCheck("B:main-si-audit", audit_log.is_file(), str(audit_log)))
 
-    if contract_version == "1.4.2":
+    if contract_version in {"1.4.2", "1.5.0"}:
         narrative_path = work_dir / "b_narrative_coverage.json"
         figure_path = work_dir / "b_figure_inventory.json"
         mapping_path = work_dir / "source_to_notebook_mapping.csv"
@@ -377,7 +377,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rendered-pdf", type=Path)
     parser.add_argument("--png-dir", type=Path)
     parser.add_argument("--visual-qa", type=Path)
-    parser.add_argument("--contract-version", choices=("1.4.1", "1.4.2"), default="1.4.2")
+    parser.add_argument("--contract-version", choices=("1.4.1", "1.4.2", "1.5.0"), default="1.5.0")
     return parser
 
 

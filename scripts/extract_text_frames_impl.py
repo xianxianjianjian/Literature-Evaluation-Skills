@@ -438,10 +438,15 @@ def _kind(block: list[dict[str, Any]], page_height: float, body_size: float) -> 
     top = min(line["top"] for line in block)
     bottom = max(line["bottom"] for line in block)
     size = statistics.median(line["size"] for line in block)
-    if top < page_height * 0.06:
+    if bottom < page_height * 0.06:
         return "page_header"
-    if bottom > page_height * 0.94:
+    if top > page_height * 0.94:
         return "page_footer"
+    # A long paragraph can reach the page edge, or have a larger font than
+    # figure/table text that dominates the page-size histogram. Neither makes
+    # the paragraph page furniture or a heading.
+    if len(block) >= 3 and sum(len(str(line["text"])) for line in block) >= 160:
+        return "body"
     if size >= max(14.0, body_size * 1.7):
         return "title"
     if size >= body_size * 1.15:

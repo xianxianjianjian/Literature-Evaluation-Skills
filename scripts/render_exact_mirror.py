@@ -21,6 +21,11 @@ try:
 except ImportError:  # pragma: no cover - CLI dependency check
     PdfReader = PdfWriter = pdfmetrics = TTFont = canvas = None
 
+try:
+    import pymupdf
+except ImportError:  # pragma: no cover - CLI dependency check
+    pymupdf = None
+
 from exact_mirror import (
     FONT_SCALE_STEPS,
     EXPANDABLE_FRAME_KINDS,
@@ -36,10 +41,12 @@ from exact_mirror import frame_role
 from mirror_pdf import MirrorPlanError, validate_plan_data
 from normalize_chinese_typography import (
     SemanticToken,
+    normalize_citation,
     normalize_chinese_text,
     normalize_inline_citations,
     semantic_tokens,
 )
+from paragraph_styles import exact_mirror_body_preference, style_name_for_role
 
 
 class ExactMirrorRenderError(ValueError):
@@ -53,11 +60,56 @@ class StyledToken:
 
 
 def _require_dependencies() -> None:
-    if any(item is None for item in (PdfReader, PdfWriter, pdfmetrics, TTFont, canvas)):
+    if any(item is None for item in (PdfReader, PdfWriter, pdfmetrics, TTFont, canvas, pymupdf)):
         raise ExactMirrorRenderError(
-            "pypdf and reportlab are required. Use the bundled Codex PDF runtime "
+            "pypdf, reportlab, and PyMuPDF are required. Use the bundled Codex PDF runtime "
             "or install requirements-exact-mirror.txt."
         )
+
+
+def _redacted_readers(
+    work_dir: Path, sources: dict[str, dict[str, Any]],
+    inventory_pages: list[dict[str, Any]], frames: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Remove source text objects in reviewed translation frames, preserving art."""
+    translated_sources = {
+        record["source_id"] for record in inventory_pages
+        if any(frames[frame_id]["translation_action"] == "TRANSLATE" for frame_id in record["frame_ids"])
+    }
+    readers = {
+        source_id: PdfReader(str(_resolve_source_pdf(work_dir, source)))
+        for source_id, source in sources.items() if source_id not in translated_sources
+    }
+    documents = {}
+    try:
+        for source_id in translated_sources:
+            documents[source_id] = pymupdf.open(_resolve_source_pdf(work_dir, sources[source_id]))
+        for record in inventory_pages:
+            if record["source_id"] not in translated_sources:
+                continue
+            page = documents[record["source_id"]][record["source_page"] - 1]
+            redactions = 0
+            for frame_id in record["frame_ids"]:
+                frame = frames[frame_id]
+                if frame["translation_action"] != "TRANSLATE":
+                    continue
+                # Inventory rectangles use PDF coordinates; MuPDF uses page
+                # coordinates. Its page matrix handles crop and rotation.
+                rect = pymupdf.Rect(frame["bbox_pt"]) * page.transformation_matrix
+                if rect.is_empty or not page.rect.intersects(rect):
+                    raise ExactMirrorRenderError(f"Invalid redaction frame: {frame_id}")
+                page.add_redact_annot(rect, fill=False, cross_out=False)
+                redactions += 1
+            if redactions:
+                page.apply_redactions(images=0, graphics=0, text=0)
+        readers.update({
+            source_id: PdfReader(io.BytesIO(document.tobytes(garbage=4, deflate=True)))
+            for source_id, document in documents.items()
+        })
+        return readers
+    finally:
+        for document in documents.values():
+            document.close()
 
 
 def _resolve_source_pdf(work_dir: Path, source: dict[str, Any]) -> Path:
@@ -122,12 +174,35 @@ def _styled_tokens(text: str, frame: dict[str, Any]) -> list[StyledToken]:
     cursor = 0
     for token in semantic_tokens(text):
         if token.kind == "BREAK":
-            start, end = cursor, cursor + 1
+            start = text.find("\n", cursor)
+            end = start + 1
+        elif token.kind == "SPACE":
+            start = cursor
+            while start < len(text) and not (
+                text[start].isspace() and text[start] != "\n"
+            ):
+                start += 1
+            end = start
+            while end < len(text) and text[end].isspace() and text[end] != "\n":
+                end += 1
+        elif token.kind == "CITATION":
+            start = -1
+            end = -1
+            for match in re.finditer(r"\[([^]]+)\]", text[cursor:]):
+                if normalize_citation(match.group(1)) == token.text:
+                    start = cursor + match.start()
+                    end = cursor + match.end()
+                    break
+            if start < 0:
+                start = text.find(token.text, cursor)
+                end = start + len(token.text)
         else:
             start = text.find(token.text, cursor)
-            if start < 0:
-                start = cursor
             end = start + len(token.text)
+        if start < 0:
+            raise ExactMirrorRenderError(
+                f"Frame {frame['frame_id']} cannot position semantic token: {token.text!r}."
+            )
         # Scientific/statistical notation is intentionally tokenized atomically.
         # A reviewed run that selects its leading symbol (for example ``p =``)
         # therefore styles the complete semantic token.
@@ -201,6 +276,69 @@ def _wrap_styled_paragraph(text: str, frame: dict[str, Any], font_size: float, w
     if current or not lines:
         lines.append(current)
     return lines
+
+
+def _wrap_styled_layout(
+    text: str, frame: dict[str, Any], font_size: float, width: float,
+    first_line_indent: float,
+) -> tuple[list[list[StyledToken]], list[float], list[bool]]:
+    """Wrap one or more hard-separated paragraphs with a first-line indent."""
+    lines: list[list[StyledToken]] = []
+    indents: list[float] = []
+    paragraph_ends: list[bool] = []
+    current: list[StyledToken] = []
+    current_indent = first_line_indent
+    current_width = current_indent
+
+    def finish(*, paragraph_end: bool) -> None:
+        nonlocal current, current_width, current_indent
+        while current and current[-1].token.kind == "SPACE":
+            current.pop()
+        lines.append(current)
+        indents.append(current_indent)
+        paragraph_ends.append(paragraph_end)
+        current = []
+        current_indent = first_line_indent if paragraph_end else 0.0
+        current_width = current_indent
+
+    for item in _styled_tokens(text, frame):
+        token = item.token
+        if token.kind == "BREAK":
+            finish(paragraph_end=True)
+            continue
+        token_width = _styled_token_width(item, frame, font_size)
+        if current and current_width + token_width > width:
+            if token.kind == "PUNCTUATION" and token.text in "，。；：！？、）】》":
+                carry: list[StyledToken] = []
+                while current and current[-1].token.kind == "SPACE":
+                    current_width -= _styled_token_width(current.pop(), frame, font_size)
+                while (
+                    current and current[-1].token.kind == "PUNCTUATION"
+                    and current[-1].token.text in "，。；：！？、）】》"
+                ):
+                    carry.insert(0, current.pop())
+                if current:
+                    carry.insert(0, current.pop())
+                finish(paragraph_end=False)
+                current = carry + [item]
+                current_width = sum(_styled_token_width(value, frame, font_size) for value in current)
+                continue
+            if current[-1].token.kind == "PUNCTUATION" and current[-1].token.text in "（【《":
+                opener = current.pop()
+                finish(paragraph_end=False)
+                current = [opener, item]
+                current_width = sum(_styled_token_width(value, frame, font_size) for value in current)
+                continue
+            finish(paragraph_end=False)
+        if not current and token.kind == "SPACE":
+            continue
+        current.append(item)
+        current_width += token_width
+    if current or not lines:
+        finish(paragraph_end=True)
+    elif paragraph_ends:
+        paragraph_ends[-1] = True
+    return lines, indents, paragraph_ends
 
 
 def _wrap_paragraph(text: str, font_name: str, font_size: float, width: float) -> list[list[SemanticToken]]:
@@ -292,11 +430,48 @@ def _layout(text: str, source_text: str, frame: dict[str, Any]) -> tuple[float, 
                 abs(item[0] - 1.0),
             ),
         )
+        font_size = source_size * scale
+        language = "zh-CN" if re.search(r"[\u3400-\u9fff]", text) else "en"
+        alignment = str(frame.get("alignment") or "left").lower()
+        first_line_indent = float(frame.get("first_line_indent_pt", 0.0))
+        line_indents = [first_line_indent] + [0.0] * max(0, len(lines) - 1)
+        paragraph_ends = [False] * max(0, len(lines) - 1) + [True]
+        style_name = style_name_for_role(frame_role(frame), language)
+        layout_exception = None
+        preferred = exact_mirror_body_preference(frame_role(frame), language, font_size)
+        if preferred is not None:
+            preferred_lines, preferred_indents, preferred_ends = _wrap_styled_layout(
+                text, frame, font_size, width, float(preferred["first_line_indent_pt"]),
+            )
+            preferred_height = _used_height(preferred_lines, font_size, leading)
+            if preferred_height <= height + 0.01:
+                lines = preferred_lines
+                line_indents = preferred_indents
+                paragraph_ends = preferred_ends
+                alignment = str(preferred["alignment"])
+                first_line_indent = float(preferred["first_line_indent_pt"])
+                ratio = preferred_height / source_used_height if source_used_height else 1.0
+            else:
+                layout_exception = {
+                    "code": "LAYOUT_EXCEPTION",
+                    "reason": "2em indentation/justification would add a line or overflow at the selected source-safe font scale",
+                    "fallback": "source-frame alignment and indentation",
+                }
         return scale, leading, lines, {
             "source_used_height_pt": round(source_used_height, 3),
             "target_used_height_pt": round(_used_height(lines, source_size * scale, leading), 3),
             "target_source_height_ratio": round(ratio, 4),
             "occupancy_status": "TARGET" if 0.90 <= ratio <= 1.05 else "WARNING",
+            "role": frame_role(frame),
+            "language": language,
+            "style_name": style_name,
+            "alignment": alignment,
+            "first_line_indent_pt": round(first_line_indent, 3),
+            "line_indents_pt": line_indents,
+            "paragraph_end_lines": paragraph_ends,
+            "layout_exception": layout_exception,
+            "overflow": False,
+            "clipping": False,
         }
     return None
 
@@ -347,23 +522,64 @@ def _draw_line(
     font_size: float,
     frame: dict[str, Any],
     is_last: bool,
+    alignment: str | None = None,
+    first_line_indent: float = 0.0,
 ) -> None:
+    x += first_line_indent
+    width = max(0.0, width - first_line_indent)
     measured = sum(_styled_token_width(item, frame, font_size) for item in line)
-    alignment = frame["alignment"]
+    alignment = alignment or frame["alignment"]
     if alignment == "center":
         x += max(0.0, (width - measured) / 2)
     elif alignment == "right":
         x += max(0.0, width - measured)
+    drawable_count = sum(1 for item in line if item.token.kind != "SPACE")
+    # Exact source frames can be much wider than a concise Chinese line. Limit
+    # expansion so justification never stretches Latin terms or CJK glyphs into
+    # visibly separate islands; the frame geometry remains unchanged.
+    justify_step = (
+        min(max(0.0, width - measured) / (drawable_count - 1), font_size * 0.35)
+        if alignment == "justify" and not is_last and drawable_count > 1 else 0.0
+    )
     cursor = x
-    for item in line:
+    drawable_index = 0
+    item_index = 0
+    while item_index < len(line):
+        item = line[item_index]
         token = item.token
         font_name, styled_size = _styled_font(item, frame, font_size)
         weight = str(item.style.get("weight") or frame.get("weight", "regular")).lower()
         italic = bool(item.style.get("italic", frame.get("italic", False)))
+        # Keep adjacent Chinese glyphs in one PDF text object.  Wrapping still
+        # happens per character, while search engines can match ordinary words
+        # instead of seeing a sequence of unrelated one-glyph objects.
+        run_length = 1
+        run_text = token.text
+        if token.kind == "TEXT" and re.fullmatch(r"[\u3400-\u9fff]", token.text):
+            while item_index + run_length < len(line):
+                following = line[item_index + run_length]
+                following_font, following_size = _styled_font(following, frame, font_size)
+                following_weight = str(
+                    following.style.get("weight") or frame.get("weight", "regular")
+                ).lower()
+                following_italic = bool(
+                    following.style.get("italic", frame.get("italic", False))
+                )
+                if not (
+                    following.token.kind == "TEXT"
+                    and re.fullmatch(r"[\u3400-\u9fff]", following.token.text)
+                    and following_font == font_name
+                    and following_size == styled_size
+                    and following_weight == weight
+                    and following_italic == italic
+                ):
+                    break
+                run_text += following.token.text
+                run_length += 1
         scientific = re.fullmatch(r"(.+?10)([+−-]?\d+)", token.text) if token.kind in {"SCIENTIFIC", "STAT"} else None
         pieces = (
             [(scientific.group(1), styled_size, 0.0), (scientific.group(2), styled_size * 0.65, styled_size * 0.32)]
-            if scientific else [(token.text, styled_size * 0.65 if token.kind == "CITATION" else styled_size,
+            if scientific else [(run_text, styled_size * 0.65 if token.kind == "CITATION" else styled_size,
                                   styled_size * 0.32 if token.kind == "CITATION" else 0.0)]
         )
         for piece, token_size, rise in pieces:
@@ -377,6 +593,8 @@ def _draw_line(
             else:
                 text.setTextOrigin(cursor, baseline)
             text.setFont(font_name, token_size)
+            if run_length > 1 and justify_step:
+                text.setCharSpace(justify_step)
             # Ts persists in the PDF text state across text objects; always reset
             # it so a citation cannot lift the following prose above its frame.
             text.setRise(rise)
@@ -387,9 +605,16 @@ def _draw_line(
             c.drawText(text)
             c.restoreState()
             cursor += pdfmetrics.stringWidth(visible_piece, font_name, token_size)
+            if run_length > 1 and justify_step:
+                cursor += justify_step * (run_length - 1)
+        if token.kind != "SPACE":
+            drawable_index += run_length
+            if drawable_index < drawable_count:
+                cursor += justify_step
+        item_index += run_length
 
 
-def _draw_frame(c: Any, frame: dict[str, Any], text: str, scale: float, leading: float, lines: list[list[StyledToken]], work_dir: Path) -> None:
+def _draw_frame(c: Any, frame: dict[str, Any], text: str, scale: float, leading: float, lines: list[list[StyledToken]], work_dir: Path, typography: dict[str, Any]) -> None:
     x0, y0, x1, y1 = [float(value) for value in frame["bbox_pt"]]
     rotation = int(frame.get("rotation", 0))
     c.saveState()
@@ -422,7 +647,14 @@ def _draw_frame(c: Any, frame: dict[str, Any], text: str, scale: float, leading:
     # full em as the top offset can push the last baseline below the frame.
     baseline = local_height - font_size * 0.85
     for index, line in enumerate(lines):
-        _draw_line(c, line, 0, baseline, local_width, font_size, frame, index == len(lines) - 1)
+        line_indents = typography.get("line_indents_pt", [])
+        paragraph_ends = typography.get("paragraph_end_lines", [])
+        _draw_line(
+            c, line, 0, baseline, local_width, font_size, frame,
+            bool(paragraph_ends[index]) if index < len(paragraph_ends) else index == len(lines) - 1,
+            alignment=str(typography.get("alignment") or frame["alignment"]),
+            first_line_indent=float(line_indents[index]) if index < len(line_indents) else 0.0,
+        )
         baseline -= leading
     c.restoreState()
 
@@ -496,15 +728,12 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
         raise ExactMirrorRenderError(f"Cannot register/embed SimSun: {exc}") from exc
 
     sources = {source["source_id"]: source for source in inventory["sources"]}
-    readers = {
-        source_id: PdfReader(str(_resolve_source_pdf(work_dir, source)))
-        for source_id, source in sources.items()
-    }
     frame_to_ledger = {
         row["frame_ids"][0]: row for row in ledger.values()
     }
     page_plan = {page["output_page_number"]: page for page in plan["pages"]}
     inventory_pages = sorted(inventory["pages"], key=lambda item: item["output_page"])
+    readers = _redacted_readers(work_dir, sources, inventory_pages, frames)
     writer = PdfWriter()
     overflows: list[str] = []
     rendered_frames: list[dict[str, Any]] = []
@@ -535,7 +764,10 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
                 overflows.append(frame_id)
                 continue
             scale, leading, lines, typography = fitted
-            _draw_frame(overlay_canvas, frame, row["translated_text"], scale, leading, lines, work_dir)
+            _draw_frame(
+                overlay_canvas, frame, row["translated_text"], scale, leading,
+                lines, work_dir, typography,
+            )
             row["font_scale_used"] = scale
             row["fit_status"] = "FIT"
             frame["source_cleared"] = True
@@ -551,9 +783,9 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
                 "weight": str(frame.get("weight") or "regular").lower(),
                 "italic": bool(frame.get("italic", "italic" in str(frame.get("weight", "")).lower())),
                 "color_rgb": [float(value) for value in frame.get("text_rgb", [0, 0, 0])],
-                "alignment": str(frame.get("alignment") or "left").lower(),
+                "alignment": str(typography.get("alignment") or frame.get("alignment") or "left").lower(),
                 "superscript": bool(frame.get("superscript", False)),
-                "first_line_indent_pt": float(frame.get("first_line_indent_pt", 0.0)),
+                "first_line_indent_pt": float(typography.get("first_line_indent_pt", frame.get("first_line_indent_pt", 0.0))),
                 "paragraph_spacing_before_pt": float(frame.get("paragraph_spacing_before_pt", 0.0)),
                 "paragraph_spacing_after_pt": float(frame.get("paragraph_spacing_after_pt", 0.0)),
                 "baseline_offset_pt": float(frame.get("baseline_offset_pt", 0.0)),
@@ -568,6 +800,8 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
                     }
                     for run in frame.get("style_runs", [])
                 ],
+                "paragraph_style_name": typography.get("style_name"),
+                "layout_exception": typography.get("layout_exception"),
             }
             rendered_frames.append(
                 {
@@ -575,8 +809,10 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
                     "output_page": output_page,
                     "bbox_pt": frame["bbox_pt"],
                     "font_scale_used": scale,
+                    "font_size_pt": round(float(frame["source_font_size_pt"]) * scale, 3),
                     "leading_pt": leading,
                     "line_count": len(lines),
+                    "exact_mirror": True,
                     **typography,
                 }
             )

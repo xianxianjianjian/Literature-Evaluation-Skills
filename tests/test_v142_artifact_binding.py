@@ -89,6 +89,14 @@ class ArtifactBindingTests(unittest.TestCase):
             'reviewed_date': '2026-09-09', 'method': 'source/output crop side-by-side',
         }}))
 
+    def test_complete_human_review_can_resolve_confident_ocr_candidate(self):
+        review = {'ocr_review': {
+            'finding': 'NO_UNTRANSLATED_PROSE', 'reviewer': 'translation QC',
+            'reviewed_date': '2026-09-09', 'method': 'source/output crop side-by-side',
+        }}
+        self.assertTrue(residual._candidate_matches_pass(['AS'], [], review))
+        self.assertFalse(residual._candidate_matches_pass(['AS'], [], {}))
+
     def test_pdf_subset_font_emphasis(self):
         self.assertEqual(extractor.font_emphasis('ABCDE+AdvOT34fe.B'),(True,False))
         self.assertEqual(extractor.font_emphasis('ABCDE+AdvOT34fe.I'),(False,True))

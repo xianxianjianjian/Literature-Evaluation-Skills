@@ -39,6 +39,17 @@ _PROTECTED = re.compile(
     r"(?:[A-Z]-Nap|CB|E-Nap)",
     re.IGNORECASE,
 )
+_ALPHANUMERIC_CODE = re.compile(
+    r"(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9._/–-]*\d[A-Za-z0-9._/–-]*(?![A-Za-z0-9_])"
+)
+_URL = re.compile(r"https?://[^\s\u3400-\u9fff（）\[\]，。；：！？、]+", re.IGNORECASE)
+_LATIN_WORD = re.compile(
+    r"(?<![A-Za-z0-9_])[A-Za-zΑ-ω]+(?:[._/–-][A-Za-zΑ-ω]+)*(?![A-Za-z0-9_])"
+)
+_NUMERIC_ATOM = re.compile(
+    r"(?<![A-Za-z0-9_])(?:\d{1,2}:\d{2}|\d{1,4}/\d{2,4}|"
+    r"[+−-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[–—-]\d+(?:\.\d+)?)?%?)(?![A-Za-z0-9_])"
+)
 
 
 def normalize_citation(value: str) -> str:
@@ -118,7 +129,9 @@ def semantic_tokens(text: str) -> list[SemanticToken]:
     text = normalize_chinese_text(text)
     patterns = [("CITATION", _CITATION), ("CITATION_SUP", _UNICODE_CITATION),
                 ("STAT", _STAT_SCI), ("SCIENTIFIC", _SCIENTIFIC), ("STAT", _STAT_GROUP),
-                ("PROTECTED", _PROTECTED), ("UNIT", _UNIT_GROUP)]
+                ("PROTECTED", _PROTECTED), ("UNIT", _UNIT_GROUP),
+                ("URL", _URL), ("CODE", _ALPHANUMERIC_CODE),
+                ("LATIN_WORD", _LATIN_WORD), ("NUMBER", _NUMERIC_ATOM)]
     tokens: list[SemanticToken] = []
     position = 0
     while position < len(text):

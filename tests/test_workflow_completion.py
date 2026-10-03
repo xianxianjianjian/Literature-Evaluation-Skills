@@ -17,6 +17,7 @@ import workflow_state as state
 class FullWorkflowCompletionTests(unittest.TestCase):
     def _complete(self, *, zotero_keys: bool = True) -> dict:
         data = state.initial_manifest("2026-W34")
+        data["contract_version"] = "1.4.2"  # Historical archive contract fixture.
         data["paper_id"] = "10.0000/full"
         for name in state.STAGE_NAMES:
             data["stages"][name]["status"] = "COMPLETE"

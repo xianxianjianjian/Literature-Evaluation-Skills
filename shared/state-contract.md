@@ -56,6 +56,8 @@ update_reason:
 
 ## 学术完成与归档完成分离
 
+For new v1.5.0 manifests, Academic completion requires the A text-layer gate and B/C academic gates. B DOCX remains the editable source. Archive completion additionally requires a validated B PDF export report, a Zotero role/title/MIME verification report for Main/SI/A/B, and no pending Zotero actions. Pre-1.5.0 manifests keep their original contract and history.
+
 V1 的阶段状态首先描述**学术工作和对应产物本身**，不再把某一种外部归档传输方式混入阶段状态。
 
 因此：
@@ -71,7 +73,7 @@ Zotero 等归档待办通过：
 pending_zotero_actions:
   - action: attach
     source_id: SRC-M1
-    expected_attachment_name: "[ORIGINAL] Main Article"
+    expected_attachment_name: "pdf"
 ```
 
 单独记录。只有当缺失 Zotero 中的文件意味着**源证据本身也不可用**时，才根据真实证据缺口影响学术阶段状态。

@@ -39,10 +39,10 @@ The academic handoff depends on this source package, not on whether Zotero alrea
 Preferred labels:
 
 ```text
-[ORIGINAL] Main Article
-[SUPPLEMENT] <descriptive name>
-[A] 中文全文翻译镜像版
-[B] 文献研究笔记·完整精读版
+pdf
+SI / SI-1, SI-2 / SI-Data-n
+A翻译
+B精读
 ```
 
 After any automatic or manual write, verify the actual parent/attachment identity rather than treating a submitted request, UI action or HTTP success code as archive success.

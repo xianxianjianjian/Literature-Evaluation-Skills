@@ -2,16 +2,19 @@
 
 Zotero 是本项目**首选的长期研究档案中心**，但不是 V1 学术工作流能够运行和完成的前置依赖。普通 Search 候选不应全部塞入 Zotero；只有用户最终确认精读的论文才进入正式归档流程。
 
-## 推荐附件名称
+## v1.5.0 附件显示名称
 
 ```text
-[ORIGINAL] Main Article
-[SUPPLEMENT] <descriptive name>
-[A] 中文全文翻译镜像版
-[B] 文献研究笔记·完整精读版
+pdf                 Main PDF
+SI / SI-1, SI-2     阅读型 SI PDF
+SI-Data-1           数据型 SI 原始文件
+A翻译                A PDF
+B精读                B PDF
 ```
 
 长期目标仍是由 Zotero 管理 Main、SI、A 和 B；Git 保存 Skills、knowledge、Search 历史、C 和工作流状态，不长期重复保存 A/B。
+
+显示 title 与底层 filename 分开；底层文件名保持唯一、可追踪。DOCX B 保留在研究工作区作为编辑源；独立验证的 B PDF 才是 Zotero 阅读附件。阅读型 DOC/DOCX/HTML/TXT/RTF SI 先生成 PDF 阅读副本，数据型 SI 保留原文件，可另附阅读副本。归档完成需核对 parent、paper identity、role、title、MIME、完整上传和重复角色，且 `pending_zotero_actions = []`。`zotero_bridge.py normalize-titles` 默认仅预览，不自动删除旧附件。
 
 ## PDF-first 父条目创建
 

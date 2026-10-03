@@ -141,7 +141,7 @@ Use:
 
 Severity is evidence-specific. Do not describe `A0` as proof that the study or data are true.
 
-Every `A3` must appear prominently in B and in C when it affects the weekly evaluation.
+Every `A3` must appear prominently in B. Include it in default C only when it is Main-visible and fits the submission evidence and author-limitation rules; otherwise keep it in the private archive or use a user-requested critical mode with clear attribution.
 
 ## Readiness and completeness
 

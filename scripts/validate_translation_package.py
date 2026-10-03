@@ -51,6 +51,8 @@ from audit_untranslated_residuals import (
     write_report as write_residual_report,
 )
 from style_fidelity import StyleFidelityError, validate_rendered_styles, audit_pdf_styles
+import validate_a_text_layer
+import validate_paragraph_styles
 
 try:
     from pypdf import PdfReader
@@ -93,6 +95,28 @@ class TranslationCheck:
 
 class TranslationPackageError(ValueError):
     """Raised when a translation package cannot be parsed."""
+
+
+def _resolve_cjk_owner(
+    owners: list[tuple[str, dict[str, Any]]],
+) -> tuple[str, dict[str, Any]] | None:
+    """Assign a glyph to the innermost reviewed frame when patches are nested."""
+    if len(owners) == 1:
+        return owners[0]
+    nested = [
+        candidate
+        for candidate in owners
+        if all(
+            candidate is other
+            or bbox_contains(
+                [float(value) for value in other[1]["bbox_pt"]],
+                [float(value) for value in candidate[1]["bbox_pt"]],
+                tolerance=0.25,
+            )
+            for other in owners
+        )
+    ]
+    return nested[0] if len(nested) == 1 else None
 
 
 def _load_json(path: Path, label: str) -> Any:
@@ -758,6 +782,14 @@ def _render_pdf_page(pdftoppm: Path, pdf: Path, page_number: int, output_prefix:
     return output
 
 
+def _material_pixel_mask(
+    source_array: Any, output_array: Any, *, antialias_tolerance: int = 64
+) -> Any:
+    """Ignore renderer-only edge-antialias variation while retaining real edits."""
+    delta = np.abs(source_array.astype(np.int16) - output_array.astype(np.int16))
+    return np.max(delta, axis=2) > antialias_tolerance
+
+
 def _raster_outside_frames_unchanged(
     source_pdf: Path,
     source_page: int,
@@ -790,7 +822,7 @@ def _raster_outside_frames_unchanged(
         top = max(0, int((media_box[3] - bbox[3]) * y_scale) - 2)
         bottom = min(height, int((media_box[3] - bbox[1]) * y_scale) + 3)
         mask[top:bottom, left:right] = True
-    changed = np.any(source_array != output_array, axis=2) & ~mask
+    changed = _material_pixel_mask(source_array, output_array) & ~mask
     changed_count = int(changed.sum())
     return changed_count == 0, changed_count
 
@@ -820,7 +852,7 @@ def _validate_exact_package(
             frame_rows, inventory
         )
         checks.append(TranslationCheck("layout:text-frame-schema", True, f"{len(frames)} reviewed frames"))
-        if contract_version == "1.4.2":
+        if contract_version in {"1.4.2", "1.5.0"}:
             missing_roles = sorted(row["frame_id"] for row in frame_rows if "role" not in row or "preserve_english" not in row)
             checks.append(TranslationCheck(
                 "layout:role-contract", not missing_roles,
@@ -848,7 +880,7 @@ def _validate_exact_package(
         checks.append(TranslationCheck("ledger:exact-schema", True, f"{len(ledger)} frame-level units"))
     except (ExactMirrorError, OSError) as exc:
         return checks + [TranslationCheck("ledger:exact-schema", False, str(exc))], diff
-    if contract_version == "1.4.2":
+    if contract_version in {"1.4.2", "1.5.0"}:
         try:
             style_map = _load_json(work_dir / "style_map.json", "style map")
             style_report = validate_rendered_styles(frame_rows, style_map)
@@ -1080,6 +1112,22 @@ def _validate_exact_package(
             "typography fit evidence covers every translated frame"
             if typography_ok else "typography fit evidence is missing or incomplete",
         ))
+        if contract_version == "1.5.0" and isinstance(records, list):
+            target_by_frame = {
+                frame_id: str(row.get("translated_text") or "")
+                for row in ledger.values()
+                for frame_id in row.get("frame_ids", [])
+            }
+            paragraph_records = [
+                {**item, "text": target_by_frame.get(str(item.get("frame_id")), "")}
+                for item in records
+            ]
+            paragraph_checks = validate_paragraph_styles.validate_records(paragraph_records)
+            paragraph_checks.append(validate_paragraph_styles.validate_bilingual_texts(paragraph_records))
+            checks.extend(
+                TranslationCheck(item.code, item.passed, item.detail)
+                for item in paragraph_checks
+            )
     except (TranslationPackageError, OSError, KeyError, TypeError, ZeroDivisionError) as exc:
         checks.append(TranslationCheck("layout:typography-fit", False, str(exc)))
     try:
@@ -1194,19 +1242,20 @@ def _validate_exact_package(
                                 tolerance=max(0.25, float(char.get("size") or 0.0) * 0.04),
                             )
                         ]
-                        if len(owners) != 1:
+                        owner = _resolve_cjk_owner(owners)
+                        if owner is None:
                             cjk_position_failures.append(output_number)
                             continue
-                        frame_id, frame = owners[0]
+                        frame_id, frame = owner
                         cjk_frame_counts[frame_id] += 1
                         if frame.get("rotation") not in {90, 270}:
                             frame_line_positions[frame_id].append(float(char["top"]))
                         font_name = str(char.get("fontname") or "")
                         expected_families = {
                             style_map.get('roles', {}).get(frame_role(frame), {}).get('cjk_font_family', 'SimSun')
-                            if contract_version == '1.4.2' else 'SimSun'
+                            if contract_version in {'1.4.2', '1.5.0'} else 'SimSun'
                         }
-                        if contract_version == '1.4.2':
+                        if contract_version in {'1.4.2', '1.5.0'}:
                             expected_families.update(
                                 str(run.get('font_family') or '')
                                 for run in frame.get('style_runs', [])
@@ -1387,6 +1436,11 @@ def validate_package_detailed(
                 "A PDF present" if pdf_ok else f"invalid A PDF: {a_path}",
             )
         ] + exact_checks
+        if contract_version == "1.5.0" and pdf_ok:
+            combined.extend(
+                TranslationCheck(item.code, item.passed, item.detail)
+                for item in validate_a_text_layer.validate(work_dir, a_path)
+            )
         diff["passed"] = all(check.passed for check in combined)
         diff["checks"] = [asdict(check) for check in combined]
         return combined, diff, layout_fidelity
@@ -1506,7 +1560,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(LAYOUT_FIDELITIES),
     )
     parser.add_argument("--report", type=Path, required=True)
-    parser.add_argument("--contract-version", choices=("1.4.1", "1.4.2"), default="1.4.2")
+    parser.add_argument("--contract-version", choices=("1.4.1", "1.4.2", "1.5.0"), default="1.5.0")
     return parser
 
 

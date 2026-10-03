@@ -14,6 +14,7 @@ from typing import Any
 
 from exact_mirror import FRAME_ROLES, TRANSLATABLE_FRAME_ROLES, frame_role, load_jsonl
 from extract_text_frames_impl import font_emphasis
+from paragraph_styles import paragraph_style
 
 
 class StyleFidelityError(ValueError):
@@ -127,7 +128,13 @@ def validate_rendered_styles(
         source = style_fingerprint(frame)
         rendered = frame.get("rendered_style")
         frame_failures: list[str] = []
-        if role in TRANSLATABLE_FRAME_ROLES:
+        # RETAIN_SOURCE frames keep the publisher's original text operators and
+        # therefore have no CJK rendered-style declaration.  Only replacement
+        # frames are expected to carry renderer-owned style evidence.
+        if (
+            role in TRANSLATABLE_FRAME_ROLES
+            and frame.get("translation_action") != "RETAIN_SOURCE"
+        ):
             if not isinstance(rendered, dict):
                 frame_failures.append("missing rendered_style")
             else:
@@ -145,11 +152,18 @@ def validate_rendered_styles(
                     frame_failures.append("font-size ratio outside role range")
                 if not rule["leading_ratio_range"][0] - epsilon <= leading_ratio <= rule["leading_ratio_range"][1] + epsilon:
                     frame_failures.append("leading ratio outside role range")
+                expected_alignment = source["alignment"]
+                expected_indent = source["first_line_indent_pt"]
+                if rendered.get("paragraph_style_name") and not rendered.get("layout_exception"):
+                    language = "zh-CN" if str(rendered["paragraph_style_name"]).endswith("_ZH") else "en"
+                    project_style = paragraph_style(role, language, float(rendered.get("font_size_pt", 0)))
+                    expected_alignment = project_style["alignment"]
+                    expected_indent = project_style["first_line_indent_pt"]
                 comparisons = {
                     "weight": source["weight"], "italic": source["italic"],
-                    "color_rgb": source["color_rgb"], "alignment": source["alignment"],
+                    "color_rgb": source["color_rgb"], "alignment": expected_alignment,
                     "superscript": source["superscript"],
-                    "first_line_indent_pt": source["first_line_indent_pt"],
+                    "first_line_indent_pt": expected_indent,
                     "paragraph_spacing_before_pt": source["paragraph_spacing_before_pt"],
                     "paragraph_spacing_after_pt": source["paragraph_spacing_after_pt"],
                     "baseline_offset_pt": source["baseline_offset_pt"],
@@ -237,7 +251,12 @@ def audit_pdf_styles(output_pdf: Path, inventory: dict[str, Any], frames: list[d
             families = {
                 style_map['roles'][frame_role(frame)]['cjk_font_family'].lower()
             } | {str(run.get('font_family','')).lower() for run in reviewed_runs}
-            operations = [item for item in text_states[page_map[(frame['source_id'],frame['source_page'])]-1] if x0 <= item['x'] <= x1 and y0 <= item['y'] <= y1]
+            operations = [
+                item
+                for item in text_states[page_map[(frame['source_id'], frame['source_page'])] - 1]
+                if x0 - 0.25 <= item['x'] <= x1 + 0.25
+                and y0 - 0.25 <= item['y'] <= y1 + 0.25
+            ]
             expected_bold = str(frame.get('weight','')).startswith('bold')
             expected_italic = bool(frame.get('italic',False))
             if operations:
