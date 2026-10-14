@@ -108,3 +108,11 @@ Failure of this add-on means **archive pending**, not Translation failure.
 Consequential missing SI/source coverage still keeps the academic stage `PROVISIONAL` or `BLOCKED` according to whether defensible work can continue.
 
 `TRI-xxx` is reserved for translation/production issues. Do not use `TRI` for methodological or statistical research-audit findings.
+
+## v1.5 selectable text hardening
+
+For v1.5 FULL_MIRROR/EXACT_TEXT_FRAME, compare the complete ledger sequence with uniquely assigned glyphs inside each reviewed frame. All CJK, English, digits, citations, units, statistics and mathematical punctuation are significant; no prefix shortcut is allowed. Fullwidth ASCII, NFC, typographic ligatures, super/subscript digits/signs, renderer-equivalent minus, whitespace and soft hyphens are the only automatic extraction equivalences. Other differences block completion. Geometry completeness and within-frame copy order are separate gates; global PDF object order is not assumed to traverse columns. Overlapping frames cannot reuse the same glyph to satisfy multiple translations.
+
+Source-backed single words and split text objects in translated regions fail the stale-English gate. Terms actually retained in the target and explicitly reasoned `retained_source_tokens` are permitted. REFERENCE and FIGURE_INTERNAL roles retain their existing exceptions. Do not erase legitimate REM/PSG/DOI, statistical notation or figure labels to satisfy a detector.
+
+ToUnicode and extraction prove encoding/copy content only. The common-reader mouse selection, copy/paste, search, cross-line and cross-column experience remains a recorded manual check. Retain the reviewed frame inventory and ledger as evidence, not disposable rendering cache. The standalone text-layer report records each frame's expected/extracted character counts, exact sequence result and failed frame IDs. v1.4.1/v1.4.2 do not acquire these new gates retroactively.

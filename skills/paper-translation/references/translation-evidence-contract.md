@@ -143,6 +143,8 @@ The validator generates `numeric_integrity.json`, `untranslated_residual_audit.j
 
 Use the existing `source_manifest.json` for source identity. Do not add per-unit, per-page, per-object or font hashes.
 
+v1.5 text-layer completeness uses the entire normalized mixed-language sequence, not a CJK-only prefix or search hit. See [translation QC](translation-qc.md) for the explicit extraction equivalences, unique glyph ownership and independent copy-order gate. The reviewed `text_frame_inventory.jsonl` must survive cleanup because it is necessary source/geometry evidence.
+
 ## Legacy and non-exact scopes
 
 Schema-v1 evidence remains readable as `LEGACY_STRUCTURAL`. It cannot be re-certified as `EXACT_TEXT_FRAME`. `MAIN_ONLY` and `ABSTRACT_ONLY` continue to use their existing content evidence without exact-layout files.
