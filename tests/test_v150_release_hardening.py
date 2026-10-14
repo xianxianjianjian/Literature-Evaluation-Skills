@@ -259,16 +259,26 @@ class CSourceAndSignoffTests(unittest.TestCase):
             cases = []
             bare = copy.deepcopy(mapping)
             bare["signoff"] = {"status": "PASS", "evidence": "reviewed"}
-            cases.append(bare)
+            cases.append((markdown, bare))
             rejected = copy.deepcopy(mapping)
-            rejected["signoff"]["claims"][0].update({"status": "FAIL", "reason": "Main says improved; assertion reverses effect direction"})
-            cases.append(rejected)
+            first_claim = rejected["paragraphs"][0]["claims"][0]
+            reversed_text = "睡眠之后记忆表现变差，研究结果显示记忆下降。"
+            reversed_markdown = markdown.replace(first_claim["text"], reversed_text, 1)
+            first_claim.update({"text": reversed_text, "kind": "result"})
+            rejected["signoff"]["comment_sha256"] = hashlib.sha256(c.extract_comment(reversed_markdown).encode()).hexdigest()
+            rejected["signoff"]["claims"][0].update({"claim_text_sha256": hashlib.sha256(reversed_text.encode()).hexdigest(),
+                "status": "FAIL", "reason": "Main says Memory improved after sleep; the Chinese assertion reverses effect direction"})
+            located = c.validate(reversed_markdown, rejected, source_index=index)
+            self.assertTrue(self.gate(located, "C_SOURCE_MAP_PASS").passed)
+            self.assertIn("improved", first_claim["source_anchor"]["quote"])
+            self.assertIn("reverses effect direction", rejected["signoff"]["claims"][0]["reason"])
+            cases.append((reversed_markdown, rejected))
             missing = copy.deepcopy(mapping)
             missing["signoff"]["reviewer"] = ""
-            cases.append(missing)
-            for bad in cases:
-                self.assertFalse(self.gate(c.validate(markdown, bad, source_index=index), "C_HUMAN_SIGNOFF_PASS").passed)
-                self.assertFalse(self.gate(c.validate(markdown, bad, source_index=index), "CLAIM_STRENGTH_PASS").passed)
+            cases.append((markdown, missing))
+            for text, bad in cases:
+                self.assertFalse(self.gate(c.validate(text, bad, source_index=index), "C_HUMAN_SIGNOFF_PASS").passed)
+                self.assertFalse(self.gate(c.validate(text, bad, source_index=index), "CLAIM_STRENGTH_PASS").passed)
             self.assertFalse(self.gate(c.validate(markdown.replace("谨慎解释", "强因果解释"), mapping, source_index=index), "C_HUMAN_SIGNOFF_PASS").passed)
 
     def test_source_pdf_changed_wrong_doi_and_scanned_main_require_review(self):
