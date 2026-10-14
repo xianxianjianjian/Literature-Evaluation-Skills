@@ -71,7 +71,8 @@ def export(b_path: Path, academic_report: Path, rendered_pdf: Path, output: Path
             raise ValueError("requested PDF path differs from signed independent render")
     else:
         render_evidence = next((str(item.get("detail") or "") for item in report.get("checks", []) if item.get("code") == "B:independent-render"), "")
-        if not render_evidence.endswith(str(rendered_pdf)):
+        prefix = "rendered by independent office engine: "
+        if not render_evidence.startswith(prefix) or resolve_path(render_evidence[len(prefix):], root, allowed_roots=allowed_roots) != rendered_pdf:
             raise ValueError("requested B PDF is not the academic report's independent render")
     if not rendered_pdf.is_file() or rendered_pdf.stat().st_size == 0:
         raise ValueError("independent B PDF is missing or empty")

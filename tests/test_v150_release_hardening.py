@@ -432,7 +432,7 @@ class BContentBindingTests(unittest.TestCase):
                     os.chdir(directory)
                     result = b_export.export(Path("B.docx"), Path("academic.json"), Path("rendered.pdf"), Path("archive.pdf"), workspace_root=root)
                     self.assertTrue(result["B_PDF_EXPORT_PASS"])
-                    self.assertEqual(Path(result["pdf_path"]), root / "archive.pdf")
+                    self.assertEqual(Path(result["pdf_path"]), (root / "archive.pdf").resolve())
             finally:
                 os.chdir(cwd)
 
@@ -571,7 +571,7 @@ class LegacyAndPathTests(unittest.TestCase):
             for value in ("../data.json", str(target), "missing.json"):
                 with self.assertRaises(ValueError):
                     binding.resolve_path(value, root)
-            self.assertEqual(binding.resolve_path(target, root, allowed_roots=(outside,)), target)
+            self.assertEqual(binding.resolve_path(target, root, allowed_roots=(outside,)), target.resolve())
             link = root / "link"
             try:
                 link.symlink_to(outside, target_is_directory=True)
