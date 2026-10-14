@@ -23,6 +23,8 @@ except ImportError:  # pragma: no cover - explicit dependency result
 from sanitize_docx_metadata import validate_docx_metadata
 from deep_reading_evidence import DeepEvidenceError, validate_deep_evidence
 from psychology_method_router import MethodRoutingError, select_modules
+from artifact_binding import fingerprint, matches_fingerprint, source_bindings
+from validate_a_text_layer import normalize_text
 
 
 class DeepReadingValidationError(ValueError):
@@ -206,7 +208,8 @@ def render_docx(path: Path, output_dir: Path, soffice: Path | None) -> Path:
 
 
 def _validate_visual_qa(
-    qa_path: Path, rendered_pdf: Path, png_dir: Path
+    qa_path: Path, rendered_pdf: Path, png_dir: Path, *, b_path: Path | None = None,
+    contract_version: str = "1.4.1",
 ) -> list[DeepReadingCheck]:
     if not qa_path.is_file():
         return [DeepReadingCheck("B:visual-qa", False, f"visual QA missing: {qa_path}")]
@@ -239,6 +242,16 @@ def _validate_visual_qa(
                 invalid.append(expected)
     if isinstance(data, dict) and data.get("wrong_page_count") is not False:
         invalid.append("wrong-page-count")
+    if contract_version == "1.5.0":
+        if (not b_path or not matches_fingerprint(b_path, data.get("source_docx", {}))
+                or not matches_fingerprint(rendered_pdf, data.get("rendered_pdf", {}))
+                or not str(data.get("reviewer") or "").strip()
+                or not str(data.get("reviewed_at") or "").strip()):
+            invalid.append("REVIEW_REQUIRED: visual QA is not bound to current DOCX/PDF/reviewer")
+        if isinstance(pages, list) and len(pngs) == page_count and len(pages) == page_count:
+            for row, png in zip(pages, pngs):
+                if not isinstance(row, dict) or not matches_fingerprint(png, row.get("image", {})):
+                    invalid.append(f"page-image-binding:{png.name}")
     return [
         DeepReadingCheck(
             "B:rendered-pdf",
@@ -260,6 +273,30 @@ def _validate_visual_qa(
     ]
 
 
+def body_consistency(b_path: Path, rendered_pdf: Path) -> list[str]:
+    """Every nonempty DOCX paragraph/table cell must survive PDF extraction.
+
+    This is a content presence check; page geometry and actual Office provenance
+    still require source-bound all-page visual review.
+    """
+    with zipfile.ZipFile(b_path) as archive:
+        root = ET.fromstring(archive.read("word/document.xml"))
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    paragraphs = [normalize_text("".join(node.itertext())) for node in root.findall(".//w:p", ns)]
+    pdf_text = normalize_text("\n".join(page.extract_text() or "" for page in PdfReader(str(rendered_pdf)).pages))
+    missing = []
+    cursor = 0
+    for text in paragraphs:
+        if not text:
+            continue
+        position = pdf_text.find(text, cursor)
+        if position < 0:
+            missing.append(text[:80])
+        else:
+            cursor = position + len(text)
+    return missing
+
+
 def validate_package(
     b_path: Path,
     work_dir: Path,
@@ -275,6 +312,7 @@ def validate_package(
     if not b_path.is_file() or b_path.suffix.casefold() != ".docx":
         return [DeepReadingCheck("B:artifact", False, f"missing or invalid DOCX: {b_path}")]
     try:
+        docx_binding = fingerprint(b_path)
         text = _docx_text(b_path)
         checks.append(DeepReadingCheck("B:ooxml", True, "DOCX package XML readable"))
     except (OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
@@ -349,12 +387,31 @@ def validate_package(
             visual_qa or work_dir / "b_visual_qa.json",
             active_pdf,
             png_dir or work_dir / "deep_reading_render" / "pages",
+            b_path=b_path, contract_version=contract_version,
         )
     )
+    if contract_version == "1.5.0":
+        try:
+            source_manifest = work_dir / "source_manifest.json"
+            source_paper_id, sources = source_bindings(source_manifest)
+            missing_body = body_consistency(b_path, active_pdf)
+            checks.append(DeepReadingCheck("B:body-consistency", not missing_body,
+                                          "DOCX paragraphs and tables present in PDF" if not missing_body else f"missing DOCX content: {missing_body}"))
+            binding = {"source_docx": {"path": str(b_path.resolve()), **docx_binding},
+                       "rendered_pdf": {"path": str(active_pdf.resolve()), **fingerprint(active_pdf),
+                                        "pages": len(PdfReader(str(active_pdf)).pages)},
+                       "visual_qa": {"path": str((visual_qa or work_dir / "b_visual_qa.json").resolve()),
+                                     **fingerprint(visual_qa or work_dir / "b_visual_qa.json")},
+                       "source_manifest": str(source_manifest.resolve()), "source_paper_id": source_paper_id,
+                       "source_fingerprints": sources}
+            checks.append(DeepReadingCheck("B:content-binding", True, json.dumps(binding)))
+        except (OSError, ValueError, zipfile.BadZipFile, ET.ParseError) as exc:
+            checks.append(DeepReadingCheck("B:content-binding", False, str(exc)))
     return checks
 
 
-def write_report(path: Path, checks: list[DeepReadingCheck], b_path: Path) -> dict[str, Any]:
+def write_report(path: Path, checks: list[DeepReadingCheck], b_path: Path, *,
+                 contract_version: str = "1.4.1", identity: dict | None = None) -> dict[str, Any]:
     payload = {
         "schema_version": 1,
         "validator": "validate_deep_reading_package.py",
@@ -362,6 +419,20 @@ def write_report(path: Path, checks: list[DeepReadingCheck], b_path: Path) -> di
         "passed": all(check.passed for check in checks),
         "checks": [asdict(check) for check in checks],
     }
+    if contract_version == "1.5.0":
+        payload.update(identity or {})
+        payload["contract_version"] = contract_version
+        binding_check = next((c for c in checks if c.code == "B:content-binding" and c.passed), None)
+        if binding_check:
+            payload.update(json.loads(binding_check.detail))
+        else:
+            payload["passed"] = False
+        if not payload.get("paper_id") or not payload.get("workflow_id"):
+            payload["passed"] = False
+        if identity and identity.get("contract_version") != contract_version:
+            payload["passed"] = False
+        if payload.get("source_paper_id") != payload.get("paper_id"):
+            payload["passed"] = False
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return payload
@@ -378,6 +449,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--png-dir", type=Path)
     parser.add_argument("--visual-qa", type=Path)
     parser.add_argument("--contract-version", choices=("1.4.1", "1.4.2", "1.5.0"), default="1.5.0")
+    parser.add_argument("--manifest", type=Path, help="Required workflow identity for a new v1.5 academic report")
     return parser
 
 
@@ -393,7 +465,8 @@ def main(argv: list[str] | None = None) -> int:
         visual_qa=args.visual_qa,
         contract_version=args.contract_version,
     )
-    payload = write_report(args.report, checks, args.b_path)
+    identity = json.loads(args.manifest.read_text(encoding="utf-8-sig")) if args.manifest else None
+    payload = write_report(args.report, checks, args.b_path, contract_version=args.contract_version, identity=identity and {k: identity.get(k) for k in ("paper_id", "workflow_id", "contract_version")})
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["passed"] else 2
 

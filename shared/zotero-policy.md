@@ -120,3 +120,5 @@ academic artifact COMPLETE
 - collection 自动定位；
 - 更完善的归档 reconciliation/repair 工具。
 新入库的默认流程必须使用 `zotero_bridge.py ingest-pdf` 或等价的 Zotero Desktop PDF 导入/自动识别路径：Main PDF 先进入目标文库，Zotero 自动识别生成父条目，再独立核对 DOI、标题、年份、collection 和 Main child。`create` 仅是带原因的 metadata-only fallback；它本身永远不能关闭归档状态。
+
+v1.5 `verify-archive` requires `--workspace-root` and a spec containing paper/workflow/contract identity, collection key, verified `source_fingerprints`, and each role's `local_path` plus `local` SHA-256/size. Read actual attachment bytes through the local API file URL, compare local/actual SHA-256, and compare actual MD5 with the API's MD5 field. The report's `content_bindings[attachment_key]` records `local`, `actual`, `api_md5`, `actual_md5`; unreadable or mismatched files prevent completion. Reading/verifying grants no authority to replace/delete attachments. Old reports are still interpreted under their original contract.

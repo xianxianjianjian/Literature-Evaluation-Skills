@@ -24,6 +24,8 @@ import validate_terminology_consistency as terminology_consistency_validator
 import validate_c_review
 import validate_translation_package as translation_validator
 from workflow_state import WorkflowStateError, load_manifest
+from artifact_binding import resolve_path, matches_fingerprint, require_identity, workflow_identity, same_content
+from main_source_index import build_index
 
 PLUGIN_REQUIRED_DIRECTORIES = [
     "skills/weekly-literature-evaluation/references",
@@ -94,6 +96,9 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/migrate_exact_mirror_v141.py",
     "scripts/render_exact_mirror.py",
     "scripts/validate_a_text_layer.py",
+    "scripts/artifact_binding.py",
+    "scripts/main_source_index.py",
+    "scripts/run_contract_tests.py",
     "scripts/validate_translation_package.py",
     "scripts/translation_integrity.py",
     "scripts/validate_deep_reading_package.py",
@@ -265,7 +270,8 @@ def _academic_completion_checks(data: dict) -> list[Check]:
     return checks
 
 
-def _archive_completion_checks(data: dict) -> list[Check]:
+def _archive_completion_checks(data: dict, *, workspace_root: Path | None = None,
+                               allowed_roots: tuple[Path, ...] = ()) -> list[Check]:
     outputs = data["outputs"]
     checks = _academic_completion_checks(data)
     archive = data.get("archive", {})
@@ -298,23 +304,54 @@ def _archive_completion_checks(data: dict) -> list[Check]:
         checks.append(Check("archive:output-archive", output_ok, "Output Archive verified" if output_ok else "v1.4.2 archive completion requires A/B Output Archive COMPLETE"))
     if data.get("contract_version") == "1.5.0":
         report_path = archive.get("b_pdf_export_report")
+        identity = workflow_identity(data)
+        def resolve(value):
+            if workspace_root is None:
+                raise ValueError("v1.5 archive validation requires explicit workspace root")
+            return resolve_path(value or "", workspace_root, allowed_roots=allowed_roots)
         try:
-            export = json.loads(Path(report_path).read_text(encoding="utf-8-sig")) if report_path else {}
-            pdf = Path(str(export.get("pdf_path") or ""))
-            with pdf.open("rb") as handle:
-                signature = handle.read(5)
-            b_pdf_ok = export.get("B_PDF_EXPORT_PASS") is True and signature == b"%PDF-"
-        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            export = json.loads(resolve(report_path).read_text(encoding="utf-8-sig"))
+            require_identity(export, identity)
+            b_docx = resolve(outputs["B"].get("local_path"))
+            pdf = resolve(outputs["B"].get("archive_pdf"))
+            academic_path = resolve(outputs["B"].get("validation_report"))
+            academic = json.loads(academic_path.read_text(encoding="utf-8-sig"))
+            require_identity(academic, identity)
+            import export_b_pdf
+            # Reuse the export contract without writing another copy.
+            export_b_pdf.validate_bound_report(b_docx, academic_path, academic, workspace_root, allowed_roots, rendered_pdf=pdf)
+            b_pdf_ok = (export.get("B_PDF_EXPORT_PASS") is True
+                        and resolve(export.get("source_docx")) == b_docx
+                        and resolve(export.get("pdf_path")) == pdf
+                        and resolve(export.get("academic_report")) == academic_path
+                        and same_content(academic.get("rendered_pdf", {}), export.get("pdf_binding", {}))
+                        and matches_fingerprint(academic_path, export.get("academic_report_binding", {}))
+                        and export.get("rendered_pdf_binding") == academic.get("rendered_pdf")
+                        and export.get("source_fingerprints") == academic.get("source_fingerprints")
+                        and export.get("source_docx_binding") == academic.get("source_docx"))
+            b_pdf_detail = "B DOCX/PDF/academic report SHA-256 chain matches manifest" if b_pdf_ok else "B content identity differs from manifest or signed report"
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             b_pdf_ok = False
-        checks.append(Check("archive:B-PDF-export", b_pdf_ok, "validated B PDF present" if b_pdf_ok else "B PDF export report/PDF missing or invalid"))
+            b_pdf_detail = str(exc)
+        checks.append(Check("archive:B-PDF-export", b_pdf_ok, b_pdf_detail))
         verification_path = archive.get("verification_report_path")
         try:
-            verified = json.loads(Path(verification_path).read_text(encoding="utf-8-sig")) if verification_path else {}
+            verified = json.loads(resolve(verification_path).read_text(encoding="utf-8-sig"))
+            require_identity(verified, identity)
             keys = set((verified.get("attachment_keys") or {}).values())
             required_keys = {archive.get("zotero_main_attachment_key"), outputs["A"].get("zotero_attachment_key"), outputs["B"].get("zotero_attachment_key")}
             required_keys.update((archive.get("zotero_si_attachment_keys") or {}).values())
-            archive_ok = verified.get("passed") is True and verified.get("parent_key") == archive.get("zotero_parent_key") and required_keys.issubset(keys)
-        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            b_attachment = verified.get("content_bindings", {}).get(outputs["B"].get("zotero_attachment_key"), {})
+            archive_ok = (b_pdf_ok and verified.get("passed") is True
+                          and verified.get("parent_key") == archive.get("zotero_parent_key")
+                          and verified.get("collection_key") == archive.get("zotero_collection_key")
+                          and verified.get("source_fingerprints") == academic.get("source_fingerprints")
+                          and required_keys.issubset(keys)
+                          and same_content(academic.get("rendered_pdf", {}), b_attachment.get("local", {}))
+                          and same_content(academic.get("rendered_pdf", {}), b_attachment.get("actual", {}))
+                          and b_attachment.get("api_md5") == b_attachment.get("actual_md5")
+                          and bool(b_attachment.get("api_md5")))
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             archive_ok = False
         checks.append(Check("archive:attachment-contract", archive_ok, "Zotero roles/titles/MIME verified" if archive_ok else "Zotero verification report missing or conflicts with manifest"))
     return checks
@@ -326,6 +363,8 @@ def check_manifest(
     require_workflow_complete: bool = False,
     require_academic_complete: bool = False,
     require_archive_complete: bool = False,
+    workspace_root: Path | None = None,
+    allowed_roots: tuple[Path, ...] = (),
 ) -> list[Check]:
     """Validate manifest relationships and optional completion levels.
 
@@ -368,7 +407,9 @@ def check_manifest(
     if require_academic_complete:
         checks.extend(_academic_completion_checks(data))
     if require_archive_complete:
-        checks.extend(_archive_completion_checks(data))
+        if workspace_root is None:
+            workspace_root = next((parent.parent for parent in path.resolve().parents if parent.name == "weekly_reviews"), path.resolve().parent)
+        checks.extend(_archive_completion_checks(data, workspace_root=workspace_root, allowed_roots=allowed_roots))
     return checks
 
 
@@ -485,6 +526,7 @@ def check_deep_reading_package(
     png_dir: Path | None = None,
     visual_qa: Path | None = None,
     contract_version: str = "1.4.1",
+    identity: dict | None = None,
 ) -> list[Check]:
     if not required and work_dir is None:
         return []
@@ -503,7 +545,7 @@ def check_deep_reading_package(
     if report_path is None:
         converted.append(Check("deep-reading:validation-report", False, "B completion requires --deep-reading-report"))
     else:
-        payload = deep_reading_validator.write_report(report_path, checks, b_path)
+        payload = deep_reading_validator.write_report(report_path, checks, b_path, contract_version=contract_version, identity=identity)
         converted.append(
             Check(
                 "deep-reading:validation-report",
@@ -564,6 +606,7 @@ def normalize_text(text: str) -> str:
 def check_c(
     root: Path, path: Path | None, required: bool, canonical_abstract: Path | None,
     *, contract_version: str = "1.4.1", source_map: Path | None = None,
+    source_manifest: Path | None = None, manifest_data: dict | None = None,
 ) -> list[Check]:
     if path is None:
         return [Check("artifact:C", not required, "not requested" if not required else "path required")]
@@ -583,13 +626,20 @@ def check_c(
         comment = extract_comment_section(markdown)
         if contract_version == "1.5.0":
             map_data = json.loads(source_map.read_text(encoding="utf-8-sig")) if source_map else None
+            index = build_index(source_manifest) if source_manifest else None
             checks.extend(
                 Check(f"C:{item.code}", item.passed, item.detail)
-                for item in validate_c_review.validate(markdown, map_data)
+                for item in validate_c_review.validate(markdown, map_data, source_index=index,
+                                                       expected_identity=workflow_identity(manifest_data) if manifest_data else None)
             )
         else:
             count = effective_chinese_characters(comment)
-            minimum = profile["minimum_comment_chars"]
+            historical = (manifest_data or {}).get("submission_contract", {}).get("weekly_review", {})
+            minimum = historical.get("minimum_comment_chars", 500)
+            # A profile explicitly recorded under the old contract remains a
+            # user requirement. An unversioned upgraded default is not history.
+            if profile.get("contract_version") in {"1.4.1", "1.4.2"} or profile.get("maximum_comment_chars") is None:
+                minimum = max(minimum, profile.get("minimum_comment_chars", 500))
             checks.append(Check("comment_chars", count >= minimum, f"{count}/{minimum} Chinese characters in comment body"))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         checks.append(Check("comment_chars", False, str(exc)))
@@ -631,6 +681,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--b-path", type=Path)
     parser.add_argument("--c-path", type=Path)
     parser.add_argument("--c-source-map", type=Path, help="Private v1.5 C claim/source and semantic review record.")
+    parser.add_argument("--source-manifest", type=Path, help="Verified Canonical Main source manifest for C")
+    parser.add_argument("--allow-external-root", type=Path, action="append", default=[], help="Explicitly authorized external artifact root")
     parser.add_argument("--canonical-abstract", type=Path)
     parser.add_argument("--translation-work-dir", type=Path)
     parser.add_argument(
@@ -692,6 +744,15 @@ def main(argv: list[str] | None = None) -> int:
             else Path(__file__).resolve().parents[1]
         )
         data_root = resolve_data_root(args.workspace_root)
+    # Every artifact/report path has the same explicit data-root convention.
+    try:
+        for name, value in vars(args).items():
+            if isinstance(value, Path) and name not in {"repo_root", "plugin_root", "workspace_root"}:
+                setattr(args, name, resolve_path(value, data_root, allowed_roots=tuple(args.allow_external_root),
+                                                must_exist=False))
+    except ValueError as exc:
+        print(f"[FAIL] paths: {exc}")
+        return 1
     requires_manifest = (
         args.require_academic_complete
         or args.require_archive_complete
@@ -712,6 +773,7 @@ def main(argv: list[str] | None = None) -> int:
                 require_workflow_complete=args.require_workflow_complete,
                 require_academic_complete=args.require_academic_complete,
                 require_archive_complete=args.require_archive_complete,
+                workspace_root=data_root, allowed_roots=tuple(args.allow_external_root),
             )
         )
     manifest_data = None
@@ -791,11 +853,13 @@ def main(argv: list[str] | None = None) -> int:
             png_dir=args.deep_reading_png_dir,
             visual_qa=args.deep_reading_visual_qa,
             contract_version=contract_version,
+            identity=workflow_identity(manifest_data) if manifest_data else None,
         )
     )
     checks.extend(check_c(
-        data_root, args.c_path, args.require_c, args.canonical_abstract,
+        data_root, args.c_path, args.require_c or bool(manifest_data and manifest_data["outputs"]["C"]["status"] == "COMPLETE"), args.canonical_abstract,
         contract_version=contract_version, source_map=args.c_source_map,
+        source_manifest=args.source_manifest, manifest_data=manifest_data,
     ))
     all_artifacts_complete = bool(
         manifest_data

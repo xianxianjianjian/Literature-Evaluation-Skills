@@ -18,6 +18,7 @@ import argparse
 import json
 import sys
 import time
+import hashlib
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -27,6 +28,7 @@ from urllib.request import Request, urlopen, url2pathname
 import zotero_local_archive as local_archive
 import zotero_local_write as local_write
 import zotero_attachment_contract as attachment_contract
+from artifact_binding import fingerprint, same_content, resolve_path
 
 SCHEMA_VERSION = 1
 CAPABILITY_SET = "V1_ZOTERO_LOCAL_ARCHIVE"
@@ -837,11 +839,20 @@ def _parent_children(args: argparse.Namespace) -> tuple[dict[str, Any], list[dic
 
 
 def command_verify_archive(args: argparse.Namespace) -> int:
+    workspace_root = getattr(args, "workspace_root", None)
+    allowed_roots = tuple(getattr(args, "allow_external_root", []))
+    if workspace_root:
+        args.spec = resolve_path(args.spec, workspace_root, allowed_roots=allowed_roots)
+        if args.report:
+            args.report = resolve_path(args.report, workspace_root, allowed_roots=allowed_roots, must_exist=False)
     spec = load_metadata(args.spec)
     if spec.get("parent_key") != args.parent_key:
         raise ZoteroBridgeError("Archive spec parent key differs from requested parent")
     parent, children = _parent_children(args)
-    result = attachment_contract.validate_archive(parent, children, spec)
+    if spec.get("contract_version") == "1.5.0" and workspace_root is None:
+        raise ZoteroBridgeError("v1.5 verification requires --workspace-root")
+    result = attachment_contract.validate_archive(parent, children, spec, workspace_root=workspace_root,
+                                                  allowed_roots=allowed_roots)
     readable_failures: list[str] = []
     if result["passed"]:
         for row in spec["attachments"]:
@@ -864,12 +875,19 @@ def command_verify_archive(args: argparse.Namespace) -> int:
                     from pypdf import PdfReader
                     if not PdfReader(str(path)).pages:
                         readable_failures.append(attachment_key)
+                if spec.get("contract_version") == "1.5.0" and path.is_file():
+                    actual = fingerprint(path)
+                    record = result["content_bindings"].get(attachment_key, {})
+                    md5 = hashlib.md5(path.read_bytes()).hexdigest()
+                    record.update({"actual": actual, "actual_md5": md5})
+                    if not same_content(actual, record.get("local", {})) or md5 != record.get("api_md5"):
+                        readable_failures.append(attachment_key)
             except (OSError, ValueError):
                 readable_failures.append(attachment_key)
     if readable_failures:
         result["passed"] = False
-        result["failures"].append(f"unreadable attachment files: {readable_failures}")
-    result["files_readable"] = not readable_failures
+        result["failures"].append(f"unreadable or content-mismatched attachment files: {readable_failures}")
+    result["files_readable"] = result["passed"] and not readable_failures
     result.update({"schema_version": 1, "command": "verify-archive", "library_prefix": args.library_prefix})
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
@@ -1179,6 +1197,8 @@ def build_parser() -> argparse.ArgumentParser:
     archive_verify = subparsers.add_parser("verify-archive", help="Verify parent and all role attachments.")
     archive_verify.add_argument("--parent-key", required=True)
     archive_verify.add_argument("--spec", type=Path, required=True)
+    archive_verify.add_argument("--workspace-root", type=Path)
+    archive_verify.add_argument("--allow-external-root", type=Path, action="append", default=[])
     archive_verify.add_argument("--report", type=Path)
     archive_verify.add_argument("--library-prefix", default=DEFAULT_LIBRARY_PREFIX)
     archive_verify.set_defaults(handler=command_verify_archive)

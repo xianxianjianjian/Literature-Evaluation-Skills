@@ -189,3 +189,13 @@ Do not use `PROVISIONAL` merely because Zotero automatic writing is unavailable.
 - Zotero/Git paths or pending actions match the workflow manifest;
 - final report distinguishes academic completion from archive completion;
 - final state accurately reflects unresolved source/evidence gaps.
+
+### v1.5 B content binding
+
+The academic report binds the current DOCX SHA-256/size, independently rendered PDF SHA-256/size/page count, visual QA file, paper/workflow/contract identity, and verified Main/SI fingerprints from the existing source manifest. All nonempty DOCX paragraphs and table cells must appear in PDF extraction in order with repetition preserved. This content check supplements Office provenance and all-page visual review; it does not certify page geometry.
+
+`b_visual_qa.json` includes `source_docx` and `rendered_pdf` SHA-256/size records, `reviewer`, ISO `reviewed_at`, renderer, existing all-page defect flags, and each page's reviewed PNG `image` SHA-256/size. These hashes invalidate visual signatures when their source or reviewed image changes. Keep the signed minimal QA JSON; render PDFs, PNGs and duplicate DOCX copies can be cleaned after promotion.
+
+Generate the academic report with `validate_deep_reading_package.py --contract-version 1.5.0 --manifest <workflow_manifest> ...`. Promote with `export_b_pdf.py --workspace-root <data-root> --manifest <workflow_manifest> --b-path <B.docx> --academic-report <report.json> --rendered-pdf <Office.pdf> --output <handoff/B.pdf> --report <export.json>`. Export refuses stale bytes or another same-named file; the copied PDF must match the reviewed render. Export does not write Zotero.
+
+Archive validation binds manifest B DOCX/PDF/report, current source versions and the Zotero B attachment's local/actual file fingerprints. The archived PDF can satisfy the signed render content after rendering caches are cleaned. Paths relative to `work/...` resolve from an explicit data root; the source manifest's source paths resolve from its own directory. Outside absolute artifacts require `--allow-external-root`; traversal, missing files and symlink escapes fail clearly. v1.4.x reports keep their old rules. Deliberately upgrading old B requires a new render/review/report and preserved historical records.
