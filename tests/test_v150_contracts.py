@@ -102,7 +102,10 @@ class CSubmissionTests(unittest.TestCase):
         markdown = (fixture / "tabarak_c.md").read_text(encoding="utf-8")
         source_map = json.loads((fixture / "tabarak_c_source_map.json").read_text(encoding="utf-8"))
         checks = validate_c_review.validate(markdown, source_map)
-        self.assertTrue(all(item.passed for item in checks), checks)
+        # This historical fixture has no actual Main or attributable sign-off.
+        # Its public format remains a regression, but it cannot prove sources.
+        self.assertFalse(next(item.passed for item in checks if item.code == "C_SOURCE_MAP_PASS"))
+        self.assertTrue(all(item.passed for item in checks[:4]), checks)
         count = validate_c_review.effective_visible_char_count(validate_c_review.extract_comment(markdown))
         self.assertTrue(850 <= count <= 950, count)
         comment = validate_c_review.extract_comment(markdown)
@@ -135,7 +138,11 @@ class CSubmissionTests(unittest.TestCase):
         count = validate_c_review.effective_visible_char_count(validate_c_review.extract_comment(markdown))
         self.assertTrue(800 <= count <= 1000)
         checks = validate_c_review.validate(markdown, source_map)
-        self.assertTrue(all(item.passed for item in checks), checks)
+        from tests.v150_test_support import bind_c_map
+        with tempfile.TemporaryDirectory() as directory:
+            source_map, index = bind_c_map(Path(directory), markdown, source_map)
+            checks = validate_c_review.validate(markdown, source_map, source_index=index)
+            self.assertTrue(all(item.passed for item in checks), checks)
         long_review = markdown + ("研究结论应保持谨慎。" * 20)
         long_checks = validate_c_review.validate(long_review, source_map)
         self.assertFalse(next(item.passed for item in long_checks if item.code == "COMMENT_LENGTH_PASS"))
@@ -143,7 +150,7 @@ class CSubmissionTests(unittest.TestCase):
         bad_checks = validate_c_review.validate(bad, source_map, min_chars=count, max_chars=count)
         self.assertFalse(next(item.passed for item in bad_checks if item.code == "NO_INTERNAL_AUDIT_METADATA_PASS"))
         source_map["paragraphs"][0]["claims"][0]["source_class"] = "SI"
-        mapped = validate_c_review.validate(markdown, source_map, min_chars=count, max_chars=count)
+        mapped = validate_c_review.validate(markdown, source_map, min_chars=count, max_chars=count, source_index=index)
         self.assertFalse(next(item.passed for item in mapped if item.code == "C_SOURCE_MAP_PASS"))
 
 
@@ -178,13 +185,13 @@ class ArchiveTests(unittest.TestCase):
                     y = 800
                 drawing.drawString(40, y, heading)
                 y -= 28
+                drawing.drawString(40, y, "已核验的研究内容。")
+                y -= 22
+            drawing.drawString(40, y, "方法 结果")
             drawing.save()
             report_path = root / "academic.json"
-            report = {"passed": True, "artifact": str(b_path.resolve()), "checks": [
-                {"code": code, "passed": True,
-                 "detail": f"rendered by independent office engine: {rendered}" if code == "B:independent-render" else "PASS"}
-                for code in ("B:independent-render", "B:rendered-pdf", "B:all-page-png", "B:visual-qa")
-            ]}
+            from tests.v150_test_support import b_report
+            report = b_report(root, b_path, rendered)
             report_path.write_text(json.dumps(report), encoding="utf-8")
             output = root / "B-archive.pdf"
             result = export_b_pdf.export(b_path, report_path, rendered, output)

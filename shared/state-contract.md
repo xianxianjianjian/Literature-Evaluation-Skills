@@ -95,3 +95,11 @@ pending_zotero_actions:
 ## 固定用户 Gate
 
 完整每周流程只有两个固定人工 Gate：用户确定主题、用户确定最终论文。其余机械步骤原则上不重复询问，除非涉及新的权限、风险或真正异常。
+
+## v1.5 revalidation and history
+
+New v1.5 C completion requires actual Main locator checks and an attributable source/comment-bound human academic review record. This is the existing academic QC responsibility, not an additional workflow user-confirmation Gate. B archive completion requires its file-content chain and actual Zotero file verification; a PASS flag or PDF header alone is insufficient.
+
+Historical v1.4.1/v1.4.2 C uses `submission_contract.weekly_review.minimum_comment_chars` recorded in its manifest, falling back to the released 500-Chinese-character rule. Respect an explicitly old-version workspace profile or an old profile without the new maximum; an unversioned/current 800–1000 default is not a historical requirement. Workspace initialization preserves existing profiles/manifests; loading manifests never writes them. Contract upgrades remain explicit, backed up and reversible.
+
+If a previous v1.5 completion cannot be substantiated under repaired gates, preserve its historical statement and record an immutable correction/revalidation result with `needs_update`/PROVISIONAL where appropriate. Never silently rewrite the research archive or reuse an old PASS as new proof. Necessary ledgers, reviewed frame geometry, source identities and signed QA are evidence to retain after rendering-cache cleanup.

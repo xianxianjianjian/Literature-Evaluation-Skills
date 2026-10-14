@@ -34,3 +34,9 @@ JSONL 每行一个完整 JSON object，不允许跨行对象。空的 `terminolo
 - “Original Abstract”字段不得用模型改写文本冒充原文。可另行生成摘要，但必须与原文栏位区分。
 
 以上规则不改变 C 的字段要求，只规定原文字段的可接受来源与公开归档边界。
+
+## v1.5 validation records
+
+Content fingerprints use `sha256` and `size_bytes`; PDFs additionally record `pages`. Zotero's `api_md5` and `actual_md5` are separate API/upload facts, never substituted for local SHA-256. B academic/export/Zotero records bind `paper_id`, `workflow_id`, `contract_version` and `source_fingerprints` from the existing source manifest. See the B QC and C submission references for schemas.
+
+Report/manifest paths relative to `work/...` use the explicit workspace data root independently of cwd. Source paths in `source_manifest.json` use its directory. When loading a standalone workflow manifest without an explicit root, the containing `weekly_reviews` directory identifies its data root; otherwise its own directory is used. External files require an explicitly authorized root; resolved symlinks must stay in an authorized root.
