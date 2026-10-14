@@ -857,7 +857,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     checks.extend(check_c(
-        data_root, args.c_path, args.require_c or bool(manifest_data and manifest_data["outputs"]["C"]["status"] == "COMPLETE"), args.canonical_abstract,
+        data_root, args.c_path, args.require_c or bool(contract_version == "1.5.0" and manifest_data and manifest_data["outputs"]["C"]["status"] == "COMPLETE"), args.canonical_abstract,
         contract_version=contract_version, source_map=args.c_source_map,
         source_manifest=args.source_manifest, manifest_data=manifest_data,
     ))

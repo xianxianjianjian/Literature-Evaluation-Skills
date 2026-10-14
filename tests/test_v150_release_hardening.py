@@ -535,6 +535,14 @@ class LegacyAndPathTests(unittest.TestCase):
                 self.assertEqual(path.read_bytes(), original)
                 checks = d._archive_completion_checks(manifest)
                 self.assertEqual(any(x.name == "archive:B-PDF-export" for x in checks), version == "1.5.0")
+                manifest["outputs"]["C"]["status"] = "COMPLETE"
+                # New C completion must not add an artifact-path requirement
+                # to an old manifest-only archive caller's published contract.
+                with patch.object(d, "check_foundation", return_value=[]), patch.object(d, "check_manifest", return_value=[]), \
+                     patch.object(d, "load_manifest", return_value=manifest), patch.object(d, "check_c", return_value=[]) as check_c, \
+                     patch("sys.stdout", io.StringIO()):
+                    d.main(["--repo-root", str(root), "--manifest", str(path)])
+                self.assertEqual(check_c.call_args.args[2], version == "1.5.0")
             real_legacy = ROOT / "weekly_reviews/2026/2026-W36/workflow_manifest.yaml"
             original = real_legacy.read_bytes()
             parsed = workflow_state.load_manifest(real_legacy)
