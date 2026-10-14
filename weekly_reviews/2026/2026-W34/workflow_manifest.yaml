@@ -2,73 +2,79 @@
   "schema_version": 1,
   "workflow_id": "2026-W34-weekly-literature-evaluation",
   "week": "2026-W34",
-  "paper_id": "10.1111-jsr.14281",
+  "paper_id": "10.1111-jsr.70052",
   "stages": {
     "topic": {
-      "status": "COMPLETE"
-    },
-    "search": {
-      "status": "PROVISIONAL"
-    },
-    "translation": {
-      "status": "BLOCKED",
+      "status": "COMPLETE",
       "needs_update": false,
       "update_reason": []
     },
+    "search": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "translation": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": [],
+      "scope": "FULL_MIRROR"
+    },
     "deep_reading": {
-      "status": "NOT_STARTED",
+      "status": "COMPLETE",
       "needs_update": false,
       "update_reason": []
     }
   },
   "outputs": {
     "A": {
-      "status": "BLOCKED",
+      "status": "COMPLETE",
       "zotero_attachment_key": null
     },
     "B": {
-      "status": "NOT_STARTED",
+      "status": "COMPLETE",
       "zotero_attachment_key": null
     },
     "C": {
-      "status": "NOT_STARTED",
-      "git_path": null
+      "status": "COMPLETE",
+      "git_path": "weekly_reviews/2026/2026-W34/C_Lee_2025_周文献评价.md",
+      "path": "D:\\codex\\workplace\\reference\\.literature-evaluation\\weekly_reviews\\2026\\2026-W34\\C_Lee_2025_周文献评价.md",
+      "reviewer_name": "张紫涵",
+      "content_authority": "USER_CONFIRMED_WEBSITE",
+      "source_url": "http://www.leixulab.net/scale/paperstu.asp?sname=%D5%C5%D7%CF%BA%AD",
+      "website_published_at": "2026-08-24 14:17:17",
+      "synced_date": "2026-10-14",
+      "sync_record": "D:\\codex\\workplace\\reference\\.literature-evaluation\\weekly_reviews\\2026\\2026-W34\\c_web_sync_record.json",
+      "validation_note": "网页版C已按用户要求同步；此前内容的学术/字数校验为历史记录，不代表本次网页版本重新通过校验。"
     }
   },
   "pending_zotero_actions": [
     {
-      "action": "find_or_create_parent",
-      "paper_id": "10.1111-jsr.14281",
-      "doi": "10.1111/jsr.14281",
-      "expected_title": "The stability of slow-wave sleep and EEG oscillations across two consecutive nights of laboratory polysomnography in cognitively normal older adults",
-      "reason": "Current ChatGPT session cannot access the user's local Zotero Desktop instance."
+      "action": "attach",
+      "source_id": "A",
+      "expected_attachment_name": "[A] 中文全文翻译镜像版",
+      "local_path": "work/10.1111-jsr.70052/handoff/[A] 中文全文翻译镜像版_Lee_2025.pdf"
     },
     {
       "action": "attach",
-      "paper_id": "10.1111-jsr.14281",
-      "source_id": "SRC-M1",
-      "expected_attachment_name": "[ORIGINAL] Main Article",
-      "source": "Version of Record at Wiley; legally accessible full text also available via PMCID PMC11671611",
-      "reason": "Pending local Zotero access."
-    },
-    {
-      "action": "attach",
-      "paper_id": "10.1111-jsr.14281",
-      "source_id": "SRC-S1",
-      "expected_attachment_name": "[SUPPLEMENT] Figure S1 - Bland-Altman plots",
-      "source": "Wiley Supporting Information jsr14281-sup-0001-FigureS1.docx; PMC counterpart NIHMS2003008-supplement-SUP_INFO.docx",
-      "reason": "Pending local Zotero access."
+      "source_id": "B",
+      "expected_attachment_name": "[B] 文献研究笔记·完整精读版",
+      "local_path": "work/10.1111-jsr.70052/handoff/[B] 文献研究笔记·完整精读版_Lee_2025.docx"
     }
   ],
-  "blocking_issues": [
-    {
-      "stage": "translation",
-      "type": "SOURCE_BINARY_UNAVAILABLE",
-      "source_id": "SRC-M1",
-      "detail": "Publisher and PMC full-text identities are verified, but the current environment cannot retrieve the source PDF binary required for page-mapped FULL_MIRROR production; Wiley PDF endpoint returned HTTP 403 in this session."
-    }
-  ],
+  "blocking_issues": [],
   "source_change": {
-    "last_checked": "2026-08-21"
-  }
+    "last_checked": "2026-08-22"
+  },
+  "record_paths": {
+    "c_web_sync": "D:\\codex\\workplace\\reference\\.literature-evaluation\\weekly_reviews\\2026\\2026-W34\\c_web_sync_record.json"
+  },
+  "lifecycle_events": [
+    {
+      "date": "2026-10-14",
+      "event": "C_UPDATED_FROM_USER_CONFIRMED_WEBSITE",
+      "paper_id": "10.1111-jsr.70052",
+      "note": "网页发表时间2026-08-24 14:17:17；仅同步C及其来源记录，既有A/B、原文和精读阶段记录保留。"
+    }
+  ]
 }
