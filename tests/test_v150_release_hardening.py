@@ -514,6 +514,10 @@ class LegacyAndPathTests(unittest.TestCase):
             c_path.write_text(fields + "\n## 评论\n" + "中" * 700, encoding="utf-8")
             historical = {"submission_contract": {"weekly_review": {"minimum_comment_chars": 750}}}
             self.assertFalse(next(x.passed for x in d.check_c(root, c_path, True, None, contract_version="1.4.2", manifest_data=historical) if x.name == "comment_chars"))
+            profile["weekly_review"]["contract_version"] = "1.5.0"
+            profile["weekly_review"].pop("maximum_comment_chars")
+            (root / "knowledge/submission_profile.yaml").write_text(json.dumps(profile))
+            self.assertTrue(next(x.passed for x in d.check_c(root, c_path, True, None, contract_version="1.4.2") if x.name == "comment_chars"))
 
     def test_v150_length_boundaries_do_not_weaken(self):
         fields = "\n".join(f"## {h}\n内容" for h in c.REQUIRED_HEADINGS[:-1])

@@ -638,7 +638,7 @@ def check_c(
             minimum = historical.get("minimum_comment_chars", 500)
             # A profile explicitly recorded under the old contract remains a
             # user requirement. An unversioned upgraded default is not history.
-            if profile.get("contract_version") in {"1.4.1", "1.4.2"} or profile.get("maximum_comment_chars") is None:
+            if profile.get("contract_version") in {"1.4.1", "1.4.2"} or (profile.get("contract_version") is None and profile.get("maximum_comment_chars") is None):
                 minimum = max(minimum, profile.get("minimum_comment_chars", 500))
             checks.append(Check("comment_chars", count >= minimum, f"{count}/{minimum} Chinese characters in comment body"))
     except (OSError, ValueError, KeyError, TypeError) as exc:
