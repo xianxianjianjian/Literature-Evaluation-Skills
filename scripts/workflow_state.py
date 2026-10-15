@@ -69,7 +69,7 @@ def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any
         )
     return {
         "schema_version": 1,
-        "contract_version": "1.4.2",
+        "contract_version": "1.5.0",
         "workflow_id": workflow_id or f"{week}-weekly-literature-evaluation",
         "week": week,
         "paper_id": None,
@@ -96,6 +96,8 @@ def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any
             "required_si_source_ids": [],
             "zotero_si_attachment_keys": {},
             "metadata_only_fallback": False,
+            "b_pdf_export_report": None,
+            "verification_report_path": None,
             "source_archive": {
                 "status": "NOT_STARTED",
                 "source_ids": [],
@@ -140,6 +142,8 @@ def normalize_manifest(data: object) -> dict[str, Any]:
         "required_si_source_ids": [],
         "zotero_si_attachment_keys": {},
         "metadata_only_fallback": False,
+        "b_pdf_export_report": None,
+        "verification_report_path": None,
         "source_archive": {
             "status": "NOT_STARTED", "source_ids": [], "verified_date": None,
         },
@@ -159,8 +163,8 @@ def validate_manifest(data: object) -> dict[str, Any]:
     data = normalize_manifest(data)
     if data.get("schema_version") != 1:
         raise WorkflowStateError("Manifest schema_version must be 1.")
-    if data.get("contract_version") not in {"1.4.1", "1.4.2"}:
-        raise WorkflowStateError("Manifest contract_version must be 1.4.1 or 1.4.2.")
+    if data.get("contract_version") not in {"1.4.1", "1.4.2", "1.5.0"}:
+        raise WorkflowStateError("Manifest contract_version must be 1.4.1, 1.4.2, or 1.5.0.")
 
     workflow_id = data.get("workflow_id")
     if not isinstance(workflow_id, str) or not workflow_id.strip():
@@ -310,6 +314,10 @@ def validate_manifest(data: object) -> dict[str, Any]:
         raise WorkflowStateError("archive.zotero_si_attachment_keys must map source IDs to keys.")
     if not isinstance(archive.get("metadata_only_fallback"), bool):
         raise WorkflowStateError("archive.metadata_only_fallback must be true or false.")
+    for field in ("b_pdf_export_report", "verification_report_path"):
+        value = archive.get(field)
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise WorkflowStateError(f"archive.{field} must be null or a path.")
     source_archive = archive.get("source_archive")
     output_archive = archive.get("output_archive")
     for label, record in (("source_archive", source_archive), ("output_archive", output_archive)):

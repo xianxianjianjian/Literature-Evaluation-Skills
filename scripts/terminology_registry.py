@@ -15,11 +15,19 @@ import sys
 from datetime import date
 from pathlib import Path
 
-FIELDS = [
+LEGACY_FIELDS = [
     "Term_ID", "English_Term", "Abbreviation", "Preferred_Chinese",
     "Alternative_Chinese", "Discipline", "Subfield", "Definition", "Context",
     "Confidence", "Evidence_Level", "Evidence_IDs", "Status", "First_Verified",
     "Last_Verified", "Notes",
+]
+FIELDS = [
+    "Term_ID", "English_Term", "Preferred_Chinese", "Alternative_Chinese",
+    "Abbreviation", "Domain", "Subdomain", "Definition", "Context",
+    "Operational_Use", "Source_Type", "Source_Citation", "Confidence",
+    "Evidence_ID", "Evidence_IDs", "Evidence_Level", "Paper_ID", "First_Seen",
+    "First_Verified", "Last_Used", "Last_Verified", "Usage_Count", "Status",
+    "Notes",
 ]
 CONFIDENCE_VALUES = {"HIGH", "MEDIUM", "LOW"}
 STATUS_VALUES = {"ACTIVE", "CONTEXTUAL", "DEPRECATED"}
@@ -27,6 +35,7 @@ EVIDENCE_ROLES = {"Translation Evidence", "Definition Evidence", "Methodological
 EVIDENCE_ID_PATTERN = re.compile(r"^TERMEV-\d{4,}$")
 TERM_ID_PATTERN = re.compile(r"^TERM-\d{4}$")
 EVIDENCE_LEVEL_PATTERN = re.compile(r"^TE[1-7]$")
+MODEL_SOURCE_PATTERN = re.compile(r"\b(?:chatgpt|openai|codex|ai\s+(?:recommended|suggested))\b", re.I)
 
 
 class TerminologyError(ValueError):
@@ -47,11 +56,29 @@ def read_registry(path: Path) -> list[dict[str, str]]:
         raise TerminologyError(f"Registry does not exist: {path}")
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
-        if reader.fieldnames != FIELDS:
+        fieldnames = reader.fieldnames
+        if fieldnames not in (FIELDS, LEGACY_FIELDS):
             raise TerminologyError(
                 f"Unexpected registry header in {path}. Expected: {','.join(FIELDS)}"
             )
-        rows = list(reader)
+        raw_rows = list(reader)
+    rows: list[dict[str, str]] = []
+    for raw in raw_rows:
+        row = {field: "" for field in FIELDS}
+        if fieldnames == LEGACY_FIELDS:
+            row.update({field: str(raw.get(field) or "") for field in LEGACY_FIELDS if field in row})
+            row["Domain"] = str(raw.get("Discipline") or "")
+            row["Subdomain"] = str(raw.get("Subfield") or "")
+            row["Evidence_ID"] = next(
+                (item.strip() for item in re.split(r"[;,]", str(raw.get("Evidence_IDs") or "")) if item.strip()),
+                "",
+            )
+            row["First_Seen"] = str(raw.get("First_Verified") or "")
+            row["Last_Used"] = str(raw.get("Last_Verified") or "")
+            row["Usage_Count"] = "0"
+        else:
+            row.update({field: str(raw.get(field) or "") for field in FIELDS})
+        rows.append(row)
     seen_ids: set[str] = set()
     for line_number, row in enumerate(rows, start=2):
         if not TERM_ID_PATTERN.fullmatch(row["Term_ID"]):
@@ -69,9 +96,24 @@ def read_registry(path: Path) -> list[dict[str, str]]:
             row["Evidence_Level"]
         ):
             raise TerminologyError(f"Invalid Evidence_Level at line {line_number}.")
+        if row["Evidence_Level"] and not (
+            row["Source_Citation"].strip() or row["Evidence_IDs"].strip() or row["Evidence_ID"].strip()
+        ):
+            raise TerminologyError(f"Evidence-backed term lacks a traceable citation/ID at line {line_number}.")
+        if MODEL_SOURCE_PATTERN.search(row["Source_Citation"]):
+            raise TerminologyError(f"Model recommendation is not terminology evidence at line {line_number}.")
         for field in ("First_Verified", "Last_Verified"):
             if row[field]:
                 validate_iso_date(row[field], f"{field} at line {line_number}")
+        for field in ("First_Seen", "Last_Used"):
+            if row[field]:
+                validate_iso_date(row[field], f"{field} at line {line_number}")
+        try:
+            usage_count = int(row["Usage_Count"] or "0")
+        except ValueError as exc:
+            raise TerminologyError(f"Invalid Usage_Count at line {line_number}.") from exc
+        if usage_count < 0:
+            raise TerminologyError(f"Invalid Usage_Count at line {line_number}.")
     return rows
 
 
@@ -94,8 +136,8 @@ def normalized_component(value: str | None) -> str:
 def terminology_identity(record: dict[str, str]) -> tuple[str, str, str, str]:
     return (
         normalized_component(record.get("English_Term")),
-        normalized_component(record.get("Discipline")),
-        normalized_component(record.get("Subfield")),
+        normalized_component(record.get("Domain")),
+        normalized_component(record.get("Subdomain")),
         normalized_component(record.get("Context")),
     )
 
@@ -117,6 +159,13 @@ def append_note(existing: str, note: str | None) -> str:
 
 def split_alternatives(value: str) -> list[str]:
     return [part.strip() for part in value.split(";") if part.strip()]
+
+
+def evidence_ids_for_row(row: dict[str, str]) -> list[str]:
+    values = f"{row.get('Evidence_ID', '')};{row.get('Evidence_IDs', '')}"
+    return list(dict.fromkeys(
+        item.strip() for item in re.split(r"[;,]", values) if item.strip()
+    ))
 
 
 def merge_alternative(value: str, candidate: str) -> str:
@@ -155,8 +204,8 @@ def ensure_unique_identity(
         raise TerminologyError(
             "Equivalent terminology context already exists: "
             f"{duplicate['Term_ID']} ({duplicate['English_Term']}; "
-            f"discipline={duplicate['Discipline'] or '-'}, "
-            f"subfield={duplicate['Subfield'] or '-'}, "
+            f"domain={duplicate['Domain'] or '-'}, "
+            f"subdomain={duplicate['Subdomain'] or '-'}, "
             f"context={duplicate['Context'] or '-'})"
         )
 
@@ -188,7 +237,22 @@ def command_add(args: argparse.Namespace) -> None:
         raise TerminologyError("Evidence level must be TE1 through TE7.")
     if args.verified_date:
         validate_iso_date(args.verified_date, "verified_date")
+    for field in ("first_seen", "last_used"):
+        value = getattr(args, field, None)
+        if value:
+            validate_iso_date(value, field)
+    if getattr(args, "usage_count", None) is not None and args.usage_count < 0:
+        raise TerminologyError("usage_count cannot be negative.")
+    if MODEL_SOURCE_PATTERN.search(getattr(args, "source_citation", None) or ""):
+        raise TerminologyError("Source_Citation cannot cite a model recommendation.")
     record = {field: "" for field in FIELDS}
+    domain = getattr(args, "domain", None) or getattr(args, "discipline", None) or ""
+    subdomain = getattr(args, "subdomain", None) or getattr(args, "subfield", None) or ""
+    verified_date = args.verified_date or ""
+    evidence_ids = getattr(args, "evidence_ids", None) or ""
+    primary_evidence_id = getattr(args, "evidence_id", None) or next(
+        (item.strip() for item in re.split(r"[;,]", evidence_ids) if item.strip()), ""
+    )
     record.update(
         {
             "Term_ID": args.term_id,
@@ -196,16 +260,24 @@ def command_add(args: argparse.Namespace) -> None:
             "Abbreviation": args.abbreviation or "",
             "Preferred_Chinese": args.preferred_chinese.strip(),
             "Alternative_Chinese": args.alternative_chinese or "",
-            "Discipline": args.discipline or "",
-            "Subfield": args.subfield or "",
+            "Domain": domain,
+            "Subdomain": subdomain,
             "Definition": args.definition or "",
             "Context": args.context or "",
+            "Operational_Use": getattr(args, "operational_use", None) or "",
+            "Source_Type": getattr(args, "source_type", None) or "",
+            "Source_Citation": getattr(args, "source_citation", None) or "",
             "Confidence": args.confidence,
             "Evidence_Level": args.evidence_level or "",
-            "Evidence_IDs": args.evidence_ids or "",
+            "Evidence_ID": primary_evidence_id,
+            "Evidence_IDs": evidence_ids or primary_evidence_id,
+            "Paper_ID": getattr(args, "paper_id", None) or "",
+            "First_Seen": getattr(args, "first_seen", None) or verified_date,
             "Status": args.status,
-            "First_Verified": args.verified_date or "",
-            "Last_Verified": args.verified_date or "",
+            "First_Verified": verified_date,
+            "Last_Used": getattr(args, "last_used", None) or verified_date,
+            "Last_Verified": verified_date,
+            "Usage_Count": str(getattr(args, "usage_count", None) or 0),
             "Notes": args.notes or "",
         }
     )
@@ -225,13 +297,17 @@ def command_update(args: argparse.Namespace) -> None:
     updates = {
         "Abbreviation": args.abbreviation,
         "Preferred_Chinese": args.preferred_chinese,
-        "Discipline": args.discipline,
-        "Subfield": args.subfield,
+        "Domain": getattr(args, "domain", None) or getattr(args, "discipline", None),
+        "Subdomain": getattr(args, "subdomain", None) or getattr(args, "subfield", None),
         "Definition": args.definition,
         "Context": args.context,
+        "Operational_Use": getattr(args, "operational_use", None),
+        "Source_Type": getattr(args, "source_type", None),
+        "Source_Citation": getattr(args, "source_citation", None),
         "Confidence": args.confidence,
         "Evidence_Level": args.evidence_level,
         "Evidence_IDs": args.evidence_ids,
+        "Paper_ID": getattr(args, "paper_id", None),
     }
     if (
         all(value is None for value in updates.values())
@@ -253,6 +329,10 @@ def command_update(args: argparse.Namespace) -> None:
     for field, value in updates.items():
         if value is not None:
             row[field] = value.strip() if isinstance(value, str) else value
+    if args.evidence_ids is not None:
+        row["Evidence_ID"] = next(
+            (item.strip() for item in re.split(r"[;,]", args.evidence_ids) if item.strip()), ""
+        )
 
     required_history = (old_preferred,) if preferred_changed else ()
     row["Alternative_Chinese"] = merge_alternative_values(
@@ -265,6 +345,25 @@ def command_update(args: argparse.Namespace) -> None:
     row["Last_Verified"] = args.verified_date
     row["Notes"] = append_note(row["Notes"], args.note)
     write_registry(args.registry, rows)
+    if preferred_changed:
+        corrections = getattr(args, "corrections", None) or args.registry.with_name(
+            "terminology_corrections.jsonl"
+        )
+        append_evidence_event(
+            corrections,
+            {
+                "schema_version": 1,
+                "event_type": "TERM_CORRECTION",
+                "term_id": args.term_id,
+                "old_preferred_chinese": old_preferred,
+                "new_preferred_chinese": row["Preferred_Chinese"],
+                "reason": args.note.strip(),
+                "evidence_ids": [
+                    item.strip() for item in re.split(r"[;,]", row["Evidence_IDs"]) if item.strip()
+                ],
+                "corrected_date": args.verified_date,
+            },
+        )
     print(f"Updated terminology record: {args.term_id}")
 
 
@@ -285,9 +384,11 @@ def context_candidates(
     rows: list[dict[str, str]],
     *,
     english_term: str,
-    discipline: str | None,
-    subfield: str | None,
-    context: str | None,
+    discipline: str | None = None,
+    subfield: str | None = None,
+    context: str | None = None,
+    domain: str | None = None,
+    subdomain: str | None = None,
 ) -> dict[str, object]:
     english = normalized_component(english_term)
     candidates = [
@@ -296,8 +397,8 @@ def context_candidates(
     exact: list[dict[str, str]] = []
     for row in candidates:
         requested = {
-            "Discipline": discipline,
-            "Subfield": subfield,
+            "Domain": domain or discipline,
+            "Subdomain": subdomain or subfield,
             "Context": context,
         }
         if all(
@@ -309,8 +410,8 @@ def context_candidates(
     return {
         "query": {
             "English_Term": english_term,
-            "Discipline": discipline,
-            "Subfield": subfield,
+            "Domain": domain or discipline,
+            "Subdomain": subdomain or subfield,
             "Context": context,
         },
         "exact_or_filtered_matches": exact,
@@ -323,6 +424,76 @@ def context_candidates(
     }
 
 
+def resolve_context_candidate(
+    rows: list[dict[str, str]], *, english_term: str, domain: str,
+    context: str, subdomain: str = "",
+) -> dict[str, object]:
+    """Reuse one verified exact-context record or require external verification."""
+    payload = context_candidates(
+        rows, english_term=english_term, domain=domain,
+        subdomain=subdomain or None, context=context,
+    )
+    exact = [
+        row for row in payload["exact_or_filtered_matches"]
+        if row["Status"] in {"ACTIVE", "CONTEXTUAL"}
+        and row["Confidence"] == "HIGH"
+        and bool(row["Evidence_IDs"].strip() or row["Evidence_ID"].strip())
+    ]
+    selected = exact[0] if len(exact) == 1 else None
+    payload["auto_selected_term_id"] = selected["Term_ID"] if selected else None
+    payload["decision"] = "REUSE_VERIFIED" if selected else "EXTERNAL_VERIFICATION_REQUIRED"
+    return payload
+
+
+def command_resolve(args: argparse.Namespace) -> None:
+    payload = resolve_context_candidate(
+        read_registry(args.registry), english_term=args.english_term,
+        domain=args.domain, subdomain=args.subdomain or "", context=args.context,
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def command_record_usage(args: argparse.Namespace) -> None:
+    """Accumulate one use per focal paper without erasing earlier paper IDs."""
+    validate_iso_date(args.used_date, "used_date")
+    rows = read_registry(args.registry)
+    requested = [item.strip() for item in re.split(r"[;,]", args.term_ids) if item.strip()]
+    if not requested:
+        raise TerminologyError("record-usage requires at least one TERM ID.")
+    unknown = sorted(set(requested) - {row["Term_ID"] for row in rows})
+    if unknown:
+        raise TerminologyError(f"Unknown TERM IDs: {unknown}")
+    for term_id in dict.fromkeys(requested):
+        row = find_term(rows, term_id)
+        paper_ids = [item.strip() for item in row["Paper_ID"].split(";") if item.strip()]
+        if args.paper_id not in paper_ids:
+            paper_ids.append(args.paper_id)
+            row["Usage_Count"] = str(int(row["Usage_Count"] or "0") + 1)
+        row["Paper_ID"] = "; ".join(paper_ids)
+        row["Last_Used"] = args.used_date
+        if not row["First_Seen"]:
+            row["First_Seen"] = args.used_date
+    write_registry(args.registry, rows)
+    print(f"Recorded terminology usage for {len(set(requested))} term(s).")
+
+
+def command_record_paper_usage(args: argparse.Namespace) -> None:
+    """Accumulate every TERM ID from one reviewed paper terminology sheet."""
+    with args.paper_terminology.open("r", encoding="utf-8-sig", newline="") as handle:
+        paper_rows = list(csv.DictReader(handle))
+    term_ids = list(dict.fromkeys(
+        str(row.get("Term_ID") or row.get("term_id") or "").strip()
+        for row in paper_rows
+        if str(row.get("Term_ID") or row.get("term_id") or "").strip()
+    ))
+    if not term_ids:
+        raise TerminologyError("paper terminology sheet contains no TERM IDs.")
+    command_record_usage(argparse.Namespace(
+        registry=args.registry, term_ids=";".join(term_ids),
+        paper_id=args.paper_id, used_date=args.used_date,
+    ))
+
+
 def command_context(args: argparse.Namespace) -> None:
     rows = read_registry(args.registry)
     payload = context_candidates(
@@ -331,6 +502,8 @@ def command_context(args: argparse.Namespace) -> None:
         discipline=args.discipline,
         subfield=args.subfield,
         context=args.context,
+        domain=getattr(args, "domain", None),
+        subdomain=getattr(args, "subdomain", None),
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     if not payload["all_english_term_candidates"]:
@@ -347,7 +520,7 @@ def command_list_ambiguous(args: argparse.Namespace) -> None:
         if row["Confidence"] in {"LOW", "MEDIUM"}
         or row["Status"] == "CONTEXTUAL"
         or bool(row["Alternative_Chinese"].strip())
-        or not row["Evidence_IDs"].strip()
+        or not evidence_ids_for_row(row)
     ]
     print_rows(ambiguous)
 
@@ -485,11 +658,13 @@ def command_deprecate_evidence(args: argparse.Namespace) -> None:
 def command_unlink_evidence(args: argparse.Namespace) -> None:
     rows = read_registry(args.registry)
     row = find_term(rows, args.term_id)
-    ids = [item.strip() for item in re.split(r"[;,]", row["Evidence_IDs"]) if item.strip()]
+    ids = evidence_ids_for_row(row)
     if args.evidence_id not in ids:
         raise TerminologyError(f"{args.term_id} is not linked to {args.evidence_id}.")
     validate_iso_date(args.verified_date, "verified_date")
-    row["Evidence_IDs"] = "; ".join(item for item in ids if item != args.evidence_id)
+    remaining = [item for item in ids if item != args.evidence_id]
+    row["Evidence_ID"] = remaining[0] if remaining else ""
+    row["Evidence_IDs"] = "; ".join(remaining)
     row["Last_Verified"] = args.verified_date
     row["Notes"] = append_note(row["Notes"], f"Unlinked {args.evidence_id}: {args.reason.strip()}")
     write_registry(args.registry, rows)
@@ -530,7 +705,7 @@ def validate_evidence_links(
             if not record.get("paper_id") or not isinstance(reported, list) or not set(map(str, supports or [])).issubset(set(map(str, reported or []))):
                 failures.append(f"{evidence_id}: focal-paper TE7 supports exceed reported_terms")
     for row in rows:
-        for evidence_id in [item.strip() for item in re.split(r"[;,]", row["Evidence_IDs"]) if item.strip()]:
+        for evidence_id in evidence_ids_for_row(row):
             record = state.get(evidence_id)
             if record is None:
                 failures.append(f"{row['Term_ID']}: unknown evidence {evidence_id}")
@@ -577,13 +752,23 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--preferred-chinese", required=True)
     add.add_argument("--abbreviation")
     add.add_argument("--alternative-chinese")
+    add.add_argument("--domain")
+    add.add_argument("--subdomain")
     add.add_argument("--discipline")
     add.add_argument("--subfield")
     add.add_argument("--definition")
     add.add_argument("--context")
+    add.add_argument("--operational-use")
+    add.add_argument("--source-type")
+    add.add_argument("--source-citation")
     add.add_argument("--confidence", choices=sorted(CONFIDENCE_VALUES), required=True)
+    add.add_argument("--evidence-id")
     add.add_argument("--evidence-level")
     add.add_argument("--evidence-ids")
+    add.add_argument("--paper-id")
+    add.add_argument("--first-seen")
+    add.add_argument("--last-used")
+    add.add_argument("--usage-count", type=int)
     add.add_argument("--status", choices=sorted(STATUS_VALUES), default="ACTIVE")
     add.add_argument("--verified-date")
     add.add_argument("--notes")
@@ -597,13 +782,20 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("--abbreviation")
     update.add_argument("--preferred-chinese")
     update.add_argument("--alternative-chinese")
+    update.add_argument("--domain")
+    update.add_argument("--subdomain")
     update.add_argument("--discipline")
     update.add_argument("--subfield")
     update.add_argument("--definition")
     update.add_argument("--context")
+    update.add_argument("--operational-use")
+    update.add_argument("--source-type")
+    update.add_argument("--source-citation")
     update.add_argument("--confidence", choices=sorted(CONFIDENCE_VALUES))
     update.add_argument("--evidence-level")
     update.add_argument("--evidence-ids")
+    update.add_argument("--paper-id")
+    update.add_argument("--corrections", type=Path)
     update.add_argument("--verified-date", required=True)
     update.add_argument("--note")
     update.set_defaults(handler=command_update)
@@ -618,10 +810,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     context.add_argument("--registry", type=Path, required=True)
     context.add_argument("--english-term", required=True)
+    context.add_argument("--domain")
+    context.add_argument("--subdomain")
     context.add_argument("--discipline")
     context.add_argument("--subfield")
     context.add_argument("--context")
     context.set_defaults(handler=command_context)
+
+    resolve = subparsers.add_parser(
+        "resolve", help="Reuse one high-confidence exact-context term or require verification."
+    )
+    resolve.add_argument("--registry", type=Path, required=True)
+    resolve.add_argument("--english-term", required=True)
+    resolve.add_argument("--domain", required=True)
+    resolve.add_argument("--subdomain")
+    resolve.add_argument("--context", required=True)
+    resolve.set_defaults(handler=command_resolve)
+
+    usage = subparsers.add_parser(
+        "record-usage", help="Increment cross-paper usage once per paper and term."
+    )
+    usage.add_argument("--registry", type=Path, required=True)
+    usage.add_argument("--term-ids", required=True, help="Semicolon-separated TERM IDs.")
+    usage.add_argument("--paper-id", required=True)
+    usage.add_argument("--used-date", required=True)
+    usage.set_defaults(handler=command_record_usage)
+
+    paper_usage = subparsers.add_parser(
+        "record-paper-usage", help="Accumulate all reviewed TERM IDs from one paper sheet."
+    )
+    paper_usage.add_argument("--registry", type=Path, required=True)
+    paper_usage.add_argument("--paper-terminology", type=Path, required=True)
+    paper_usage.add_argument("--paper-id", required=True)
+    paper_usage.add_argument("--used-date", required=True)
+    paper_usage.set_defaults(handler=command_record_paper_usage)
 
     ambiguous = subparsers.add_parser(
         "list-ambiguous", help="List terms requiring contextual review."

@@ -19,6 +19,26 @@ import zotero_bridge as zotero
 
 
 class ZoteroParentCreateTests(unittest.TestCase):
+    def test_library_probe_works_with_html_api_landing_page(self) -> None:
+        args = argparse.Namespace(api_base_url="http://localhost/api", timeout=1.0)
+        def response(base_url, path, **kwargs):
+            if path == "/users/0/items":
+                return []
+            raise zotero.ZoteroBridgeError("HTML landing page")
+        with patch.object(zotero, "api_get", side_effect=response):
+            ok, evidence, error = zotero.probe_api(args)
+        self.assertTrue(ok)
+        self.assertEqual(evidence["verified_endpoint"], "/users/0/items")
+        self.assertIsNone(error)
+
+    def test_library_probe_rejects_non_list_json(self) -> None:
+        args = argparse.Namespace(api_base_url="http://localhost/api", timeout=1.0)
+        with patch.object(zotero, "api_get", return_value={"error": "unavailable"}):
+            ok, evidence, error = zotero.probe_api(args)
+        self.assertFalse(ok)
+        self.assertIsNone(evidence)
+        self.assertIn("item list", error)
+
     def _metadata_file(self, root: Path, **overrides) -> Path:
         metadata = {
             "itemType": "journalArticle",

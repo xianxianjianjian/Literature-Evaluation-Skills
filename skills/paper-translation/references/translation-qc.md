@@ -1,6 +1,6 @@
 # Translation QC
 
-For v1.4.2, run `validate_translation_package.py --contract-version 1.4.2`. Completion requires role closure, `style_fidelity.json`, one-token source-matched residual rejection in translatable roles, preserved figure-internal pixels, translated captions and numeric integrity. A manual “looks correct” statement cannot replace these reports.
+For new v1.5.0 work, run `validate_translation_package.py --contract-version 1.5.0`. Completion requires role closure, `style_fidelity.json`, source-matched residual rejection in translatable roles, preserved figure-internal pixels, translated captions, numeric integrity and a real Chinese text layer. A manual “looks correct” statement cannot replace these reports.
 
 A may be described as academically `COMPLETE` only after four QC passes. Translation QC checks fidelity of the translation artifact; it does not replace the later research audit or the optional archive-completion check.
 
@@ -25,6 +25,7 @@ Any missing or unreadable source unit must be explicitly logged rather than sile
 Check:
 
 - terminology consistency and context match;
+- shared terminology-database lookup and Domain/Subdomain/Context match;
 - causal strength;
 - negation;
 - higher/lower and increase/decrease direction;
@@ -63,10 +64,15 @@ Check:
 - embedded SimSun for every CJK glyph with no fallback;
 - role-specific 95%-110% font sizing, recorded 1.15-1.45 leading, source-relative used-height evidence and unchanged frame geometry;
 - hard heading/paragraph separation, semantic Nature-style raised citations, Chinese punctuation/spacing, intact signs and scientific exponents;
-- frame closure plus independent source/output OCR residual audit with no unapproved surviving English run of four or more words;
+- Chinese body justification/2em indentation where geometry permits, no body indent on headings/captions/tables/references, and APA-style hanging indent only for Skill-generated reference lists;
+- frame closure plus independent source/output text-layer and visual residual audit with no unapproved source English in translatable roles; OCR is a fallback for source defects, not routine A verification;
 - exact table cells and figure-label replacement;
 - no extension page, adaptive layout or page-wide reflow panel;
 - zero same-renderer pixel changes outside reviewed replacement frames.
+
+For v1.5.0, sample Abstract, Introduction, Methods, Results, Discussion and captions: selecting and copying must return Chinese at the printed location, Chinese search must locate the same text, CJK fonts need ToUnicode, and translated English text objects must be absent. `validate_a_text_layer.py` checks extractability, search, reading order and stale-English evidence; reader selection alignment remains part of visual QA.
+
+Do not describe justified Chinese body prose as an APA requirement. It is the project Chinese-reading style. APA-oriented English prose is left aligned; Skill-generated reference entries use a 0.5-inch hanging indent. `validate_paragraph_styles.py` owns the corresponding role, alignment, indentation, bilingual-typography and reference-format gates.
 
 Layout QC requires actual render/visual inspection. A valid layout plan alone is not proof that the rendered PDF is visually correct.
 
@@ -102,3 +108,11 @@ Failure of this add-on means **archive pending**, not Translation failure.
 Consequential missing SI/source coverage still keeps the academic stage `PROVISIONAL` or `BLOCKED` according to whether defensible work can continue.
 
 `TRI-xxx` is reserved for translation/production issues. Do not use `TRI` for methodological or statistical research-audit findings.
+
+## v1.5 selectable text hardening
+
+For v1.5 FULL_MIRROR/EXACT_TEXT_FRAME, compare the complete ledger sequence with uniquely assigned glyphs inside each reviewed frame. All CJK, English, digits, citations, units, statistics and mathematical punctuation are significant; no prefix shortcut is allowed. Fullwidth ASCII, NFC, typographic ligatures, super/subscript digits/signs, renderer-equivalent minus, whitespace and soft hyphens are the only automatic extraction equivalences. Other differences block completion. Geometry completeness and within-frame copy order are separate gates; global PDF object order is not assumed to traverse columns. Overlapping frames cannot reuse the same glyph to satisfy multiple translations.
+
+Source-backed single words and split text objects in translated regions fail the stale-English gate. Terms actually retained in the target and explicitly reasoned `retained_source_tokens` are permitted. REFERENCE and FIGURE_INTERNAL roles retain their existing exceptions. Do not erase legitimate REM/PSG/DOI, statistical notation or figure labels to satisfy a detector.
+
+ToUnicode and extraction prove encoding/copy content only. The common-reader mouse selection, copy/paste, search, cross-line and cross-column experience remains a recorded manual check. Retain the reviewed frame inventory and ledger as evidence, not disposable rendering cache. The standalone text-layer report records each frame's expected/extracted character counts, exact sequence result and failed frame IDs. v1.4.1/v1.4.2 do not acquire these new gates retroactively.

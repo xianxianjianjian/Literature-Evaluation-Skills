@@ -49,6 +49,15 @@ def _valid_ocr_review(row: dict[str, Any]) -> bool:
     return True
 
 
+def _candidate_matches_pass(
+    failures: list[str], uncertain: list[str], ledger_row: dict[str, Any]
+) -> bool:
+    """Resolve OCR candidates only with a complete human crop-review record."""
+    if failures:
+        return _valid_ocr_review(ledger_row)
+    return not uncertain or _valid_ocr_review(ledger_row)
+
+
 def _confident_tsv_text(payload: str, minimum_confidence: float = 70.0) -> str:
     """Keep OCR words supported by word-level confidence, not CJK gibberish."""
     words: list[str] = []
@@ -147,7 +156,8 @@ def audit_residuals(
     tesseract = _find_program("tesseract", [Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe")])
     if not pdftoppm or not tesseract:
         raise ResidualAuditError("pdftoppm and Tesseract are required for independent visible-English audit")
-    allowed = _allowed_words(ledger_rows, legacy=contract_version != '1.4.2')
+    modern_contract = contract_version in {"1.4.2", "1.5.0"}
+    allowed = _allowed_words(ledger_rows, legacy=not modern_contract)
     frame_ledger = {frame_id: row for row in ledger_rows for frame_id in row.get('frame_ids', [])}
     sources = {source["source_id"]: source for source in inventory["sources"]}
     frame_rows: list[dict[str, Any]] = []
@@ -177,7 +187,7 @@ def audit_residuals(
                 role = frame_role(frame)
                 if frame["translation_action"] != "TRANSLATE":
                     continue
-                if contract_version == "1.4.2" and (
+                if modern_contract and (
                     role in PRESERVE_ENGLISH_FRAME_ROLES
                     or frame.get("preserve_english") is True
                 ):
@@ -201,16 +211,20 @@ def audit_residuals(
                 detected = _confident_tsv_text(result.stdout)
                 all_detected = _confident_tsv_text(result.stdout, minimum_confidence=0.0)
                 source_detected = _confident_tsv_text(source_result.stdout, minimum_confidence=0.0)
-                if contract_version == '1.4.2':
+                if modern_contract:
                     allowed = _allowed_words([frame_ledger.get(frame_id, {})], legacy=False)
                 failures = _shared_source_runs(
                     detected, source_detected, allowed,
-                    minimum_words=1 if contract_version == "1.4.2" else 4,
+                    minimum_words=1 if modern_contract else 4,
                 )
-                uncertain = _shared_source_runs(all_detected, source_detected, allowed, minimum_words=1) if contract_version == '1.4.2' else []
+                uncertain = _shared_source_runs(all_detected, source_detected, allowed, minimum_words=1) if modern_contract else []
                 if result.returncode or source_result.returncode:
                     failures.append('OCR process failed')
-                reviewed_uncertain = bool(uncertain) and _valid_ocr_review(frame_ledger.get(frame_id, {}))
+                ledger_row = frame_ledger.get(frame_id, {})
+                valid_review = _valid_ocr_review(ledger_row)
+                reviewed_uncertain = bool(uncertain) and valid_review
+                reviewed_confident = bool(failures) and valid_review
+                candidate_matches = list(dict.fromkeys(failures + uncertain))
                 frame_rows.append({
                     "frame_id": frame_id,
                     "role": role,
@@ -218,20 +232,22 @@ def audit_residuals(
                     "ocr_text": detected,
                     "source_ocr_text": source_detected,
                     "ocr_all_confidences": all_detected,
+                    "candidate_source_matches": candidate_matches,
                     "uncertain_source_matches": uncertain if not failures else [],
                     "uncertain_reviewed": reviewed_uncertain,
-                    "unapproved_latin_runs": failures,
-                    "passed": not failures and (not uncertain or reviewed_uncertain),
+                    "confident_matches_reviewed": reviewed_confident,
+                    "unapproved_latin_runs": [] if reviewed_confident else failures,
+                    "passed": _candidate_matches_pass(failures, uncertain, ledger_row),
                 })
     failed = [row["frame_id"] for row in frame_rows if not row["passed"]]
     report = {
-        "schema_version": 2 if contract_version == "1.4.2" else 1,
+        "schema_version": 2 if modern_contract else 1,
         "auditor": "audit_untranslated_residuals.py",
         "method": "200-dpi frame-crop OCR with role-aware source-matched English-token rejection",
         "policy": {
             "translatable_roles": "any unapproved source-matched English residual fails",
             "preserve_english_roles": sorted(PRESERVE_ENGLISH_FRAME_ROLES),
-            "minimum_words": 1 if contract_version == "1.4.2" else 4,
+            "minimum_words": 1 if modern_contract else 4,
         },
         "passed": not failed,
         "failed_frame_ids": failed,

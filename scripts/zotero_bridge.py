@@ -18,14 +18,17 @@ import argparse
 import json
 import sys
 import time
+import hashlib
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import quote, urlencode, urlparse
+from urllib.request import Request, urlopen, url2pathname
 
 import zotero_local_archive as local_archive
 import zotero_local_write as local_write
+import zotero_attachment_contract as attachment_contract
+from artifact_binding import fingerprint, same_content, resolve_path
 
 SCHEMA_VERSION = 1
 CAPABILITY_SET = "V1_ZOTERO_LOCAL_ARCHIVE"
@@ -257,8 +260,15 @@ def status_payload(
 
 def probe_api(args: argparse.Namespace) -> tuple[bool, Any | None, str | None]:
     try:
-        root = api_get(args.api_base_url, "/", timeout=args.timeout)
-        return True, root, None
+        # The API root is an HTML landing page on supported Zotero versions.
+        # Probe the same library route used for parent identity verification.
+        items = api_get(
+            args.api_base_url, "/users/0/items",
+            query={"limit": "1"}, timeout=args.timeout,
+        )
+        if not isinstance(items, list):
+            raise ZoteroBridgeError("Zotero library probe expected a JSON item list.")
+        return True, {"verified_endpoint": "/users/0/items"}, None
     except ZoteroBridgeError as exc:
         return False, None, str(exc)
 
@@ -792,6 +802,153 @@ def command_pending_template(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_attach_role(args: argparse.Namespace) -> int:
+    try:
+        args.name = attachment_contract.role_title(
+            args.role, args.si_number, data_si=args.data_si
+        )
+    except ValueError as exc:
+        raise ZoteroBridgeError(str(exc)) from exc
+    if not args.data_si and args.file.suffix.casefold() != ".pdf":
+        raise ZoteroBridgeError(f"{args.role} reading attachment must be a PDF")
+    if args.data_si and args.role != "SI":
+        raise ZoteroBridgeError("--data-si applies only to SI")
+    _, existing = _parent_children(args)
+    legacy = {
+        "MAIN": ("[ORIGINAL] Main Article",),
+        "A": ("[A] 中文全文翻译镜像版",),
+        "B": ("[B] 文献研究笔记·完整精读版",),
+        "SI": ("[SUPPLEMENT]",),
+    }[args.role]
+    old = [item_key(child) for child in existing if any(
+        str(item_data(child).get("title") or "").startswith(label) for label in legacy
+    )]
+    if old:
+        raise ZoteroBridgeError(f"Legacy {args.role} attachment exists; normalize/verify before attaching a duplicate: {old}")
+    return command_attach(args)
+
+
+def _parent_children(args: argparse.Namespace) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    prefix = args.library_prefix.strip().strip("/")
+    parent_key = quote(args.parent_key.strip(), safe="")
+    parent = api_get(args.api_base_url, f"/{prefix}/items/{parent_key}", timeout=args.timeout)
+    children = api_get(args.api_base_url, f"/{prefix}/items/{parent_key}/children", timeout=args.timeout)
+    if not isinstance(parent, dict) or not isinstance(children, list):
+        raise ZoteroBridgeError("Unexpected parent/children response")
+    return parent, children
+
+
+def command_verify_archive(args: argparse.Namespace) -> int:
+    workspace_root = getattr(args, "workspace_root", None)
+    allowed_roots = tuple(getattr(args, "allow_external_root", []))
+    if workspace_root:
+        args.spec = resolve_path(args.spec, workspace_root, allowed_roots=allowed_roots)
+        if args.report:
+            args.report = resolve_path(args.report, workspace_root, allowed_roots=allowed_roots, must_exist=False)
+    spec = load_metadata(args.spec)
+    if spec.get("parent_key") != args.parent_key:
+        raise ZoteroBridgeError("Archive spec parent key differs from requested parent")
+    parent, children = _parent_children(args)
+    if spec.get("contract_version") == "1.5.0" and workspace_root is None:
+        raise ZoteroBridgeError("v1.5 verification requires --workspace-root")
+    result = attachment_contract.validate_archive(parent, children, spec, workspace_root=workspace_root,
+                                                  allowed_roots=allowed_roots)
+    readable_failures: list[str] = []
+    if result["passed"]:
+        for row in spec["attachments"]:
+            attachment_key = str(row["key"])
+            url = request_text(
+                args.api_base_url.rstrip("/") + f"/{args.library_prefix.strip().strip('/')}/items/{quote(attachment_key, safe='')}/file/view/url",
+                timeout=args.timeout,
+            ).strip()
+            parsed = urlparse(url)
+            if parsed.scheme != "file":
+                readable_failures.append(attachment_key)
+                continue
+            path = Path(url2pathname(parsed.path))
+            if parsed.netloc:
+                path = Path(f"//{parsed.netloc}{url2pathname(parsed.path)}")
+            try:
+                if not path.is_file() or path.stat().st_size == 0:
+                    readable_failures.append(attachment_key)
+                elif row.get("mime", "application/pdf") == "application/pdf":
+                    from pypdf import PdfReader
+                    if not PdfReader(str(path)).pages:
+                        readable_failures.append(attachment_key)
+                if spec.get("contract_version") == "1.5.0" and path.is_file():
+                    actual = fingerprint(path)
+                    record = result["content_bindings"].get(attachment_key, {})
+                    md5 = hashlib.md5(path.read_bytes()).hexdigest()
+                    record.update({"actual": actual, "actual_md5": md5})
+                    if not same_content(actual, record.get("local", {})) or md5 != record.get("api_md5"):
+                        readable_failures.append(attachment_key)
+            except (OSError, ValueError):
+                readable_failures.append(attachment_key)
+    if readable_failures:
+        result["passed"] = False
+        result["failures"].append(f"unreadable or content-mismatched attachment files: {readable_failures}")
+    result["files_readable"] = result["passed"] and not readable_failures
+    result.update({"schema_version": 1, "command": "verify-archive", "library_prefix": args.library_prefix})
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    emit(result)
+    return 0 if result["passed"] else 2
+
+
+def command_normalize_titles(args: argparse.Namespace) -> int:
+    spec = load_metadata(args.spec)
+    if spec.get("parent_key") != args.parent_key:
+        raise ZoteroBridgeError("Normalization spec parent key differs from requested parent")
+    parent, children = _parent_children(args)
+    if attachment_contract.key(parent) != args.parent_key:
+        raise ZoteroBridgeError("Parent identity mismatch")
+    actual = {attachment_contract.key(child): child for child in children}
+    changes: list[dict[str, Any]] = []
+    for row in spec.get("attachments", []):
+        try:
+            title = attachment_contract.role_title(
+                row["role"], row.get("si_number"), data_si=row.get("data_si") is True
+            )
+        except (KeyError, ValueError, TypeError) as exc:
+            raise ZoteroBridgeError(f"Invalid normalization row: {exc}") from exc
+        attachment_key = str(row.get("key") or "").strip()
+        item = actual.get(attachment_key)
+        if item is None:
+            raise ZoteroBridgeError(f"Attachment not found under parent: {attachment_key}")
+        old_title = str(item_data(item).get("title") or "")
+        if old_title != title:
+            if any(item_data(child).get("title") == title for child in children):
+                raise ZoteroBridgeError(f"Target title already belongs to another child: {title}")
+            changes.append({"key": attachment_key, "old_title": old_title, "new_title": title,
+                            "version": item.get("version") or item_data(item).get("version")})
+    if not args.yes:
+        emit({"status": "DRY_RUN", "changes": changes, "deleted": []})
+        return 0
+    client = local_write.LocalWriteClient.connect(args.api_base_url, timeout=args.timeout)
+    for change in changes:
+        if not isinstance(change["version"], int):
+            raise ZoteroBridgeError(f"Missing item version for {change['key']}")
+        try:
+            client.request(
+                f"/{args.library_prefix.strip().strip('/')}/items/{quote(change['key'], safe='')}",
+                method="PATCH", data=json.dumps({"title": change["new_title"]}, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json", "If-Unmodified-Since-Version": str(change["version"])},
+                expected_statuses={204},
+            )
+        except local_write.LocalAPIError as exc:
+            raise ZoteroBridgeError(str(exc)) from exc
+    _, updated = _parent_children(args)
+    updated_by_key = {attachment_contract.key(child): child for child in updated}
+    verified = all(
+        item_data(updated_by_key.get(change["key"], {})).get("title") == change["new_title"]
+        for change in changes
+    )
+    emit({"status": "UPDATED_AND_VERIFIED" if verified else "UPDATE_NOT_VERIFIED",
+          "changes": changes, "deleted": []})
+    return 0 if verified else 2
+
+
 def pdf_ingest_preview(args: argparse.Namespace) -> dict[str, Any]:
     """Describe the PDF-first ingest without treating metadata creation as success."""
     pdf = args.pdf.resolve()
@@ -888,6 +1045,8 @@ def command_ingest_pdf(args: argparse.Namespace) -> int:
         ] if isinstance(children, list) else []
         if not pdf_children:
             raise ZoteroBridgeError("Recognized parent has no PDF child; archive remains incomplete.")
+        if len(pdf_children) != 1:
+            raise ZoteroBridgeError("Recognized parent has multiple PDF children; identify Main before archive closure.")
         actual = item_data(verified)
         expected_doi = normalize_doi(doi)
         actual_doi = normalize_doi(str(actual.get("DOI") or actual.get("doi") or ""))
@@ -895,16 +1054,19 @@ def command_ingest_pdf(args: argparse.Namespace) -> int:
             raise ZoteroBridgeError("Recognized DOI does not match expected DOI.")
         if title and str(actual.get("title") or "").strip().casefold() != title.casefold():
             raise ZoteroBridgeError("Recognized title does not match expected title.")
+        main_title_pass = item_data(pdf_children[0]).get("title") == "pdf"
         preview.update(
             {
-                "status": "VERIFIED",
+                "status": "VERIFIED" if main_title_pass else "TITLE_NORMALIZATION_REQUIRED",
                 "recognized_parent_key": recognized_key,
                 "main_attachment_keys": [item_key(child) for child in pdf_children],
-                "archive_complete": True,
+                "main_title_pass": main_title_pass,
+                "source_archive_complete": main_title_pass,
+                "archive_complete": False,
             }
         )
         emit(preview)
-        return 0
+        return 0 if main_title_pass else 4
 
     if args.fallback_metadata:
         preview.update(
@@ -914,7 +1076,7 @@ def command_ingest_pdf(args: argparse.Namespace) -> int:
                 "pending_zotero_action": {
                     "action": "replace_metadata_fallback_with_pdf_first_parent",
                     "reason": args.fallback_reason.strip(),
-                    "expected_attachment_name": "[ORIGINAL] Main Article",
+                    "expected_attachment_name": "pdf",
                 },
                 "note": (
                     "Metadata-only fallback is explicitly recorded but is not archive completion. "
@@ -1021,6 +1183,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Request Zotero Desktop authorization and execute the write. Without --yes, preview only.",
     )
     attach.set_defaults(handler=command_attach)
+
+    attach_role = subparsers.add_parser("attach-role", help="Attach a file with its v1.5 role title.")
+    attach_role.add_argument("--parent-key", required=True)
+    attach_role.add_argument("--file", type=Path, required=True)
+    attach_role.add_argument("--role", choices=("MAIN", "SI", "A", "B"), required=True)
+    attach_role.add_argument("--si-number", type=int)
+    attach_role.add_argument("--data-si", action="store_true")
+    attach_role.add_argument("--library-prefix", default=DEFAULT_LIBRARY_PREFIX)
+    attach_role.add_argument("--yes", action="store_true")
+    attach_role.set_defaults(handler=command_attach_role)
+
+    archive_verify = subparsers.add_parser("verify-archive", help="Verify parent and all role attachments.")
+    archive_verify.add_argument("--parent-key", required=True)
+    archive_verify.add_argument("--spec", type=Path, required=True)
+    archive_verify.add_argument("--workspace-root", type=Path)
+    archive_verify.add_argument("--allow-external-root", type=Path, action="append", default=[])
+    archive_verify.add_argument("--report", type=Path)
+    archive_verify.add_argument("--library-prefix", default=DEFAULT_LIBRARY_PREFIX)
+    archive_verify.set_defaults(handler=command_verify_archive)
+
+    normalize = subparsers.add_parser("normalize-titles", help="Preview or apply title-only migration.")
+    normalize.add_argument("--parent-key", required=True)
+    normalize.add_argument("--spec", type=Path, required=True)
+    normalize.add_argument("--library-prefix", default=DEFAULT_LIBRARY_PREFIX)
+    normalize.add_argument("--yes", action="store_true")
+    normalize.set_defaults(handler=command_normalize_titles)
 
     ingest = subparsers.add_parser(
         "ingest-pdf",

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "archived_date": "2026-10-14",
+  "scope": "C_CURRENT_VERSIONS",
+  "entries": [
+    {
+      "week": "2026-W33",
+      "doi": "10.1523/JNEUROSCI.0381-25.2025",
+      "path": "weekly_reviews/2026/2026-W33/C_Sjogard_2025_周文献评价.md",
+      "authority": "WEBSITE_USER_CONFIRMED",
+      "website_published_at": "2026-08-24 14:24:31",
+      "chinese_title": "运动学习相关脑区中的睡眠纺锤波增加可预测记忆巩固"
+    },
+    {
+      "week": "2026-W34",
+      "doi": "10.1111/jsr.70052",
+      "path": "weekly_reviews/2026/2026-W34/C_Lee_2025_周文献评价.md",
+      "authority": "WEBSITE_USER_CONFIRMED",
+      "website_published_at": "2026-08-24 14:17:17",
+      "chinese_title": "轮班工作者24小时静息-活动节律紊乱及与情绪调节相关的神经改变"
+    },
+    {
+      "week": "2026-W35",
+      "doi": "10.1093/sleep/zsaf117",
+      "path": "weekly_reviews/2026/2026-W35/C_Chappel-Farley_2025_周文献评价.md",
+      "authority": "WEBSITE_USER_CONFIRMED",
+      "website_published_at": "2026-08-24 14:36:20",
+      "chinese_title": "内侧颞叶功能网络结构的个体差异预测老年人睡眠相关情绪记忆巩固能力"
+    },
+    {
+      "week": "2026-W36",
+      "doi": "10.1038/s42003-025-07868-5",
+      "path": "weekly_reviews/2026/2026-W36/C_Yuksel_2025_周文献评价.md",
+      "authority": "WEBSITE_USER_CONFIRMED",
+      "website_published_at": "2026-09-06 19:52:53",
+      "chinese_title": "慢波睡眠与快速眼动睡眠均有助于情绪记忆巩固"
+    },
+    {
+      "week": "2026-W37",
+      "doi": "10.1038/s41398-024-03146-w",
+      "path": "weekly_reviews/2026/2026-W37/C_Tabarak_2024_周文献评价_v1.5.0.md",
+      "authority": "WEBSITE_USER_CONFIRMED",
+      "website_published_at": "2026-09-13 22:47:41",
+      "chinese_title": "睡眠中负性情绪记忆再加工的时间动态"
+    },
+    {
+      "week": "2026-W38",
+      "doi": "10.1038/s41398-024-03192-4",
+      "path": "weekly_reviews/2026/2026-W38/C_Recher_2024_周文献评价.md",
+      "authority": "WEBSITE_USER_CONFIRMED",
+      "website_published_at": "2026-09-27 23:14:19",
+      "chinese_title": "睡眠期间的靶向记忆再激活改善意象重写后的情绪记忆调节"
+    },
+    {
+      "week": "2026-W39",
+      "doi": "10.1093/sleep/zsaf409",
+      "path": "weekly_reviews/2026/2026-W39/C_Viselli_2026_周文献评价.md",
+      "authority": "LOCAL_COMPLETED_REVIEW",
+      "website_published_at": null,
+      "chinese_title": "实验诱发的 REM睡眠碎片化影响对情绪刺激的心理生理习惯化"
+    },
+    {
+      "week": "2026-W40",
+      "doi": "10.1016/j.isci.2026.116601",
+      "path": "weekly_reviews/2026/2026-W40/C_文献评论.md",
+      "authority": "LOCAL_COMPLETED_REVIEW",
+      "website_published_at": null,
+      "chinese_title": "睡眠中的随机听觉刺激扰乱行进慢波与陈述性记忆"
+    },
+    {
+      "week": "2026-W41",
+      "doi": "10.1038/s41598-019-42478-2",
+      "path": "weekly_reviews/2026/2026-W41/C_Ashton_2019_周文献译评.md",
+      "authority": "LOCAL_COMPLETED_REVIEW",
+      "website_published_at": null,
+      "chinese_title": "睡眠保留情绪记忆中的生理唤醒"
+    }
+  ],
+  "website_source": "http://www.leixulab.net/scale/paperstu.asp?sname=%D5%C5%D7%CF%BA%AD",
+  "website_snapshot": "sources/web_c_source_2026-10-14.json",
+  "duplicate_resolution": {
+    "doi": "10.1038/s41398-024-03146-w",
+    "published_at": "2026-09-27 23:05:21",
+    "selection": "使用用户此前要求保留的2026-09-13记录作为本地C正文；网页重复条目未删除。"
+  },
+  "acceptance": "W33–W38以用户指定网页为准；W37选用2026-09-13条目。W39–W41保留已完成的本地C。网页版本原样保留，此前内容的字数/学术校验仅为历史记录。",
+  "legacy_w34_record_correction": {
+    "previous_paper_id": "10.1111-jsr.14281",
+    "current_paper_id": "10.1111-jsr.70052",
+    "basis": "当前data root工作流和网页C的DOI一致；旧Git占位工作流按当前版本纠正，原版本可从Git历史追溯。"
+  }
+}

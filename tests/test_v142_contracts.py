@@ -19,6 +19,7 @@ import psychology_method_router as router
 import source_package
 import style_fidelity
 import translation_integrity
+import render_exact_mirror
 
 
 def frame(role="BODY", **overrides):
@@ -127,6 +128,23 @@ class StyleContractTests(unittest.TestCase):
         row["rendered_style"]["style_runs"] = []
         report = style_fidelity.validate_rendered_styles([row], style_fidelity.default_style_map([row]))
         self.assertFalse(report["passed"])
+
+    def test_11_retain_source_frame_needs_no_cjk_rendered_style(self):
+        row = frame(translation_action="RETAIN_SOURCE")
+        self.assertTrue(
+            style_fidelity.validate_rendered_styles(
+                [row], style_fidelity.default_style_map([row])
+            )["passed"]
+        )
+
+    def test_12_style_run_after_ideographic_space_keeps_source_position(self):
+        row = frame(style_runs=[{
+            "target_text": "p < .05", "occurrence": 1, "font_family": "SimSun",
+            "weight": "regular", "italic": True, "size_ratio": 1.0,
+        }])
+        tokens = render_exact_mirror._styled_tokens("图 2　结果，p < .05。", row)
+        styled = [item for item in tokens if item.style]
+        self.assertEqual([item.token.text for item in styled], ["p < .05"])
 
 
 class NumericHardGateTests(unittest.TestCase):

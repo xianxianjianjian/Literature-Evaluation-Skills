@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -340,9 +341,17 @@ def validate_text_frames(
                 raise ExactMirrorError(
                     f"text frame {frame_id} style run {run_index} requires target_text."
                 )
-            if run.get("font_family") not in {"SimSun", "SimHei"}:
+            symbol_run = (
+                run.get("font_purpose") == "SYMBOL"
+                and nonempty_text(run.get("source_style_evidence"))
+                and all(unicodedata.category(char).startswith("S")
+                        for char in run["target_text"])
+                and nonempty_text(run.get("font_family"))
+            )
+            if run.get("font_family") not in {"SimSun", "SimHei"} and not symbol_run:
                 raise ExactMirrorError(
-                    f"text frame {frame_id} style run {run_index} requires SimSun or SimHei."
+                    f"text frame {frame_id} style run {run_index} requires SimSun or SimHei "
+                    "unless it is an explicitly reviewed symbol-only run."
                 )
             if str(run.get("weight") or "regular").lower() not in {"regular", "bold"}:
                 raise ExactMirrorError(

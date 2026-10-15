@@ -19,6 +19,7 @@ import history_manager
 import exact_mirror
 import terminology_registry
 import translation_integrity
+import validate_translation_package
 import validate_deep_reading_package as deep_validator
 import validate_deliverables
 import validate_terminology_consistency as term_consistency
@@ -36,6 +37,15 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 class NumericIntegrityTests(unittest.TestCase):
+    def test_numeric_tokens_can_cross_adjacent_frames_on_same_source_page(self) -> None:
+        ledger = {
+            "U1": {"source_id": "SRC", "source_page": 1, "source_text": "n = 28", "translated_text": "样本量"},
+            "U2": {"source_id": "SRC", "source_page": 1, "source_text": "participants", "translated_text": "为 28 人"},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            result, _ = translation_integrity.validate_numeric_integrity(Path(directory), ledger)
+        self.assertTrue(result.passed, result)
+
     def test_scientific_notation_sign_statistics_units_and_doi_are_preserved(self) -> None:
         text = "β = −0.42, p < 4 × 10^-4, 95%, 12.5 Hz, R²=.31; 10.1000/test.v2"
         tokens = translation_integrity.extract_numeric_tokens(text)
@@ -74,6 +84,44 @@ class NumericIntegrityTests(unittest.TestCase):
             ledger = {"TU-1": {"source_text": "−0.42", "translated_text": "0.42"}}
             result, _ = translation_integrity.validate_numeric_integrity(work, ledger)
             self.assertTrue(result.passed)
+
+    def test_reviewed_one_sided_whitelist_accounts_for_textual_number_conversion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            write_jsonl(work / "numeric_integrity_whitelist.jsonl", [{
+                "unit_id": "TU-1", "kind": "ADDED", "translated_token": "17",
+                "reason": "English number word translated as an Arabic numeral",
+                "reviewer": "reviewer", "reviewed_date": "2026-09-22",
+            }])
+            ledger = {"TU-1": {"source_text": "Seventeen participants", "translated_text": "17 名参与者"}}
+            result, _ = translation_integrity.validate_numeric_integrity(work, ledger)
+            self.assertTrue(result.passed)
+
+
+class ExactFrameGeometryTests(unittest.TestCase):
+    def test_nested_patch_frame_owns_overlapping_glyph(self) -> None:
+        outer = ("OUTER", {"bbox_pt": [0, 0, 100, 100]})
+        inner = ("INNER", {"bbox_pt": [20, 20, 40, 40]})
+        owner = validate_translation_package._resolve_cjk_owner([outer, inner])
+        self.assertEqual(owner[0], "INNER")
+
+    def test_partial_overlap_remains_ambiguous(self) -> None:
+        first = ("F1", {"bbox_pt": [0, 0, 40, 40]})
+        second = ("F2", {"bbox_pt": [20, 20, 60, 60]})
+        self.assertIsNone(
+            validate_translation_package._resolve_cjk_owner([first, second])
+        )
+
+    def test_raster_gate_ignores_antialias_noise_but_keeps_material_edits(self) -> None:
+        if validate_translation_package.np is None:
+            self.skipTest("NumPy unavailable")
+        np = validate_translation_package.np
+        source = np.zeros((1, 2, 3), dtype=np.uint8)
+        output = source.copy()
+        output[0, 0] = [64, 0, 0]
+        output[0, 1] = [65, 0, 0]
+        result = validate_translation_package._material_pixel_mask(source, output)
+        self.assertEqual(result.tolist(), [[False, True]])
 
 
 class FigureAndConflictTests(unittest.TestCase):

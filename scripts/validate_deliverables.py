@@ -21,8 +21,11 @@ from runtime_paths import resolve_data_root
 from sanitize_docx_metadata import validate_docx_metadata
 import validate_deep_reading_package as deep_reading_validator
 import validate_terminology_consistency as terminology_consistency_validator
+import validate_c_review
 import validate_translation_package as translation_validator
 from workflow_state import WorkflowStateError, load_manifest
+from artifact_binding import resolve_path, matches_fingerprint, require_identity, workflow_identity, same_content
+from main_source_index import build_index
 
 PLUGIN_REQUIRED_DIRECTORIES = [
     "skills/weekly-literature-evaluation/references",
@@ -54,6 +57,7 @@ PLUGIN_REQUIRED_FILES = [
     "skills/paper-translation/agents/openai.yaml",
     "skills/paper-translation/references/terminology-policy.md",
     "skills/paper-translation/references/abstract-translation.md",
+    "skills/paper-translation/references/academic-typography.md",
     "skills/paper-translation/references/fulltext-translation.md",
     "skills/paper-translation/references/figures-tables-supplement.md",
     "skills/paper-translation/references/mirror-layout.md",
@@ -68,6 +72,7 @@ PLUGIN_REQUIRED_FILES = [
     "skills/paper-deep-reading/references/discussion-and-critique.md",
     "skills/paper-deep-reading/references/dynamic-coverage.md",
     "skills/paper-deep-reading/references/deliverables-and-qc.md",
+    "skills/paper-deep-reading/references/c-submission.md",
     "skills/paper-deep-reading/references/psychology-methods-routing.md",
     "shared/evidence-policy.md",
     "shared/identifier-policy.md",
@@ -85,12 +90,22 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/exact_mirror.py",
     "scripts/extract_text_frames.py",
     "scripts/normalize_chinese_typography.py",
+    "scripts/paragraph_styles.py",
+    "scripts/validate_paragraph_styles.py",
     "scripts/audit_untranslated_residuals.py",
     "scripts/migrate_exact_mirror_v141.py",
     "scripts/render_exact_mirror.py",
+    "scripts/validate_a_text_layer.py",
+    "scripts/artifact_binding.py",
+    "scripts/main_source_index.py",
+    "scripts/run_contract_tests.py",
     "scripts/validate_translation_package.py",
     "scripts/translation_integrity.py",
     "scripts/validate_deep_reading_package.py",
+    "scripts/export_b_pdf.py",
+    "scripts/prepare_si_pdf.py",
+    "scripts/validate_c_review.py",
+    "scripts/zotero_attachment_contract.py",
     "scripts/validate_terminology_consistency.py",
     "scripts/sanitize_docx_metadata.py",
     "scripts/psychology_method_router.py",
@@ -116,10 +131,11 @@ WORKSPACE_REQUIRED_FILES = [
 ]
 CSV_HEADERS = {
     "journal_registry.csv": "Journal,Field,Scope,Publisher,Peer_Reviewed,Priority,Strength,Caution,Status,Verified_Date".split(","),
-    "terminology_registry.csv": "Term_ID,English_Term,Abbreviation,Preferred_Chinese,Alternative_Chinese,Discipline,Subfield,Definition,Context,Confidence,Evidence_Level,Evidence_IDs,Status,First_Verified,Last_Verified,Notes".split(","),
+    "terminology_registry.csv": "Term_ID,English_Term,Preferred_Chinese,Alternative_Chinese,Abbreviation,Domain,Subdomain,Definition,Context,Operational_Use,Source_Type,Source_Citation,Confidence,Evidence_ID,Evidence_IDs,Evidence_Level,Paper_ID,First_Seen,First_Verified,Last_Used,Last_Verified,Usage_Count,Status,Notes".split(","),
     "reading_history.csv": "Week,Topic,Paper_ID,Title,DOI,Journal,Year,Study_Type,Core_Finding,Method_Value,Transfer_Value,Major_Limitation,Open_Questions,Next_Reading_Direction,Zotero_Item_Key,A_Attachment_Key,B_Attachment_Key,Git_Review_Path,Completed_Date".split(","),
     "selection_log.csv": "Week,Topic,Paper_ID,Title,DOI,Journal,Year,Role,Quality_Gate,Weighted_Score,Selection_Decision,Selection_Reason,Zotero_Item_Key,Logged_Date".split(","),
 }
+LEGACY_TERMINOLOGY_HEADER = "Term_ID,English_Term,Abbreviation,Preferred_Chinese,Alternative_Chinese,Discipline,Subfield,Definition,Context,Confidence,Evidence_Level,Evidence_IDs,Status,First_Verified,Last_Verified,Notes".split(",")
 COMMENT_HEADING_PATTERN = re.compile(r"^##\s+(?:评论|评译评论|Comment|Review)\s*$", re.IGNORECASE)
 SECTION_HEADING_PATTERN = re.compile(r"^##\s+(.+?)\s*$")
 SECTION_END_PATTERN = re.compile(r"^#{1,2}\s+")
@@ -147,7 +163,12 @@ B_SECTION_ALIASES = [
     ("改进", "redesign"),
     ("迁移", "transfer value"),
     ("术语", "terminology", "evidence index"),
-    ("研究设计与适用方法规范", "study design and applicable methods"),
+    (
+        "研究设计与适用方法规范",
+        "study design and applicable methods",
+        "适用方法规范",
+        "3 Methods",
+    ),
 ]
 
 
@@ -191,11 +212,20 @@ def check_foundation(
     try:
         profile = load_profile(data_root)
         weekly = profile.get("weekly_review", {})
+        minimum_comment_chars = weekly.get("minimum_comment_chars")
+        maximum_comment_chars = weekly.get("maximum_comment_chars")
         valid = (
             profile.get("schema_version") == 1
             and isinstance(weekly, dict)
-            and isinstance(weekly.get("minimum_comment_chars"), int)
-            and weekly.get("minimum_comment_chars", 0) > 0
+            and isinstance(minimum_comment_chars, int)
+            and minimum_comment_chars > 0
+            and (
+                maximum_comment_chars is None
+                or (
+                    isinstance(maximum_comment_chars, int)
+                    and maximum_comment_chars >= minimum_comment_chars
+                )
+            )
             and isinstance(weekly.get("original_abstract_required"), bool)
             and isinstance(weekly.get("translated_abstract_required"), bool)
         )
@@ -209,7 +239,13 @@ def check_foundation(
         try:
             with path.open("r", encoding="utf-8-sig", newline="") as handle:
                 actual = next(csv.reader(handle), None)
-            checks.append(Check(f"schema:{name}", actual == expected, "header valid" if actual == expected else "header mismatch"))
+            valid_header = actual == expected or (
+                name == "terminology_registry.csv" and actual == LEGACY_TERMINOLOGY_HEADER
+            )
+            detail = "legacy header readable; next terminology write upgrades it" if (
+                name == "terminology_registry.csv" and actual == LEGACY_TERMINOLOGY_HEADER
+            ) else ("header valid" if valid_header else "header mismatch")
+            checks.append(Check(f"schema:{name}", valid_header, detail))
         except (OSError, csv.Error) as exc:
             checks.append(Check(f"schema:{name}", False, str(exc)))
     return checks
@@ -234,7 +270,8 @@ def _academic_completion_checks(data: dict) -> list[Check]:
     return checks
 
 
-def _archive_completion_checks(data: dict) -> list[Check]:
+def _archive_completion_checks(data: dict, *, workspace_root: Path | None = None,
+                               allowed_roots: tuple[Path, ...] = ()) -> list[Check]:
     outputs = data["outputs"]
     checks = _academic_completion_checks(data)
     archive = data.get("archive", {})
@@ -255,7 +292,7 @@ def _archive_completion_checks(data: dict) -> list[Check]:
     checks.append(Check("archive:B-zotero-key", b_key, "B attachment key present" if b_key else "archive completion requires verified B Zotero key"))
     no_pending = not data.get("pending_zotero_actions")
     checks.append(Check("workflow:no-pending-zotero", no_pending, "no pending Zotero actions" if no_pending else "archive completion has pending_zotero_actions"))
-    if data.get("contract_version") == "1.4.2":
+    if data.get("contract_version") in {"1.4.2", "1.5.0"}:
         source_record = archive.get("source_archive", {})
         output_record = archive.get("output_archive", {})
         source_ok = source_record.get("status") == "COMPLETE" and bool(source_record.get("source_ids"))
@@ -265,6 +302,58 @@ def _archive_completion_checks(data: dict) -> list[Check]:
         )
         checks.append(Check("archive:source-archive", source_ok, "Source Archive verified" if source_ok else "v1.4.2 archive completion requires Source Archive COMPLETE"))
         checks.append(Check("archive:output-archive", output_ok, "Output Archive verified" if output_ok else "v1.4.2 archive completion requires A/B Output Archive COMPLETE"))
+    if data.get("contract_version") == "1.5.0":
+        report_path = archive.get("b_pdf_export_report")
+        identity = workflow_identity(data)
+        def resolve(value):
+            if workspace_root is None:
+                raise ValueError("v1.5 archive validation requires explicit workspace root")
+            return resolve_path(value or "", workspace_root, allowed_roots=allowed_roots)
+        try:
+            export = json.loads(resolve(report_path).read_text(encoding="utf-8-sig"))
+            require_identity(export, identity)
+            b_docx = resolve(outputs["B"].get("local_path"))
+            pdf = resolve(outputs["B"].get("archive_pdf"))
+            academic_path = resolve(outputs["B"].get("validation_report"))
+            academic = json.loads(academic_path.read_text(encoding="utf-8-sig"))
+            require_identity(academic, identity)
+            import export_b_pdf
+            # Reuse the export contract without writing another copy.
+            export_b_pdf.validate_bound_report(b_docx, academic_path, academic, workspace_root, allowed_roots, rendered_pdf=pdf)
+            b_pdf_ok = (export.get("B_PDF_EXPORT_PASS") is True
+                        and resolve(export.get("source_docx")) == b_docx
+                        and resolve(export.get("pdf_path")) == pdf
+                        and resolve(export.get("academic_report")) == academic_path
+                        and same_content(academic.get("rendered_pdf", {}), export.get("pdf_binding", {}))
+                        and matches_fingerprint(academic_path, export.get("academic_report_binding", {}))
+                        and export.get("rendered_pdf_binding") == academic.get("rendered_pdf")
+                        and export.get("source_fingerprints") == academic.get("source_fingerprints")
+                        and export.get("source_docx_binding") == academic.get("source_docx"))
+            b_pdf_detail = "B DOCX/PDF/academic report SHA-256 chain matches manifest" if b_pdf_ok else "B content identity differs from manifest or signed report"
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            b_pdf_ok = False
+            b_pdf_detail = str(exc)
+        checks.append(Check("archive:B-PDF-export", b_pdf_ok, b_pdf_detail))
+        verification_path = archive.get("verification_report_path")
+        try:
+            verified = json.loads(resolve(verification_path).read_text(encoding="utf-8-sig"))
+            require_identity(verified, identity)
+            keys = set((verified.get("attachment_keys") or {}).values())
+            required_keys = {archive.get("zotero_main_attachment_key"), outputs["A"].get("zotero_attachment_key"), outputs["B"].get("zotero_attachment_key")}
+            required_keys.update((archive.get("zotero_si_attachment_keys") or {}).values())
+            b_attachment = verified.get("content_bindings", {}).get(outputs["B"].get("zotero_attachment_key"), {})
+            archive_ok = (b_pdf_ok and verified.get("passed") is True
+                          and verified.get("parent_key") == archive.get("zotero_parent_key")
+                          and verified.get("collection_key") == archive.get("zotero_collection_key")
+                          and verified.get("source_fingerprints") == academic.get("source_fingerprints")
+                          and required_keys.issubset(keys)
+                          and same_content(academic.get("rendered_pdf", {}), b_attachment.get("local", {}))
+                          and same_content(academic.get("rendered_pdf", {}), b_attachment.get("actual", {}))
+                          and b_attachment.get("api_md5") == b_attachment.get("actual_md5")
+                          and bool(b_attachment.get("api_md5")))
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+            archive_ok = False
+        checks.append(Check("archive:attachment-contract", archive_ok, "Zotero roles/titles/MIME verified" if archive_ok else "Zotero verification report missing or conflicts with manifest"))
     return checks
 
 
@@ -274,6 +363,8 @@ def check_manifest(
     require_workflow_complete: bool = False,
     require_academic_complete: bool = False,
     require_archive_complete: bool = False,
+    workspace_root: Path | None = None,
+    allowed_roots: tuple[Path, ...] = (),
 ) -> list[Check]:
     """Validate manifest relationships and optional completion levels.
 
@@ -316,7 +407,9 @@ def check_manifest(
     if require_academic_complete:
         checks.extend(_academic_completion_checks(data))
     if require_archive_complete:
-        checks.extend(_archive_completion_checks(data))
+        if workspace_root is None:
+            workspace_root = next((parent.parent for parent in path.resolve().parents if parent.name == "weekly_reviews"), path.resolve().parent)
+        checks.extend(_archive_completion_checks(data, workspace_root=workspace_root, allowed_roots=allowed_roots))
     return checks
 
 
@@ -433,6 +526,7 @@ def check_deep_reading_package(
     png_dir: Path | None = None,
     visual_qa: Path | None = None,
     contract_version: str = "1.4.1",
+    identity: dict | None = None,
 ) -> list[Check]:
     if not required and work_dir is None:
         return []
@@ -451,7 +545,7 @@ def check_deep_reading_package(
     if report_path is None:
         converted.append(Check("deep-reading:validation-report", False, "B completion requires --deep-reading-report"))
     else:
-        payload = deep_reading_validator.write_report(report_path, checks, b_path)
+        payload = deep_reading_validator.write_report(report_path, checks, b_path, contract_version=contract_version, identity=identity)
         converted.append(
             Check(
                 "deep-reading:validation-report",
@@ -509,7 +603,11 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", "", text).strip()
 
 
-def check_c(root: Path, path: Path | None, required: bool, canonical_abstract: Path | None) -> list[Check]:
+def check_c(
+    root: Path, path: Path | None, required: bool, canonical_abstract: Path | None,
+    *, contract_version: str = "1.4.1", source_map: Path | None = None,
+    source_manifest: Path | None = None, manifest_data: dict | None = None,
+) -> list[Check]:
     if path is None:
         return [Check("artifact:C", not required, "not requested" if not required else "path required")]
     if not path.is_file() or path.stat().st_size == 0:
@@ -526,10 +624,24 @@ def check_c(root: Path, path: Path | None, required: bool, canonical_abstract: P
     checks = [Check("artifact:C", not missing_fields, "required sections found" if not missing_fields else f"missing C sections: {', '.join(missing_fields)}")]
     try:
         comment = extract_comment_section(markdown)
-        count = effective_chinese_characters(comment)
-        minimum = profile["minimum_comment_chars"]
-        checks.append(Check("comment_chars", count >= minimum, f"{count}/{minimum} Chinese characters in comment body"))
-    except (ValueError, KeyError, TypeError) as exc:
+        if contract_version == "1.5.0":
+            map_data = json.loads(source_map.read_text(encoding="utf-8-sig")) if source_map else None
+            index = build_index(source_manifest) if source_manifest else None
+            checks.extend(
+                Check(f"C:{item.code}", item.passed, item.detail)
+                for item in validate_c_review.validate(markdown, map_data, source_index=index,
+                                                       expected_identity=workflow_identity(manifest_data) if manifest_data else None)
+            )
+        else:
+            count = effective_chinese_characters(comment)
+            historical = (manifest_data or {}).get("submission_contract", {}).get("weekly_review", {})
+            minimum = historical.get("minimum_comment_chars", 500)
+            # A profile explicitly recorded under the old contract remains a
+            # user requirement. An unversioned upgraded default is not history.
+            if profile.get("contract_version") in {"1.4.1", "1.4.2"} or (profile.get("contract_version") is None and profile.get("maximum_comment_chars") is None):
+                minimum = max(minimum, profile.get("minimum_comment_chars", 500))
+            checks.append(Check("comment_chars", count >= minimum, f"{count}/{minimum} Chinese characters in comment body"))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
         checks.append(Check("comment_chars", False, str(exc)))
     reviewer_required = profile.get("reviewer_name") is not None
     reviewer = find_section(sections, C_FIELD_ALIASES["reviewer"])
@@ -568,6 +680,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--a-path", type=Path)
     parser.add_argument("--b-path", type=Path)
     parser.add_argument("--c-path", type=Path)
+    parser.add_argument("--c-source-map", type=Path, help="Private v1.5 C claim/source and semantic review record.")
+    parser.add_argument("--source-manifest", type=Path, help="Verified Canonical Main source manifest for C")
+    parser.add_argument("--allow-external-root", type=Path, action="append", default=[], help="Explicitly authorized external artifact root")
     parser.add_argument("--canonical-abstract", type=Path)
     parser.add_argument("--translation-work-dir", type=Path)
     parser.add_argument(
@@ -629,6 +744,15 @@ def main(argv: list[str] | None = None) -> int:
             else Path(__file__).resolve().parents[1]
         )
         data_root = resolve_data_root(args.workspace_root)
+    # Every artifact/report path has the same explicit data-root convention.
+    try:
+        for name, value in vars(args).items():
+            if isinstance(value, Path) and name not in {"repo_root", "plugin_root", "workspace_root"}:
+                setattr(args, name, resolve_path(value, data_root, allowed_roots=tuple(args.allow_external_root),
+                                                must_exist=False))
+    except ValueError as exc:
+        print(f"[FAIL] paths: {exc}")
+        return 1
     requires_manifest = (
         args.require_academic_complete
         or args.require_archive_complete
@@ -649,6 +773,7 @@ def main(argv: list[str] | None = None) -> int:
                 require_workflow_complete=args.require_workflow_complete,
                 require_academic_complete=args.require_academic_complete,
                 require_archive_complete=args.require_archive_complete,
+                workspace_root=data_root, allowed_roots=tuple(args.allow_external_root),
             )
         )
     manifest_data = None
@@ -675,7 +800,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     translation_scope = args.translation_scope or manifest_scope
-    contract_version = manifest_data.get("contract_version", "1.4.1") if manifest_data else "1.4.2"
+    contract_version = manifest_data.get("contract_version", "1.4.1") if manifest_data else "1.5.0"
     if (
         args.translation_layout_fidelity
         and manifest_layout_fidelity
@@ -728,9 +853,14 @@ def main(argv: list[str] | None = None) -> int:
             png_dir=args.deep_reading_png_dir,
             visual_qa=args.deep_reading_visual_qa,
             contract_version=contract_version,
+            identity=workflow_identity(manifest_data) if manifest_data else None,
         )
     )
-    checks.extend(check_c(data_root, args.c_path, args.require_c, args.canonical_abstract))
+    checks.extend(check_c(
+        data_root, args.c_path, args.require_c or bool(contract_version == "1.5.0" and manifest_data and manifest_data["outputs"]["C"]["status"] == "COMPLETE"), args.canonical_abstract,
+        contract_version=contract_version, source_map=args.c_source_map,
+        source_manifest=args.source_manifest, manifest_data=manifest_data,
+    ))
     all_artifacts_complete = bool(
         manifest_data
         and all(manifest_data["outputs"][name]["status"] == "COMPLETE" for name in ("A", "B", "C"))

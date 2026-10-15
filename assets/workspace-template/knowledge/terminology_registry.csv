@@ -1,1 +1,1 @@
-Term_ID,English_Term,Abbreviation,Preferred_Chinese,Alternative_Chinese,Discipline,Subfield,Definition,Context,Confidence,Evidence_Level,Evidence_IDs,Status,First_Verified,Last_Verified,Notes
+Term_ID,English_Term,Preferred_Chinese,Alternative_Chinese,Abbreviation,Domain,Subdomain,Definition,Context,Operational_Use,Source_Type,Source_Citation,Confidence,Evidence_ID,Evidence_IDs,Evidence_Level,Paper_ID,First_Seen,First_Verified,Last_Used,Last_Verified,Usage_Count,Status,Notes

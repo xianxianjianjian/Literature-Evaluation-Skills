@@ -1,0 +1,18 @@
+{
+  "paragraphs": [
+    {"paragraph_index": 1, "claims": [{"text": "该研究把问题推进到周期尺度", "source_class": "MAIN", "source_anchor": "Main Introduction, research aim"}]},
+    {"paragraph_index": 2, "claims": [{"text": "第二周期是负性条件差异和记忆关联最集中的窗口", "source_class": "MAIN", "source_anchor": "Main Results, second-cycle analyses"}]},
+    {"paragraph_index": 3, "claims": [{"text": "作者在讨论中仍把机制表述为需要继续澄清的问题", "source_class": "MAIN", "source_anchor": "Main Discussion, interpretive boundary", "kind": "limitation", "author_acknowledged": true}]},
+    {"paragraph_index": 4, "claims": [{"text": "分析单位可以从整夜均值转向时间演变", "source_class": "MAIN", "source_anchor": "Main Introduction and Discussion, temporal framing"}]}
+  ],
+  "semantic_review": {
+    "BACKGROUND_GAP_PASS": {"status": "PASS", "evidence": "Paragraph 1 moves from established sleep-memory work to the unresolved within-night timing question."},
+    "CORE_RESULT_CHAIN_PASS": {"status": "PASS", "evidence": "Paragraph 2 records design, second-cycle result, coupling association, and intervention result without copying every analysis."},
+    "MAIN_SOURCE_SCOPE_PASS": {"status": "PASS", "evidence": "All mapped paper facts were checked against Main Introduction, Results, or Discussion."},
+    "AUTHOR_LIMITATION_POLICY_PASS": {"status": "PASS", "evidence": "The uncertainty sentence is anchored to author interpretation in Main Discussion."},
+    "NO_SI_ONLY_CLAIMS_PASS": {"status": "PASS", "evidence": "No supplementary table or supplementary-only result is visible."},
+    "FIELD_IMPLICATION_PASS": {"status": "PASS", "evidence": "Paragraph 4 links the reported temporal framing to a cautious future research route."},
+    "CLAIM_STRENGTH_PASS": {"status": "PASS", "evidence": "The review describes a candidate window and rejects unique-mechanism and clinical conclusions."},
+    "STYLE_NATURALNESS_PASS": {"status": "PASS", "evidence": "Four paragraphs use connected prose without label-style openings or repeated transition scaffolds."}
+  }
+}

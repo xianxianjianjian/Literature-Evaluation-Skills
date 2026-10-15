@@ -30,6 +30,7 @@ Resolve and initialize `<data-root>` through the workspace contract before any w
 Read the reference that owns each translation decision:
 
 - terminology verification and registry use → [`references/terminology-policy.md`](references/terminology-policy.md)
+- paragraph roles, Chinese body style, APA-oriented English/reference style and bilingual typography → [`references/academic-typography.md`](references/academic-typography.md)
 - canonical Abstract → [`references/abstract-translation.md`](references/abstract-translation.md)
 - Translation Units and full scientific coverage → [`references/fulltext-translation.md`](references/fulltext-translation.md)
 - figures, tables and SI → [`references/figures-tables-supplement.md`](references/figures-tables-supplement.md)
@@ -66,7 +67,7 @@ Prefer Version of Record for identity and page mapping. A legal author manuscrip
 
 ## Translation workflow
 
-### v1.4.2 acceptance contract
+### v1.5.0 acceptance contract
 
 Exact mirror means **Geometry + Content + Style fidelity**. Before rendering, every text frame must declare one role from `TITLE / ABSTRACT / BODY / H1 / H2 / H3 / CAPTION / TABLE_TEXT / TABLE_NOTE / FIGURE_INTERNAL / REFERENCE / DOI_URL / FORMULA / STATISTIC / FOOTNOTE / AFFILIATION / OTHER`, plus consistent `translatable` and `preserve_english` flags. Translate captions and prose roles. Preserve `FIGURE_INTERNAL`, references, DOI/URL, formulas and locked statistic tokens in English/source form; never mask or redraw scientific figure internals.
 
@@ -79,18 +80,18 @@ For `FULL_MIRROR`:
 1. Minimal Intake and source identity check.
 2. Separate authority roles: use publisher XML/JATS/HTML first for language when clean and complete, then selectable PDF, another legal official source, and OCR only last; always use the Version-of-Record PDF as the visual/geometry authority. Record both choices in `source_inventory.json`.
 3. Fix-render paginated sources as needed, then build schema-v2 `source_inventory.json`, reviewed `text_frame_inventory.jsonl`, `figure_text_inventory.jsonl`, and `source_conflicts.jsonl` before translation. Inventory PDF pages visually and inspect DOCX drawings/relationships; paragraph-only extraction is insufficient.
-4. Run terminology preflight and create/update `paper_terminology.csv`.
+4. Extract candidate psychology/neuroscience/method terms, query the shared context-aware terminology database, verify unresolved choices, and create/update `paper_terminology.csv` before translating prose.
 5. Translate the Abstract through two translation passes plus an alignment pass and write `canonical_abstract.md`.
 6. Translate Main Article by stable Translation Units and record `translation_ledger.jsonl`.
 7. Translate/verify tables, captions, notes and Supporting Information. Preserve figure-internal scientific labels/data as `FIGURE_INTERNAL`; translate the external caption and record both lifecycles.
 8. Preserve every Main/SI disagreement verbatim and record it in `source_conflicts.jsonl` with `AUD-xxx`; never normalize one source to the other.
 9. Record translation-specific issues in `translation_issues.jsonl` using `TRI-xxx`.
 10. Create `font_map.json` and role-aware `style_map.json`, then create the schema-v2 `mirror_layout_plan.json`; do not bypass the mirror helper with reflow or page-wide overlay panels.
-11. Normalize Chinese typography into semantic text/citation/formula/unit tokens, render A through `render_exact_mirror.py`, visually compare every source/output page, and record object/table/text-frame placement and render notes.
-12. Run Coverage, Semantic and Numeric QC, then run `validate_translation_package.py --contract-version 1.4.2` to generate validator-owned `numeric_integrity.json`, `untranslated_residual_audit.json`, `style_fidelity.json`, `typography_fit.json`, `layout_diff.json`, and `translation_validation.json`.
-13. Only after the independent validator passes, verify A as `[A] 中文全文翻译镜像版` and set Translation/A `COMPLETE`.
+11. Normalize bilingual typography and apply the shared paragraph-role engine. Chinese body prose prefers justification plus a 2em first-line indent; headings/captions/tables/references do not inherit that body rule. In Exact Mirror, apply the preference only when it fits at the already selected source-safe scale; otherwise record `LAYOUT_EXCEPTION`. Remove old text objects, render real Chinese PDF text through `render_exact_mirror.py`, and visually compare every source/output page.
+12. Run Coverage, Semantic and Numeric QC, then run `validate_translation_package.py --contract-version 1.5.0` to generate validator-owned numeric, residual, style, typography, layout and text-layer reports.
+13. Only after the independent validator passes, verify A as the active paper's Chinese PDF and set Translation/A `COMPLETE`.
 14. Archive A to Zotero when available; otherwise stage a handoff/pending action without changing the academic completion state.
-15. Propose evidence-backed terminology-registry updates where warranted.
+15. Apply evidence-backed terminology-registry updates, record one usage per TERM/Paper pair, and append a correction event when preferred wording changes.
 
 ## Canonical Abstract
 
@@ -110,13 +111,15 @@ Original conceptual figures may be localized only without changing structure and
 
 ## Mirror PDF production
 
+The source page is the geometry and non-text base. Permanently remove old text objects in reviewed translation frames before inserting Chinese text objects. A visual cover over surviving English is not a valid A.
+
 For ordinary `FULL_MIRROR`, keep each source page as the immutable base and replace only reviewed text frames, table cells, or figure-label regions. Preserve page count, page boxes, rotation, columns, headers/footers, figures, tables and all non-text pixels. Every frame must close as `TRANSLATED`, `INTENTIONAL_PRESERVE`, or `NON_TRANSLATABLE`; a translated frame must record source clearing, target rendering, and independent residual checking. Chinese glyphs must use embedded SimSun with no fallback. Body/abstract/caption/footnote frames may fit from 95% through 110% with leading from 1.15 through 1.45 times the rendered font size; excluded roles remain at 95%-100%. Optimize translated used height against source used height inside the unchanged source frame. If 95% still overflows, keep Translation/A `PROVISIONAL`; do not move the frame, add a page, compress tracking, or switch layout modes.
 
 The former `Strict Mirror → Adaptive Mirror → Readable Extension` sequence belongs only to user-requested `STRUCTURAL_MIRROR` and the artifact/report must use that name rather than claiming exact mirror fidelity.
 
 ## Zotero archive handoff
 
-Zotero remains the preferred long-term location for A. When a write-capable route is available, attach A as `[A] 中文全文翻译镜像版` and verify the returned parent/attachment identity.
+Zotero remains the preferred long-term location for A. When a write-capable route is available, attach the PDF with display title `A翻译` and verify parent, role, MIME, file and attachment identity. Keep the underlying filename descriptive and unique.
 
 If Zotero is unavailable, automation is not live-validated, or the user chooses manual archive handling:
 
@@ -130,7 +133,7 @@ Never claim that A is in Zotero until the attachment is actually observed and ve
 
 ## Terminology update
 
-The registry is context-sensitive. Reuse a term only when the English term, discipline/subfield, conceptual meaning and paper context match. `HIGH / MEDIUM / LOW` confidence is distinct from TE1–TE7 evidence-source type.
+The registry is context-sensitive and accumulates across papers. Reuse a term only when the English term, Domain/Subdomain, conceptual meaning and paper context match. `HIGH / MEDIUM / LOW` confidence is distinct from TE1–TE7 evidence-source type. The required decision sequence and psychology domain seed list are in `terminology-policy.md`.
 
 Never silently overwrite an existing preferred translation; preserve evidence history and alternatives.
 
@@ -141,6 +144,7 @@ For any manifest scope, Translation `COMPLETE` requires:
 - source identity/package accounted for;
 - canonical Abstract complete;
 - terminology issues resolved or explicitly accounted for;
+- `TERMINOLOGY_DATABASE_LOOKUP_PASS`, `TERMINOLOGY_CONTEXT_MATCH_PASS`, `TERMINOLOGY_CROSS_DOCUMENT_CONSISTENCY_PASS`, and `TRANSLATION_DOMAIN_TERMINOLOGY_PASS` pass for completed A/B/C work;
 - 100% expected translatable coverage accounted for;
 - Main and SI status explicit;
 - `source_inventory.json`, `translation_ledger.jsonl`, and `translation_issues.jsonl` cross-validate for the requested scope;
@@ -148,6 +152,8 @@ For any manifest scope, Translation `COMPLETE` requires:
 - Coverage/Semantic/Numeric/Layout QC complete;
 - `translation_validation.json` was generated by the validator and passed for the active A;
 - A generated and verified as the correct artifact for the active `paper_id`/source version.
+- for v1.5.0, Chinese is selectable, copyable and searchable in representative Abstract, body and caption frames; old translated English text objects are absent; reading order and CJK ToUnicode mapping pass `validate_a_text_layer.py`. Reader selection alignment remains part of visual QA.
+- generated paragraph records pass role mapping, alignment, indentation, bilingual typography and APA-reference gates; any Exact Mirror exception names the affected frame and still has zero overflow/clipping.
 
 `FULL_MIRROR` with `EXACT_TEXT_FRAME` additionally requires schema-v2 `source_inventory.json`, explicit-role closed `text_frame_inventory.jsonl`, `font_map.json`, `style_map.json`, `mirror_layout_plan.json`, validator-generated `numeric_integrity.json`, `untranslated_residual_audit.json`, `style_fidelity.json`, `typography_fit.json`, and `layout_diff.json`, one-to-one pages, exact table cells, mapped embedded CJK fonts, role-specific 95%-110% frame sizing, semantic Chinese punctuation/citations, zero unapproved source-matched English residuals in translatable roles, unchanged figure internals, and zero rendered changes outside reviewed replacement regions. Do not apply these exact-layout requirements to `MAIN_ONLY` or `ABSTRACT_ONLY`.
 
@@ -158,6 +164,7 @@ Use `PROVISIONAL` when a named source/SI/content/layout gap affects the requeste
 ## Hard translation rules
 
 - Accuracy > professionalism > fidelity > fluency.
+- Translation priority is scientific meaning > professional terminology > causal strength > statistical direction > natural Chinese > literal form.
 - Do not intensify or weaken causal language beyond the source.
 - If authors themselves overstate causality, translate faithfully; criticism belongs to Deep Reading.
 - Preserve all numbers, statistics, equations, parameters, software names and data.

@@ -212,6 +212,20 @@ class TextFrameExtractionTests(unittest.TestCase):
                 any("Scientific manuscript line" in frame["source_text"] for frame in translated)
             )
 
+    def test_long_body_reaching_page_bottom_is_not_footer(self) -> None:
+        block = [
+            {"top": 75 + index * 32, "bottom": 85 + index * 32,
+             "size": 12, "fontname": "ArialMT", "text": "A scientific paragraph continues on this page."}
+            for index in range(19)
+        ]
+        self.assertGreater(block[-1]["bottom"], 700 * 0.94)
+        self.assertEqual(extract_text_frames._kind(block, 700, 8), "body")
+
+    def test_true_margin_footer_stays_footer(self) -> None:
+        block = [{"top": 674, "bottom": 686, "size": 8,
+                  "fontname": "ArialMT", "text": "12"}]
+        self.assertEqual(extract_text_frames._kind(block, 700, 8), "page_footer")
+
 
 if __name__ == "__main__":
     unittest.main()

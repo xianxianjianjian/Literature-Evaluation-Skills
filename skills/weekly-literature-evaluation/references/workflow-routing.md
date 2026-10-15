@@ -42,7 +42,7 @@ WAITING_USER — Gate 2: final paper confirmation
   ↓
 literature-search: selected-paper/source package handoff
   ↓
-paper-translation: terminology → canonical Abstract → Main/SI → A
+paper-translation: context-aware terminology lookup/update → canonical Abstract → Main/SI → paragraph-role/text-layer A
   ↓
 paper-deep-reading: audit → Intro/Methods/Results/Discussion → B → C
   ↓
@@ -144,7 +144,7 @@ If Translation is blocked because Main/SI source evidence itself is unavailable,
 
 ### Deep Reading → C
 
-In weekly context C is generated from B/Deep Reading evidence. Do not generate a polished C from Search notes alone when Deep Reading has not established the critique/evidence basis.
+In weekly context C is generated from validated B/Deep Reading, then filtered through the private C source map. Default visible paper facts must be in Main; SI-only results and evaluator-only limitations remain in B. Apply the v1.5.0 C submission contract to new work, while preserving legacy C history.
 
 ## Resume algorithm
 
