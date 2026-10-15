@@ -2,7 +2,7 @@
 
 A research-oriented workflow framework for **literature search → full-text translation → systematic deep reading → weekly evaluation submission**.
 
-> Current development version: **v1.5.0**
+> Software version: **v1.5.0** (manual research-artifact acceptance pending; see [Issue #15](https://github.com/xianxianjianjian/Literature-Evaluation-Skills/issues/15))
 >
 > Validated with:
 > - Python 3.11 CI
@@ -75,7 +75,7 @@ v1.5.0 adds:
 
 ## Release History
 
-### v1.5.0 (development)
+### v1.5.0 (software release; known manual acceptance limitations)
 
 - Replace translated English text objects with selectable/searchable Chinese PDF text and reject stale English layers.
 - Promote validated B DOCX renders to PDF for Zotero archive.
@@ -99,5 +99,8 @@ v1.5.0 adds:
 - Introduced plugin packaging architecture.
 
 ## Documentation
+
+- [v1.5.0 software release notes and known limitations](docs/releases/v1.5.0-release.md)
+- [Post-release A/C manual acceptance tracker](https://github.com/xianxianjianjian/Literature-Evaluation-Skills/issues/15)
 
 Detailed specifications remain available under [`docs/`](docs/).
