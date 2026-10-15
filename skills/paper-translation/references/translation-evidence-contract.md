@@ -99,6 +99,22 @@ Required exact settings:
 
 The font file itself is not committed. If it is absent or cannot be embedded, use `BLOCKED`; never silently select another CJK font.
 
+For a scientific symbol absent from SimSun/SimHei, declare an embedded font in
+`additional_fonts` (family name mapped to `font_path`, optionally `ttc_face_index`).
+Use it only in a reviewed style run with `font_purpose: "SYMBOL"`, symbol-only
+`target_text`, and `source_style_evidence`. This does not permit another font for
+Chinese or Latin prose or enable fallback. Missing target glyphs, including
+`.notdef` mappings, stop rendering before a defective PDF is written.
+
+The output ledger records the actual raised citation text as Unicode superscripts
+and preserves the pre-typography translation. Strict copy comparison still checks
+the entire character sequence; ordinary punctuation and statistical intervals
+must not be removed to make that comparison pass.
+
+A retained source fragment fully inside a replacement rectangle cannot survive
+redaction. Review and merge its source/translation evidence into the containing
+frame before rendering; the renderer rejects this contradictory segmentation.
+
 ## 5. `mirror_layout_plan.json`
 
 Schema v2 maps every source page to exactly one output page and records:

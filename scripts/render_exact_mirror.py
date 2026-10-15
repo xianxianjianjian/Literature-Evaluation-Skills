@@ -44,6 +44,7 @@ from normalize_chinese_typography import (
     normalize_citation,
     normalize_chinese_text,
     normalize_inline_citations,
+    rendered_citation_text,
     semantic_tokens,
 )
 from paragraph_styles import exact_mirror_body_preference, style_name_for_role
@@ -72,6 +73,18 @@ def _redacted_readers(
     inventory_pages: list[dict[str, Any]], frames: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     """Remove source text objects in reviewed translation frames, preserving art."""
+    for record in inventory_pages:
+        page_frames = [frames[fid] for fid in record["frame_ids"]]
+        for translated in page_frames:
+            if translated["translation_action"] != "TRANSLATE":
+                continue
+            replacement = pymupdf.Rect(translated["bbox_pt"])
+            for retained in page_frames:
+                if retained["translation_action"] == "RETAIN_SOURCE" and replacement.contains(pymupdf.Rect(retained["bbox_pt"])):
+                    raise ExactMirrorRenderError(
+                        f"Replacement {translated['frame_id']} would erase retained frame "
+                        f"{retained['frame_id']}; review and merge its source/translation evidence first."
+                    )
     translated_sources = {
         record["source_id"] for record in inventory_pages
         if any(frames[frame_id]["translation_action"] == "TRANSLATE" for frame_id in record["frame_ids"])
@@ -127,6 +140,20 @@ def _resolve_source_pdf(work_dir: Path, source: dict[str, Any]) -> Path:
     return path.resolve()
 
 
+def _require_glyphs(token: SemanticToken, font_name: str) -> None:
+    # ReportLab otherwise emits .notdef / NUL for unsupported TTF characters.
+    # Require an explicitly declared, embedded font instead of a silent loss.
+    face = pdfmetrics.getFont(font_name).face
+    cmap = getattr(face, "charToGlyph", None)
+    if cmap is not None:
+        missing = sorted({char for char in token.text.replace("−", "-")
+                          if not char.isspace() and not cmap.get(ord(char))})
+        if missing:
+            raise ExactMirrorRenderError(
+                f"Font {font_name} has no Unicode glyph for {missing!r}; declare a supported style-run font."
+            )
+
+
 def _token_width(token: SemanticToken, font_name: str, font_size: float) -> float:
     size = font_size * 0.65 if token.kind == "CITATION" else font_size
     if token.kind in {"SCIENTIFIC", "STAT"}:
@@ -145,7 +172,7 @@ def _reviewed_style_spans(text: str, frame: dict[str, Any]) -> list[tuple[int, i
     """Resolve reviewed target-text style runs to non-overlapping character spans."""
     spans: list[tuple[int, int, dict[str, Any]]] = []
     for index, run in enumerate(frame.get("style_runs", []), 1):
-        target = normalize_chinese_text(str(run.get("target_text") or ""))
+        target = rendered_citation_text(normalize_chinese_text(str(run.get("target_text") or "")))
         if not target:
             raise ExactMirrorRenderError(f"Frame {frame['frame_id']} style run {index} has no target_text.")
         occurrence = int(run.get("occurrence", 1))
@@ -168,7 +195,7 @@ def _reviewed_style_spans(text: str, frame: dict[str, Any]) -> list[tuple[int, i
 
 
 def _styled_tokens(text: str, frame: dict[str, Any]) -> list[StyledToken]:
-    text = normalize_chinese_text(text)
+    text = rendered_citation_text(normalize_chinese_text(text))
     spans = _reviewed_style_spans(text, frame)
     result: list[StyledToken] = []
     cursor = 0
@@ -188,8 +215,10 @@ def _styled_tokens(text: str, frame: dict[str, Any]) -> list[StyledToken]:
         elif token.kind == "CITATION":
             start = -1
             end = -1
-            for match in re.finditer(r"\[([^]]+)\]", text[cursor:]):
-                if normalize_citation(match.group(1)) == token.text:
+            for match in re.finditer(r"\[([^]]+)\]|[⁰¹²³⁴⁵⁶⁷⁸⁹]+(?:[˒,，–—-][⁰¹²³⁴⁵⁶⁷⁸⁹]+)*", text[cursor:]):
+                payload = (match.group(1) if match.group(1) is not None else
+                           match.group(0).translate(str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹˒", "0123456789,")))
+                if normalize_citation(payload) == token.text:
                     start = cursor + match.start()
                     end = cursor + match.end()
                     break
@@ -220,6 +249,7 @@ def _styled_font(item: StyledToken, frame: dict[str, Any], base_size: float) -> 
 
 def _styled_token_width(item: StyledToken, frame: dict[str, Any], base_size: float) -> float:
     family, size = _styled_font(item, frame, base_size)
+    _require_glyphs(item.token, family)
     return _token_width(item.token, family, size)
 
 
@@ -724,8 +754,20 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
             if not hei_path.is_file():
                 raise ExactMirrorRenderError(f'Required SimHei font missing: {hei_path}')
             pdfmetrics.registerFont(TTFont('SimHei', str(hei_path)))
+        for family, declaration in font_map.get("additional_fonts", {}).items():
+            if family in {"SimSun", "SimHei"}:
+                raise ExactMirrorRenderError("Additional fonts cannot replace the required CJK fonts.")
+            pdfmetrics.registerFont(TTFont(
+                family, str(declaration["font_path"]),
+                subfontIndex=int(declaration.get("ttc_face_index", 0)),
+            ))
+        for frame in frame_rows:
+            for run in frame.get("style_runs", []):
+                family = run["font_family"]
+                if family not in {"SimSun", "SimHei"} and family not in font_map.get("additional_fonts", {}):
+                    raise ExactMirrorRenderError(f"Symbol font {family} must be explicitly declared in font_map.json.")
     except Exception as exc:  # reportlab exposes several font-parser exception types
-        raise ExactMirrorRenderError(f"Cannot register/embed SimSun: {exc}") from exc
+        raise ExactMirrorRenderError(f"Cannot register/embed required fonts: {exc}") from exc
 
     sources = {source["source_id"]: source for source in inventory["sources"]}
     frame_to_ledger = {
@@ -755,9 +797,13 @@ def render(work_dir: Path, output: Path) -> dict[str, Any]:
                 continue
             row = frame_to_ledger[frame_id]
             frame['render_font_name'] = style_map.get('roles', {}).get(frame_role(frame), {}).get('cjk_font_family', 'SimSun')
-            row["translated_text"] = normalize_chinese_text(
+            normalized_text = normalize_chinese_text(
                 normalize_inline_citations(row["translated_text"], row["source_text"])
             )
+            row["translated_text"] = rendered_citation_text(normalized_text)
+            if row["translated_text"] != normalized_text:
+                row.setdefault("translation_before_typography", normalized_text)
+                row["citation_format"] = "UNICODE_SUPERSCRIPT"
             fitted = _layout(row["translated_text"], row["source_text"], frame)
             if fitted is None:
                 row["fit_status"] = "OVERFLOW"

@@ -30,6 +30,9 @@ import validate_deep_reading_package as b_validate
 import zotero_bridge
 import zotero_attachment_contract as zotero_contract
 import init_workspace
+import exact_mirror
+import normalize_chinese_typography as typography
+import translation_integrity
 from tests.v150_test_support import bind_c_map
 from tests.v150_test_support import b_report
 from tests import test_v150_contracts as contracts
@@ -219,6 +222,127 @@ class ACompletenessTests(unittest.TestCase):
                     self.assertIn("PSG figure label", doc[0].get_text())
                     self.assertEqual(protected, doc[0].get_pixmap(clip=pymupdf.Rect(290, 140, 430, 270) * doc[0].rotation_matrix).samples)
                     self.assertNotEqual(before, doc[0].get_pixmap().samples)
+
+
+class ARendererRegressionTests(unittest.TestCase):
+    package = ACompletenessTests.package
+    assert_gate = ACompletenessTests.assert_gate
+    def test_citation_ledger_records_actual_raised_text_without_dropping_values(self):
+        value = '记忆[11, 12-14]，p=.001；95% CI [0.12, 0.45]。'
+        rendered = typography.rendered_citation_text(value)
+        self.assertEqual(rendered, '记忆¹¹,¹²–¹⁴，p=.001；95% CI [0.12, 0.45]。')
+        tokens = render_exact_mirror._styled_tokens(value, {'frame_id': 'F1'})
+        self.assertEqual([t.token.text for t in tokens if t.token.kind == 'CITATION'], ['11,12–14'])
+        for actual, passed in ((rendered, True), (rendered.replace('¹⁴', '¹³'), False),
+                               (rendered.replace('.001', '.01'), False)):
+            with self.subTest(actual=actual), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                # Renderer paints baseline digits with PDF text rise, rather than
+                # relying on the font's coverage of Unicode superscript glyphs.
+                extracted = actual.translate(str.maketrans('⁰¹²³⁴⁵⁶⁷⁸⁹', '0123456789'))
+                checks = a.validate(root, self.package(root, rendered, extracted))
+                self.assert_gate(checks, 'A_COPY_TEXT_FIDELITY_PASS', passed)
+        # Legacy bracket expectations stay strict; the renderer fixes its ledger.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.assert_gate(a.validate(root, self.package(root, '记忆[11]', '记忆11')),
+                             'A_COPY_TEXT_FIDELITY_PASS', False)
+
+    def test_missing_glyph_and_notdef_are_rejected_before_drawing(self):
+        import reportlab
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        path = Path(reportlab.__file__).parent / 'fonts/Vera.ttf'
+        pdfmetrics.registerFont(TTFont('GlyphProbe', str(path)))
+        for char in ('∗', '\U0010ffff'):
+            item = render_exact_mirror.StyledToken(typography.SemanticToken('TEXT', char), {})
+            with self.subTest(char=char), self.assertRaisesRegex(render_exact_mirror.ExactMirrorRenderError, 'no Unicode glyph'):
+                render_exact_mirror._styled_token_width(item, {'render_font_name': 'GlyphProbe'}, 10)
+
+    def test_explicit_symbol_font_preserves_unicode_and_cjk_contract(self):
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.pdfgen import canvas
+        import reportlab
+        windows = Path(r'C:\Windows\Fonts\seguisym.ttf').is_file()
+        fontpath = Path(r'C:\Windows\Fonts\seguisym.ttf') if windows else Path(reportlab.__file__).parent / 'fonts/Vera.ttf'
+        pdfmetrics.registerFont(TTFont('SymbolProbe', str(fontpath)))
+        symbol = '∗' if windows else '±'
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pdf = self.package(root, symbol * 2, symbol * 2)
+            buf = io.BytesIO(); cpdf = canvas.Canvas(buf, pagesize=(600, 800))
+            frame = {'render_font_name': 'SymbolProbe', 'weight': 'regular', 'italic': False, 'alignment': 'left'}
+            items = [render_exact_mirror.StyledToken(typography.SemanticToken('TEXT', symbol), {})] * 2
+            render_exact_mirror._draw_line(cpdf, items, 50, 710, 500, 10, frame, True)
+            cpdf.save(); pdf.write_bytes(buf.getvalue())
+            self.assertTrue(all(c.passed for c in a.validate(root, pdf)))
+            with pymupdf.open(pdf) as doc:
+                self.assertIn(symbol * 2, doc[0].get_text().replace(' ', ''))
+                self.assertNotIn('\x00', doc[0].get_text())
+        from tests.test_v13_exact_mirror import ExactMirrorTests
+        with tempfile.TemporaryDirectory() as tmp:
+            work, _ = ExactMirrorTests()._package(Path(tmp))
+            inv = json.loads((work / 'source_inventory.json').read_text(encoding='utf-8'))
+            frames = [json.loads(x) for x in (work / 'text_frame_inventory.jsonl').read_text(encoding='utf-8').splitlines()]
+            run = {'target_text': '∗', 'font_family': 'SymbolProbe', 'font_purpose': 'SYMBOL', 'source_style_evidence': 'Source caption asterisk'}
+            frames[0]['style_runs'] = [run]
+            exact_mirror.validate_text_frames(frames, inv)
+            for target in ('中文', 'REM', '∗中文'):
+                run['target_text'] = target
+                with self.subTest(target=target), self.assertRaises(exact_mirror.ExactMirrorError):
+                    exact_mirror.validate_text_frames(frames, inv)
+            with self.assertRaises(exact_mirror.ExactMirrorError):
+                exact_mirror.validate_font_map({'schema_version': 1, 'cjk_font_family': 'SymbolProbe'})
+
+    def test_split_statistic_must_exist_in_ledger_and_pdf(self):
+        target = '0.001）。经Bonferroni校正的比较显示记忆下降。'
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for text, passed in ((target, True), (target.replace('0.001）。', ''), False),
+                                 (target.replace('0.001', '0.01'), False)):
+                result, _ = translation_integrity.validate_numeric_integrity(root, {
+                    'U1': {'source_id': 'SI', 'source_page': 14, 'source_text': '0.001). Bonferroni-corrected comparisons showed memory decline.', 'translated_text': text}})
+                self.assertEqual(result.passed, passed)
+                checks = a.validate(root, self.package(root, target, text))
+                self.assert_gate(checks, 'A_COPY_TEXT_FIDELITY_PASS', passed)
+
+    def test_renderer_persists_citation_ledger_and_requires_symbol_declaration(self):
+        from tests.test_v13_exact_mirror import ExactMirrorTests
+        with tempfile.TemporaryDirectory() as tmp:
+            work, output = ExactMirrorTests()._package(Path(tmp))
+            path = work / 'translation_ledger.jsonl'
+            rows = [json.loads(x) for x in path.read_text(encoding='utf-8').splitlines()]
+            rows[0]['translated_text'] = '中文正文[11]'
+            path.write_text('\n'.join(json.dumps(r, ensure_ascii=False) for r in rows), encoding='utf-8')
+            render_exact_mirror.render(work, output)
+            current = json.loads(path.read_text(encoding='utf-8').splitlines()[0])
+            self.assertEqual(current['translated_text'], '中文正文¹¹')
+            self.assertEqual(current['translation_before_typography'], '中文正文[11]')
+            self.assertEqual(current['citation_format'], 'UNICODE_SUPERSCRIPT')
+            self.assertTrue(all(c.passed for c in a.validate(work, output)))
+            fpath = work / 'text_frame_inventory.jsonl'
+            frames = [json.loads(x) for x in fpath.read_text(encoding='utf-8').splitlines()]
+            frames[0]['style_runs'] = [{'target_text': '∗', 'font_family': 'UndeclaredSymbol',
+                                       'font_purpose': 'SYMBOL', 'source_style_evidence': 'caption'}]
+            fpath.write_text('\n'.join(json.dumps(f, ensure_ascii=False) for f in frames), encoding='utf-8')
+            before = output.read_bytes()
+            with self.assertRaisesRegex(render_exact_mirror.ExactMirrorRenderError, 'explicitly declared'):
+                render_exact_mirror.render(work, output)
+            self.assertEqual(output.read_bytes(), before)
+
+    def test_redaction_cannot_silently_erase_retained_statistic(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pdf = self.package(root, '图注统计', '图注统计')
+            frames = {'F1': {'frame_id': 'F1', 'translation_action': 'TRANSLATE', 'bbox_pt': [40, 650, 560, 730]},
+                      'F2': {'frame_id': 'F2', 'translation_action': 'RETAIN_SOURCE', 'bbox_pt': [400, 680, 500, 700], 'source_text': 'p < .001).'}}
+            pages = [{'source_id': 'S', 'source_page': 1, 'frame_ids': ['F1', 'F2']}]
+            sources = {'S': {'pdf_path': str(pdf)}}
+            with self.assertRaisesRegex(render_exact_mirror.ExactMirrorRenderError, 'F1.*F2'):
+                render_exact_mirror._redacted_readers(root, sources, pages, frames)
+            frames['F2']['bbox_pt'] = [40, 450, 560, 530]
+            self.assertIn('S', render_exact_mirror._redacted_readers(root, sources, pages, frames))
 
 
 class CSourceAndSignoffTests(unittest.TestCase):

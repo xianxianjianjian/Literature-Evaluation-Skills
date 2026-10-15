@@ -60,6 +60,18 @@ def normalize_citation(value: str) -> str:
     return value
 
 
+def rendered_citation_text(text: str) -> str:
+    """Record the actual raised citation text, rather than its bracket markup.
+
+    The renderer has always painted citation payloads without square brackets.
+    Keep an explicit Unicode superscript representation in its output ledger so
+    strict copy validation can compare the visible text without dropping any
+    punctuation from ordinary prose, statistics or intervals.
+    """
+    digits = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+    return _CITATION.sub(lambda match: normalize_citation(match.group(1)).translate(digits), text)
+
+
 def source_citation_groups(source_text: str) -> list[str]:
     """Extract publisher-style citation groups attached to English prose words."""
     groups: list[str] = []
