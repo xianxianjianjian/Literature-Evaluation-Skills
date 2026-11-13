@@ -14,7 +14,7 @@ def now(): return datetime.now(timezone.utc).isoformat()
 def load(path): return json.loads(path.read_text(encoding='utf-8-sig'))
 def atomic(path, text):
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',dir=path.parent,delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',newline='',dir=path.parent,delete=False) as f:
         f.write(text); tmp=Path(f.name)
     os.replace(tmp,path)
 def save(path, value): atomic(path,json.dumps(value,ensure_ascii=False,indent=2)+'\n')

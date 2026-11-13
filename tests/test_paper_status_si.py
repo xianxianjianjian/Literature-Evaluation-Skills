@@ -170,4 +170,20 @@ class ConversionResumeTests(unittest.TestCase):
                 self.assertTrue(second['passed']); self.assertEqual(converter.call_count,1)
                 self.assertFalse(reviewed.exists())
 
+
+
+class CsvOutputTests(unittest.TestCase):
+    def test_csv_has_one_physical_row_per_record_on_windows(self):
+        import csv
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            status.save(root/'knowledge/intake/one/paper_status.json',{'paper_id':'one','title':'Synthetic title'})
+            status.rebuild(root)
+            path=root/'knowledge/paper_status_overview.csv'
+            self.assertNotIn(b'\r\r\n',path.read_bytes())
+            with path.open(encoding='utf-8',newline='') as handle:
+                rows=list(csv.reader(handle))
+            self.assertEqual(len(rows),2)
+            self.assertTrue(all(len(row)==7 for row in rows))
+
 if __name__=='__main__': unittest.main()
