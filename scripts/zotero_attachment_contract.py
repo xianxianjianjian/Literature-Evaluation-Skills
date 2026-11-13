@@ -8,18 +8,25 @@ from pathlib import Path
 from artifact_binding import fingerprint, same_content, resolve_path
 
 
-ROLE_TITLES = {"MAIN": "pdf", "A": "A翻译", "B": "B精读"}
+LEGACY_TITLES = {"MAIN": "pdf", "A": "A翻译", "B": "B精读"}
+ROLE_TITLES = {"MAIN": "Main Article", "A": "A-Translation", "B": "B-DeepReading"}
 
 
-def role_title(role: str, si_number: int | None = None, *, data_si: bool = False) -> str:
+def role_title(role: str, si_number: int | None = None, *, data_si: bool = False, naming_version: int = 2) -> str:
     if role in ROLE_TITLES:
-        return ROLE_TITLES[role]
+        return (LEGACY_TITLES if naming_version == 1 else ROLE_TITLES)[role]
+    if role in {"VIDEO", "DATA"}:
+        if not isinstance(si_number, int) or si_number < 1:
+            raise ValueError("media SI requires a positive number")
+        return f"SI-{role.title()}-{si_number}"
     if role != "SI":
         raise ValueError(f"unsupported attachment role: {role}")
     if data_si:
         if not isinstance(si_number, int) or si_number < 1:
             raise ValueError("data SI requires a positive SI number")
         return f"SI-Data-{si_number}"
+    if naming_version != 1:
+        return "Support Information"
     if si_number is None:
         return "SI"
     if si_number < 1:
@@ -49,6 +56,9 @@ def validate_archive(parent: dict[str, Any], children: list[dict[str, Any]], spe
         failures.append("parent key mismatch")
     if parent_data.get("itemType") in {"attachment", "note", "annotation"}:
         failures.append("parent is not bibliographic")
+    expected_collection = spec.get("collection_key")
+    if expected_collection and expected_collection not in parent_data.get("collections", []):
+        failures.append("parent collection mismatch")
     rows = spec.get("attachments")
     if not isinstance(rows, list) or not rows:
         failures.append("attachment specification missing")
@@ -66,7 +76,7 @@ def validate_archive(parent: dict[str, Any], children: list[dict[str, Any]], spe
         number = row.get("si_number")
         data_si = row.get("data_si") is True
         try:
-            title = role_title(role, number, data_si=data_si)
+            title = role_title(role, number, data_si=data_si, naming_version=spec.get("naming_version", 1))
         except (ValueError, TypeError) as exc:
             failures.append(str(exc))
             continue
@@ -83,7 +93,7 @@ def validate_archive(parent: dict[str, Any], children: list[dict[str, Any]], spe
             failures.append(f"missing child: {title}")
             continue
         child = data(item)
-        expected_mime = str(row.get("mime") or ("application/pdf" if not data_si else "")).strip()
+        expected_mime = str(row.get("mime") or ("application/pdf" if not data_si and role not in {"VIDEO", "DATA"} else "")).strip()
         if child.get("parentItem") != parent_key:
             failures.append(f"wrong parent: {title}")
         if child.get("itemType") != "attachment" or child.get("title") != title:
@@ -96,7 +106,7 @@ def validate_archive(parent: dict[str, Any], children: list[dict[str, Any]], spe
         if expected_mime == "application/pdf" and not filename.casefold().endswith(".pdf"):
             failures.append(f"not a PDF filename: {title}")
         matched[title] = attachment_key
-        if spec.get("contract_version") == "1.5.0":
+        if spec.get("contract_version") == "1.5.0" or spec.get("naming_version", 1) >= 2:
             try:
                 if workspace_root is None:
                     raise ValueError("explicit workspace root required for local attachment binding")
@@ -115,14 +125,18 @@ def validate_archive(parent: dict[str, Any], children: list[dict[str, Any]], spe
     for row in rows:
         if isinstance(row, dict):
             try:
-                title = role_title(row["role"], row.get("si_number"), data_si=row.get("data_si") is True)
+                title = role_title(row["role"], row.get("si_number"), data_si=row.get("data_si") is True, naming_version=spec.get("naming_version", 1))
             except (KeyError, ValueError, TypeError):
                 continue
             same_title = [child for child in children if data(child).get("title") == title]
             if len(same_title) > 1:
                 failures.append(f"duplicate Zotero title: {title}")
-    result = {"passed": not failures, "failures": sorted(set(failures)), "attachment_keys": matched, "parent_key": parent_key}
-    if spec.get("contract_version") == "1.5.0":
+    required_ids = set(spec.get("required_si_source_ids", []))
+    covered = {sid for row in rows if isinstance(row, dict) for sid in row.get("source_ids", [])}
+    if not required_ids.issubset(covered):
+        failures.append("required SI source coverage missing")
+    result = {"naming_version": spec.get("naming_version", 1), "passed": not failures, "failures": sorted(set(failures)), "attachment_keys": matched, "parent_key": parent_key}
+    if spec.get("contract_version") == "1.5.0" or spec.get("naming_version", 1) >= 2:
         result.update({k: spec.get(k) for k in ("paper_id", "workflow_id", "contract_version", "source_fingerprints", "collection_key")})
         if not all(result.get(k) for k in ("paper_id", "workflow_id", "source_fingerprints", "collection_key")):
             result["passed"] = False
@@ -131,4 +145,19 @@ def validate_archive(parent: dict[str, Any], children: list[dict[str, Any]], spe
             result["passed"] = False
             result["failures"].append("parent collection mismatch")
         result["content_bindings"] = local_bindings
+    if spec.get("naming_version", 1) >= 2:
+        for row in rows:
+            if row.get("role") != "SI" or row.get("data_si"): continue
+            bundle_path = row.get("si_bundle_manifest")
+            try:
+                import json
+                from prepare_si_bundle import verify_bundle
+                bundle = json.loads(resolve_path(bundle_path or "", workspace_root).read_text(encoding="utf-8"))
+                covered_ids = {s["source_id"] for s in bundle.get("sources", [])}
+                if not bundle.get("passed") or set(row.get("source_ids", [])) != covered_ids or verify_bundle(bundle, workspace_root):
+                    raise ValueError("SI bundle coverage or content invalid")
+                if bundle.get("sha256") != row.get("local", {}).get("sha256"):
+                    raise ValueError("SI bundle differs from attachment")
+            except (OSError, ValueError, TypeError) as exc:
+                result["passed"] = False; result["failures"].append(str(exc))
     return result

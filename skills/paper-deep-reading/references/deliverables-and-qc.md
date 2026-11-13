@@ -106,7 +106,7 @@ A Zotero-only pending action does not prevent the reading from entering complete
 
 ## B archive handoff
 
-Promote the independently rendered B PDF with `scripts/export_b_pdf.py` only after the DOCX academic report and visual QA pass. Keep the DOCX as editable source; Zotero receives the PDF with display title `B精读`. If PDF export fails, B academic status stays intact and Archive remains pending.
+Promote the independently rendered B PDF with `scripts/export_b_pdf.py` only after the DOCX academic report and visual QA pass. Keep the DOCX as editable source; Zotero receives the PDF with display title `B-DeepReading`. If PDF export fails, B academic status stays intact and Archive remains pending.
 
 When Zotero is writable, verify the parent item and attachment after writing. If Zotero is unavailable, stage under `<data-root>/work/<paper_id>/handoff/` and record a pending action. This archive pending state must not downgrade a B that already passed its academic/QC gate.
 

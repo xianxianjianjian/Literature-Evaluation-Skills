@@ -601,7 +601,7 @@ class BContentBindingTests(unittest.TestCase):
         manifest["paper_id"] = report["paper_id"]
         manifest["outputs"]["B"].update({"local_path": "B.docx", "archive_pdf": "archive.pdf", "validation_report": "academic.json", "zotero_attachment_key": "B"})
         manifest["outputs"]["A"]["zotero_attachment_key"] = "A"
-        manifest["archive"].update({"b_pdf_export_report": "export.json", "verification_report_path": "zotero.json", "zotero_parent_key": "P", "zotero_collection_key": "COL", "zotero_main_attachment_key": "MAIN"})
+        manifest["archive"].update({"naming_version": 1, "b_pdf_export_report": "export.json", "verification_report_path": "zotero.json", "zotero_parent_key": "P", "zotero_collection_key": "COL", "zotero_main_attachment_key": "MAIN"})
         pdf_binding = binding.fingerprint(root / "archive.pdf")
         verified = {"passed": True, "parent_key": "P", "collection_key": "COL", "attachment_keys": {"pdf": "MAIN", "A翻译": "A", "B精读": "B"},
                     **binding.workflow_identity(manifest), "source_fingerprints": report["source_fingerprints"],
@@ -741,7 +741,7 @@ class ZoteroContentTests(unittest.TestCase):
             pdf.save(local)
         actual.write_bytes(local.read_bytes())
         parent = {"key": "P", "data": {"itemType": "journalArticle", "DOI": "10.1234/test", "collections": ["COL"]}}
-        children = [{"key": role, "data": {"itemType": "attachment", "parentItem": "P", "title": zotero_contract.role_title(role),
+        children = [{"key": role, "data": {"itemType": "attachment", "parentItem": "P", "title": zotero_contract.role_title(role, naming_version=1),
                                            "contentType": "application/pdf", "filename": "uploaded.pdf", "md5": hashlib.md5(actual.read_bytes()).hexdigest()}}
                     for role in ("MAIN", "A", "B")]
         spec = {"parent_key": "P", "doi": "10.1234/test", "collection_key": "COL", "paper_id": "TEST", "workflow_id": "TEST-WF", "contract_version": "1.5.0",

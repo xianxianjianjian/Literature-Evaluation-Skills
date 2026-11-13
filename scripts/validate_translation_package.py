@@ -1527,6 +1527,9 @@ def write_report(
         "passed": all(check.passed for check in checks),
         "checks": [asdict(check) for check in checks],
     }
+    if a_path.is_file():
+        from artifact_binding import fingerprint
+        payload["pdf_binding"] = fingerprint(a_path)
     path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(

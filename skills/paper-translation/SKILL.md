@@ -119,7 +119,7 @@ The former `Strict Mirror → Adaptive Mirror → Readable Extension` sequence b
 
 ## Zotero archive handoff
 
-Zotero remains the preferred long-term location for A. When a write-capable route is available, attach the PDF with display title `A翻译` and verify parent, role, MIME, file and attachment identity. Keep the underlying filename descriptive and unique.
+Zotero remains the preferred long-term location for A. When a write-capable route is available, attach the PDF with display title `A-Translation` and verify parent, role, MIME, file and attachment identity. Keep the underlying filename descriptive and unique.
 
 If Zotero is unavailable, automation is not live-validated, or the user chooses manual archive handling:
 
@@ -176,3 +176,9 @@ Use `PROVISIONAL` when a named source/SI/content/layout gap affects the requeste
 - References normally remain in the original language.
 - Do not change figure/table data.
 - OCR is a last resort; unreliable source text must be marked rather than guessed.
+
+## 文献状态刷新与 SI 归档
+
+确认论文后以现有 paper_id 写入/关联单篇 intake 或周 manifest，使用 `scripts/build_paper_status_overview.py --workspace-root <data-root> --record <record.json>`。来源准备、A/B/C 验证、Zotero 回查及经观察的提交/推送/发布后执行 `--refresh --paper-id <paper_id>`；恢复先读取原记录。用户说“刷新文献状态”时路由此入口；仅重建用 `--rebuild-only`。详见 [状态与归档命令](../../docs/paper-status-and-si.md)。四个原入口保持不变。
+
+新附件命名版本 2：Main Article / Support Information / A-Translation / B-DeepReading / SI-Video-n / SI-Data-n。阅读型 SI 先运行 `prepare_si_bundle.py` 并验证来源区间，视频/数据保留原格式及稳定编号。A/B 仅经 QC 的 PDF 使用 attach-role；B 完整 DOCX 保留本地。旧标题 normalize-titles 先预览，旧 Word 保留并列出清理项；删除、覆盖、批量清理需要独立授权。归档状态与学术完成分开。

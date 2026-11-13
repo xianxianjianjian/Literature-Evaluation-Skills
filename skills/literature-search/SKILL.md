@@ -188,3 +188,9 @@ Use `PROVISIONAL` when the academic selection/handoff is usable but a named sour
 - Keep external evidence distinct from the focal paper's own claims.
 - Preserve the chronology of Search-time decisions; later Deep Reading findings belong in a separate post-reading assessment or `needs_update` record.
 - Do not downgrade an otherwise complete Search solely because Zotero automation is unavailable.
+
+## 文献状态刷新与 SI 归档
+
+确认论文后以现有 paper_id 写入/关联单篇 intake 或周 manifest，使用 `scripts/build_paper_status_overview.py --workspace-root <data-root> --record <record.json>`。来源准备、A/B/C 验证、Zotero 回查及经观察的提交/推送/发布后执行 `--refresh --paper-id <paper_id>`；恢复先读取原记录。用户说“刷新文献状态”时路由此入口；仅重建用 `--rebuild-only`。详见 [状态与归档命令](../../docs/paper-status-and-si.md)。四个原入口保持不变。
+
+新附件命名版本 2：Main Article / Support Information / A-Translation / B-DeepReading / SI-Video-n / SI-Data-n。阅读型 SI 先运行 `prepare_si_bundle.py` 并验证来源区间，视频/数据保留原格式及稳定编号。A/B 仅经 QC 的 PDF 使用 attach-role；B 完整 DOCX 保留本地。旧标题 normalize-titles 先预览，旧 Word 保留并列出清理项；删除、覆盖、批量清理需要独立授权。归档状态与学术完成分开。

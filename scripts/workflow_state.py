@@ -90,6 +90,7 @@ def initial_manifest(week: str, workflow_id: str | None = None) -> dict[str, Any
             "C": {"status": "NOT_STARTED", "git_path": None},
         },
         "archive": {
+            "naming_version": 2,
             "zotero_parent_key": None,
             "zotero_collection_key": None,
             "zotero_main_attachment_key": None,
@@ -390,6 +391,10 @@ def write_manifest(path: Path, data: dict[str, Any], *, overwrite: bool = True) 
         handle.write(payload)
         temporary = Path(handle.name)
     temporary.replace(path)
+    if path.name == "workflow_manifest.yaml" and path.parent.parent.parent.name == "weekly_reviews":
+        from build_paper_status_overview import locked, rebuild
+        root = path.parent.parent.parent.parent
+        with locked(root): rebuild(root)
 
 
 def command_init(args: argparse.Namespace) -> None:
