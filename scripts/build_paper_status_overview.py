@@ -176,6 +176,15 @@ def refresh(root,items,config):
                     for role in 'ABC':
                         out=doc.get('outputs',{}).get(role,{})
                         rel=out.get('path') or out.get('local_path') or out.get('local_paths',{}).get(doc.get('paper_id'))
+                        if not rel and role in 'AB':
+                            folder=root/'work'/str(doc.get('paper_id',''))/'handoff'
+                            candidates=[p for p in folder.glob('*') if p.is_file() and p.suffix.lower() in {'.pdf','.docx'} and re.search(r'(?:^\['+role+r'\]|^'+role+r'_|_'+role+r'_)',p.name,re.I)]
+                            preferred=[p for p in candidates if p.suffix.lower()==('.pdf' if role=='A' else '.docx')]
+                            if len(preferred)==1: rel=str(preferred[0].relative_to(root))
+                            elif len(candidates)==1: rel=str(candidates[0].relative_to(root))
+                            elif candidates:
+                                details.append(role+' 多个文件候选待核'); states.append('PRESENT_UNVERIFIED')
+                                evidence.append({'role':role,'candidate_paths':[str(p.relative_to(root)) for p in candidates]}); continue
                         if not rel: details.append(role+' 未查见独立文件（路径未登记）'); states.append('UNKNOWN'); continue
                         p=root/rel
                         if not p.is_file(): details.append(role+' 目标缺失'); states.append('MISSING'); continue
