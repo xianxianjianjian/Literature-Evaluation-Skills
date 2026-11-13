@@ -66,7 +66,19 @@ def publication_entries(html, final_url):
         published = re.search(r'(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)', body)
         links = re.findall(r'href=[\"\x27]([^\"\x27]+)', part, re.I)
         comment = re.search(r'<td[^>]*>\s*评论[:：]?\s*</td>.*?<td[^>]*>(.*?)</td>', part, re.S)
-        entries.append({'entry_id': final_url + '#published=' + published.group(1) if published else None,
+        fields={}
+        labels={'Original Abstract':'Abstract','摘要译文':'摘要翻译','评论':'评论'}
+        for name,label in labels.items():
+            found=re.search(r'<td[^>]*>\s*'+label+r'[:：]?\s*</td>\s*<td[^>]*>(.*?)</td>',part,re.S|re.I)
+            if found: fields[name]=plain(found.group(1))
+        centered=re.findall(r'<td[^>]*align=["\']center["\'][^>]*>(.*?)</td>',part,re.S|re.I)
+        centered=[value for value in centered if plain(value).strip() and not re.fullmatch(r'\d+',plain(value).strip())]
+        if len(centered)>=3:
+            fields['英文题目']=plain(centered[0]); fields['中文题目']=plain(centered[1]); fields['作者']=plain(centered[2])
+        journal=re.search(r'<td[^>]*>\s*<strong>(.*?)</strong>\s*(?:&nbsp;|\s)*(\d{4}-\d{1,2}-\d{1,2})',part,re.S|re.I)
+        if journal:
+            fields['期刊']=plain(journal.group(1)); fields['发表日期']='-'.join(f'{int(v):02d}' if i else v for i,v in enumerate(journal.group(2).split('-')))
+        entries.append({'fields':fields,'entry_id': final_url + '#published=' + published.group(1) if published else None,
                         'published_at': published.group(1) if published else None,
                         'links': links, 'body': body,
                         'comment': plain(comment.group(1)) if comment else None})
@@ -98,17 +110,33 @@ def probe_web(root, doc, config):
         c = doc.get('outputs', {}).get('C', {})
         path = c.get('path') or c.get('local_path')
         comment = None
+        c_sections={}; c_version=None
         if path and (Path(root) / path).is_file():
             content = (Path(root) / path).read_text(encoding='utf-8-sig')
+            from artifact_binding import fingerprint
+            c_version=fingerprint(Path(root)/path)
+            c_sections={m.group(1).strip():m.group(2).strip() for m in re.finditer(r'^##\s+([^\n]+)\n(.*?)(?=^##\s|\Z)',content,re.M|re.S)}
+            for alias in ['中文摘要','摘要翻译','Translated Abstract']:
+                if alias in c_sections: c_sections['摘要译文']=c_sections[alias]
             found = re.search(r'^##\s+评论\s*\n(.*?)(?=^##\s|\Z)', content, re.M | re.S)
             comment = found.group(1) if found else None
         for entry in matches:
             entry['comment_equal'] = normalized(comment) == normalized(entry['comment']) if comment and entry['comment'] else None
+            checks={}
+            for field in ['英文题目','中文题目','作者','期刊','发表日期','Original Abstract','摘要译文','评论']:
+                local=c_sections.get(field); remote=entry['fields'].get(field)
+                if field=='作者':
+                    norm=lambda value: re.sub(r'[;,，、]', '', normalized(value))
+                else: norm=normalized
+                checks[field]=norm(local)==norm(remote) if local and remote else None
+            entry['field_comparisons']=checks
         distinct = {e['entry_id'] for e in matches if e['entry_id']}
         if len(distinct) > 1:
             status, detail = 'CONFLICT', '同文献存在两个不同实际发布条目；保留各条目及人工选择说明'
-        elif matches and any(e['comment_equal'] is False for e in matches):
-            status, detail = 'CONFLICT', '已发布；评论正文与当前C有措辞差异，待核对人工润色说明'
+        elif matches and any(v is False for e in matches for v in e['field_comparisons'].values()):
+            status, detail = 'CONFLICT', '已发布；正文或书目与当前C有差异，待核对人工润色说明'
+        elif matches and all(v is True for v in matches[0]['field_comparisons'].values()):
+            status,detail='VERIFIED','同文献发布正文、双语摘要、题名、作者、期刊及日期与当前C一致'
         elif matches:
             status, detail = 'PRESENT_UNVERIFIED', '同文献发布条目已确认；评论' + ('与当前C一致' if matches[0]['comment_equal'] is True else '尚未完成比较') + '，摘要与书目字段尚待核验'
         elif complete:
@@ -118,7 +146,7 @@ def probe_web(root, doc, config):
         previous = doc.get('platform_status', {}).get('web', {})
         result = observation(status, detail, source, final_url=final_url,
                              entries=matches, listing_complete=complete,
-                             listing_count=len(entries), comparison_scope='comment_only',
+                             listing_count=len(entries), comparison_scope='public_C_body_and_bibliography',c_version=c_version,
                              c_path=path, manual_edit_notes=previous.get('manual_edit_notes', doc.get('manual_edit_notes', [])),
                              previous_user_confirmed_notes=previous.get('previous_user_confirmed_notes', []))
         return persist(root, doc, 'web', result)

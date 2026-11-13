@@ -66,7 +66,12 @@ def bundle(root, package_path, output, soffice=None):
     for _,_,s,src in reading:
         converted=conversion_dir/(s['source_id']+'.pdf')
         try:
-            conversion=prepare(src,converted,soffice); reader=PdfReader(converted)
+            same_input=any(row.get('source_id')==s['source_id'] and row.get('sha256')==fingerprint(src) for row in previous.get('inputs',[]))
+            if src.suffix.lower() in {'.doc','.docx'} and converted.is_file() and same_input:
+                conversion={'status':'SI_PDF_READY','reused_conversion':True,'original_retained':True}
+            else:
+                conversion=prepare(src,converted,soffice)
+            reader=PdfReader(converted)
             conversion['source']=str(src.relative_to(root)); conversion['pdf_path']=None  # conversion copy is disposable
             if src.suffix.lower() in {'.doc','.docx'}:
                 qc_path=s.get('conversion_qc_report'); qc=load(root/qc_path) if qc_path else {}

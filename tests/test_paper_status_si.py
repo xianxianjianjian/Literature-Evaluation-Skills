@@ -102,7 +102,6 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(contract.role_title('SI'),'Support Information')
         self.assertEqual(contract.role_title('VIDEO',2),'SI-Video-2')
         self.assertEqual(contract.role_title('DATA',1),'SI-Data-1')
-if __name__=='__main__': unittest.main()
 
 class RoleEntryTests(unittest.TestCase):
     def test_a_requires_real_pdf_and_bound_qc(self):
@@ -133,3 +132,42 @@ class RoleEntryTests(unittest.TestCase):
             with patch.object(bridge,'_parent_children',return_value=(parent,children)),patch.object(bridge.local_write.LocalWriteClient,'connect') as connect:
                 with self.assertRaisesRegex(bridge.ZoteroBridgeError,'another child'): bridge.command_normalize_titles(args)
                 connect.assert_not_called()
+
+class WebBodyTests(unittest.TestCase):
+    def test_author_listing_compares_all_public_body_fields(self):
+        import paper_status_live as live
+        html='共发表了1条译评<tr bgcolor="#00FFFF"><td align="center">1</td><td>于2026-11-01 21:59:59发布</td></tr><tr><td><strong>Journal</strong>&nbsp;2026-1-2</td></tr><td align="center"><strong>Title</strong></td><td align="center">中文题名</td><td align="center"><em>A, B</em></td><td>Abstract:</td><td>English abstract</td><td>摘要翻译:</td><td>摘要</td><td>评论:</td><td>评论内容</td><a href="https://doi.org/10.1/synthetic">DOI</a>'
+        entries,complete=live.publication_entries(html,'https://example.org/author')
+        self.assertTrue(complete); self.assertEqual(entries[0]['fields']['英文题目'],'Title')
+        self.assertEqual(entries[0]['fields']['发表日期'],'2026-01-02')
+        self.assertEqual(entries[0]['fields']['Original Abstract'],'English abstract')
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); c=root/'c.md'
+            c.write_text('\n\n'.join('## '+key+'\n\n'+value for key,value in entries[0]['fields'].items()),encoding='utf-8')
+            doc={'paper_id':'synthetic','doi':'10.1/synthetic','outputs':{'C':{'path':'c.md'}}}
+            config={'web':{'source_url':'https://example.org/author'},'_live_cache':{'https://example.org/author':(html,'https://example.org/author')}}
+            self.assertEqual(live.probe_web(root,doc,config)['status'],'VERIFIED')
+            c.write_text(c.read_text(encoding='utf-8').replace('English abstract','Changed abstract'),encoding='utf-8')
+            self.assertEqual(live.probe_web(root,doc,config)['status'],'CONFLICT')
+
+
+class ConversionResumeTests(unittest.TestCase):
+    def test_visual_qc_retry_reuses_reviewed_conversion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); (root/'s.docx').write_bytes(b'synthetic document')
+            writer=PdfWriter(); writer.add_blank_page(width=100,height=100); writer.write(root/'converted.pdf')
+            row={'source_id':'S','source_type':'SI','local_path':'s.docx'}
+            source=root/'sources.json'; status.save(source,{'sources':[row]})
+            out=root/'handoff/si.pdf'
+            def convert(src,dest,soffice):
+                dest.write_bytes((root/'converted.pdf').read_bytes()); return {'pages':1}
+            with patch.object(si,'prepare',side_effect=convert) as converter:
+                first=si.bundle(root,source,out); self.assertFalse(first['passed'])
+                reviewed=root/'handoff/si_conversion_pending/S.pdf'
+                status.save(root/'visual.json',{'passed':True,'pdf_sha256':si.fingerprint(reviewed),'all_pages_visual_reviewed':True})
+                row['conversion_qc_report']='visual.json'; status.save(source,{'sources':[row]})
+                second=si.bundle(root,source,out)
+                self.assertTrue(second['passed']); self.assertEqual(converter.call_count,1)
+                self.assertFalse(reviewed.exists())
+
+if __name__=='__main__': unittest.main()

@@ -3,7 +3,7 @@
 在插件根目录执行，`$data` 必须是研究数据根（含 workspace.json），不是插件目录：
 
 ```powershell
-$data = 'D:/codex/workplace/reference/.literature-evaluation'
+$data = '<data-root>'
 py -3.11 scripts/build_paper_status_overview.py --workspace-root $data --paper-id <paper_id> --refresh
 py -3.11 scripts/build_paper_status_overview.py --workspace-root $data --refresh
 py -3.11 scripts/build_paper_status_overview.py --workspace-root $data --rebuild-only
@@ -24,7 +24,7 @@ py -3.11 scripts/zotero_bridge.py verify-archive --parent-key <parent> --spec <a
 {"research_git_root":"<research Git root>","remote_url":"<confirmed remote>","remote_branch":"<confirmed branch>","zotero":{"library_prefix":"users/0","collection_key":"<target>"},"web":{"source_url":"<confirmed author publication list>","charset":"gb18030"}}
 ```
 
-复用 workspace.json 的 data-root 与 research_git_root；显式配置覆盖平台目标。GitHub 用临时 bare repository 实时 fetch 目标分支，比对 C 字节，支持提交 SHA 不同但内容相同；目标/访问失败标 UNKNOWN，保留上次结果。不推送。网页适配当前 ASP 作者清单，确认 DOI 后仅比较评论正文，忽略格式；摘要/书目尚未逐字段比对时保持 PRESENT_UNVERIFIED。完整枚举才能判定此清单未发布，不能代表全站。不同实际发布时间条目才报告重复。manual_edit_notes 保留人工润色说明。其他网站需提供适配器或经核对的报告，不猜发布状态。
+复用 workspace.json 的 data-root 与 research_git_root；显式配置覆盖平台目标。GitHub 用临时 bare repository 实时 fetch 目标分支，比对 C 字节，支持提交 SHA 不同但内容相同；目标/访问失败标 UNKNOWN，保留上次结果。不推送。网页适配当前 ASP 作者清单，确认 DOI 后逐字段比较评论、双语摘要、题名、作者、期刊和日期，忽略格式；未取得完整字段时保持 PRESENT_UNVERIFIED。完整枚举才能判定此清单未发布，不能代表全站。不同实际发布时间条目才报告重复。manual_edit_notes 保留人工润色说明。其他网站需提供适配器或经核对的报告，不猜发布状态。
 
 每篇平台 observations 在 manifest 或 intake 的 platform_status；网页/Zotero 原始回查报告在 knowledge/status_reports。`knowledge/paper_status_overview.md/.csv` 七列重建产物含待处理摘要，默认私有。平台 UNKNOWN 表示本次待核验，last_observation 保存上次结论与日期。本地文件只有通过内容绑定 QC 才显示已验证；其他可读文件作为草稿报告。阅读历史不由状态汇总写入。
 
