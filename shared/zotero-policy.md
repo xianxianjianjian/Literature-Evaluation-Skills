@@ -5,11 +5,12 @@ Zotero 是本项目**首选的长期研究档案中心**，但不是 V1 学术�
 ## v1.5.0 附件显示名称
 
 ```text
-pdf                 Main PDF
-SI / SI-1, SI-2     阅读型 SI PDF
-SI-Data-1           数据型 SI 原始文件
-A翻译                A PDF
-B精读                B PDF
+Main Article          Main PDF
+Support Information   单份阅读型 SI 合并 PDF
+A-Translation         最终经 QC 的 A PDF
+B-DeepReading         最终经 QC 的 B PDF
+SI-Video-1            视频原格式，各自稳定编号
+SI-Data-1             数据原格式，各自稳定编号
 ```
 
 长期目标仍是由 Zotero 管理 Main、SI、A 和 B；Git 保存 Skills、knowledge、Search 历史、C 和工作流状态，不长期重复保存 A/B。
@@ -122,3 +123,5 @@ academic artifact COMPLETE
 新入库的默认流程必须使用 `zotero_bridge.py ingest-pdf` 或等价的 Zotero Desktop PDF 导入/自动识别路径：Main PDF 先进入目标文库，Zotero 自动识别生成父条目，再独立核对 DOI、标题、年份、collection 和 Main child。`create` 仅是带原因的 metadata-only fallback；它本身永远不能关闭归档状态。
 
 v1.5 `verify-archive` requires `--workspace-root` and a spec containing paper/workflow/contract identity, collection key, verified `source_fingerprints`, and each role's `local_path` plus `local` SHA-256/size. Read actual attachment bytes through the local API file URL, compare local/actual SHA-256, and compare actual MD5 with the API's MD5 field. The report's `content_bindings[attachment_key]` records `local`, `actual`, `api_md5`, `actual_md5`; unreadable or mismatched files prevent completion. Reading/verifying grants no authority to replace/delete attachments. Old reports are still interpreted under their original contract.
+
+命名独立版本：新归档 archive/spec `naming_version: 2`；没有此字段的旧规格按版本 1（pdf / SI / A翻译 / B精读）读取，不改变学术 contract_version。阅读型 SI 使用 `prepare_si_bundle.py`，每个源 ID 映射合并页区间；媒体 source_id 编号映射持久化。完整新归档规格包含 library_prefix、required_si_source_ids，每个 SI 行含 source_ids、si_bundle_manifest；多来源共用同一 SI 附件行，不重复 attachment key。

@@ -271,7 +271,7 @@ A `PROVISIONAL` Deep Reading caused by a real source/evidence gap must not enter
 
 ## Zotero archive handoff
 
-Keep B DOCX as the editable academic source. After its independent academic render and visual QA pass, promote the rendered PDF with `scripts/export_b_pdf.py` and attach that PDF to Zotero as `B精读`. Verify parent, title, MIME and file; a PDF export failure blocks Archive closure, not a passed B academic gate.
+Keep B DOCX as the editable academic source. After its independent academic render and visual QA pass, promote the rendered PDF with `scripts/export_b_pdf.py` and attach that PDF to Zotero as `B-DeepReading`. Verify parent, title, MIME and file; a PDF export failure blocks Archive closure, not a passed B academic gate.
 
 If Zotero is unavailable, stage B under `<data-root>/work/<paper_id>/handoff/` when possible, record a pending action, and continue to close the academic Deep Reading workflow. Archive completion is reported separately.
 
@@ -296,3 +296,9 @@ Do **not** use `PROVISIONAL` solely because Zotero automatic writing or attachme
 - Do not silently repair inconsistent statistics or source errors.
 - Do not let a polished narrative override conflicting tables/figures/SI.
 - Do not describe an `A0` audit as proof that the data or paper are true.
+
+## 文献状态刷新与 SI 归档
+
+确认论文后以现有 paper_id 写入/关联单篇 intake 或周 manifest，使用 `scripts/build_paper_status_overview.py --workspace-root <data-root> --record <record.json>`。来源准备、A/B/C 验证、Zotero 回查及经观察的提交/推送/发布后执行 `--refresh --paper-id <paper_id>`；恢复先读取原记录。用户说“刷新文献状态”时路由此入口；仅重建用 `--rebuild-only`。详见 [状态与归档命令](../../docs/paper-status-and-si.md)。四个原入口保持不变。
+
+新附件命名版本 2：Main Article / Support Information / A-Translation / B-DeepReading / SI-Video-n / SI-Data-n。阅读型 SI 先运行 `prepare_si_bundle.py` 并验证来源区间，视频/数据保留原格式及稳定编号。A/B 仅经 QC 的 PDF 使用 attach-role；B 完整 DOCX 保留本地。旧标题 normalize-titles 先预览，旧 Word 保留并列出清理项；删除、覆盖、批量清理需要独立授权。归档状态与学术完成分开。

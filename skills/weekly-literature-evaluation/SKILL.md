@@ -185,7 +185,7 @@ Zotero: Main / SI / A / B
 Git:    Skills / shared policies / knowledge registries / weekly Search decisions / C / workflow manifest
 ```
 
-Zotero child display titles for v1.5.0 are `pdf` (Main), `SI` or `SI-n` (reading SI), `A翻译` and `B精读`. Data SI keeps its original file and may use `SI-Data-n`. Attachment titles are separate from unique underlying filenames.
+Zotero child display titles for v1.5.0 are `Main Article` (Main), `Support Information` (one bundled reading SI), `A-Translation` and `B-DeepReading`. Data SI keeps its original file and may use `SI-Data-n`. Attachment titles are separate from unique underlying filenames.
 
 If Zotero is unavailable, use `<data-root>/work/<paper_id>/handoff/` when a local runtime exists and preserve `pending_zotero_actions`. Manual Zotero handoff followed by verification is acceptable. Never claim an attachment was created until verified.
 
@@ -230,7 +230,7 @@ The weekly **academic workflow** may be declared `COMPLETE` when the applicable 
 
 ## Archive completion
 
-Report archive closure separately. For v1.5.0 a fully closed Zotero archive requires the target collection, bibliographic parent, Main PDF (`pdf`), required SI (`SI`/`SI-n`), A PDF (`A翻译`), validated B PDF (`B精读`), role/title/MIME verification, `metadata_only_fallback: false`, and `pending_zotero_actions = []`. Data SI originals remain available.
+Report archive closure separately. For v1.5.0 a fully closed Zotero archive requires the target collection, bibliographic parent, Main PDF (`Main Article`), required reading SI (`Support Information`), A PDF (`A-Translation`), validated B PDF (`B-DeepReading`), role/title/MIME verification, `metadata_only_fallback: false`, and `pending_zotero_actions = []`. Data SI originals remain available.
 
 Do not describe the Zotero archive as complete merely because the academic workflow is complete. Conversely, do not call the academic workflow incomplete merely because automatic Zotero writing is unavailable.
 
@@ -258,3 +258,9 @@ Zotero Local API parent-create unification, group-library routing and full live 
 - Do not repeat a user Gate already satisfied.
 - Do not let Zotero/network limitations erase safe academic work that can continue independently.
 - Do not conflate academic completion with Zotero archive completion.
+
+## 文献状态刷新与 SI 归档
+
+确认论文后以现有 paper_id 写入/关联单篇 intake 或周 manifest，使用 `scripts/build_paper_status_overview.py --workspace-root <data-root> --record <record.json>`。来源准备、A/B/C 验证、Zotero 回查及经观察的提交/推送/发布后执行 `--refresh --paper-id <paper_id>`；恢复先读取原记录。用户说“刷新文献状态”时路由此入口；仅重建用 `--rebuild-only`。详见 [状态与归档命令](../../docs/paper-status-and-si.md)。四个原入口保持不变。
+
+新附件命名版本 2：Main Article / Support Information / A-Translation / B-DeepReading / SI-Video-n / SI-Data-n。阅读型 SI 先运行 `prepare_si_bundle.py` 并验证来源区间，视频/数据保留原格式及稳定编号。A/B 仅经 QC 的 PDF 使用 attach-role；B 完整 DOCX 保留本地。旧标题 normalize-titles 先预览，旧 Word 保留并列出清理项；删除、覆盖、批量清理需要独立授权。归档状态与学术完成分开。

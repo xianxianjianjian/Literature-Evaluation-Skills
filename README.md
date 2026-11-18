@@ -69,7 +69,7 @@ v1.5.0 adds:
 - Main/SI source package management.
 - A/B/C archive workflow.
 - Automated structural and regression validation.
-- Zotero role titles `pdf / SI / A翻译 / B精读` and separate academic/archive gates.
+- Zotero role titles `Main Article / Support Information / A-Translation / B-DeepReading` (naming v2; legacy v1 remains readable) and separate academic/archive gates.
 - A cross-paper, evidence-linked psychology terminology database with Domain/Subdomain/Context matching, usage accumulation and correction history.
 - Shared paragraph roles for Chinese body formatting, APA-oriented English/reference formatting, bilingual typography and Exact-Mirror layout exceptions.
 
@@ -104,3 +104,5 @@ v1.5.0 adds:
 - [Post-release A/C manual acceptance tracker](https://github.com/xianxianjianjian/Literature-Evaluation-Skills/issues/15)
 
 Detailed specifications remain available under [`docs/`](docs/).
+
+文献状态刷新、历史导入与 SI 合并：[命令与格式](docs/paper-status-and-si.md)。新归档采用 naming_version=2，旧命名契约继续读取。

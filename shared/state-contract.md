@@ -73,7 +73,7 @@ Zotero 等归档待办通过：
 pending_zotero_actions:
   - action: attach
     source_id: SRC-M1
-    expected_attachment_name: "pdf"
+    expected_attachment_name: "Main Article"
 ```
 
 单独记录。只有当缺失 Zotero 中的文件意味着**源证据本身也不可用**时，才根据真实证据缺口影响学术阶段状态。
@@ -103,3 +103,11 @@ New v1.5 C completion requires actual Main locator checks and an attributable so
 Historical v1.4.1/v1.4.2 C uses `submission_contract.weekly_review.minimum_comment_chars` recorded in its manifest, falling back to the released 500-Chinese-character rule. Respect an explicitly old-version workspace profile or an old profile without the new maximum; an unversioned/current 800–1000 default is not a historical requirement. Workspace initialization preserves existing profiles/manifests; loading manifests never writes them. Contract upgrades remain explicit, backed up and reversible.
 
 If a previous v1.5 completion cannot be substantiated under repaired gates, preserve its historical statement and record an immutable correction/revalidation result with `needs_update`/PROVISIONAL where appropriate. Never silently rewrite the research archive or reuse an old PASS as new proof. Necessary ledgers, reviewed frame geometry, source identities and signed QA are evidence to retain after rendering-cache cleanup.
+
+## 文献平台状态（独立于学术阶段）
+
+`platform_status.{zotero,local,git,github,web}` 属于对应 workflow manifest 或 `knowledge/intake/<paper_id>/paper_status.json`。每项含 status、detail、source、checked_at、evidence_ref（有报告时）。状态为 VERIFIED / PRESENT_UNVERIFIED / PENDING / MISSING / CONFLICT / UNKNOWN / NOT_APPLICABLE。UNKNOWN 保留 last_observation。未知字段、原有阶段及历史不重写。阅读周与 publication_year 分离。
+
+`knowledge/paper_status_overview.{md,csv}` 是派生的私有七列总览。历史 snapshot 保留原文与 imported_at；简称不是身份；身份仅经明确 DOI/full-title 核对后的 identity-map 确认。多个真实周评需 `status_current: true` 显式选择，否则显示多个周次待核。学术完成与 reading_history 仍由既有验证器判定。公开同步仅允许人工确认的公开标识、周次、状态及公开链接；总览和平台证据默认留在研究数据根。
+
+工作流确认 paper、更新来源/产物/归档后重建总览。外部系统发生提交、推送或发布后执行 refresh 获取观察；refresh 不推送、不挂附件、不发布。命名版本 2 不改变 academic contract_version，必须继承 v1.5.0 内容绑定及嵌套归档回查。

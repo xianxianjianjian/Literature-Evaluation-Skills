@@ -104,6 +104,10 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/validate_deep_reading_package.py",
     "scripts/export_b_pdf.py",
     "scripts/prepare_si_pdf.py",
+    "scripts/prepare_si_bundle.py",
+    "scripts/build_paper_status_overview.py",
+    "scripts/paper_status_live.py",
+    "docs/paper-status-and-si.md",
     "scripts/validate_c_review.py",
     "scripts/zotero_attachment_contract.py",
     "scripts/validate_terminology_consistency.py",
@@ -343,6 +347,7 @@ def _archive_completion_checks(data: dict, *, workspace_root: Path | None = None
             required_keys.update((archive.get("zotero_si_attachment_keys") or {}).values())
             b_attachment = verified.get("content_bindings", {}).get(outputs["B"].get("zotero_attachment_key"), {})
             archive_ok = (b_pdf_ok and verified.get("passed") is True
+                          and verified.get("naming_version", 1) == archive.get("naming_version", 1)
                           and verified.get("parent_key") == archive.get("zotero_parent_key")
                           and verified.get("collection_key") == archive.get("zotero_collection_key")
                           and verified.get("source_fingerprints") == academic.get("source_fingerprints")

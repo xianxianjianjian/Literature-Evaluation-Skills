@@ -210,7 +210,7 @@ class ArchiveTests(unittest.TestCase):
         ]
         children = [
             {"key": role, "data": {"itemType": "attachment", "parentItem": "PARENT",
-              "title": zotero_contract.role_title(role), "contentType": "application/pdf",
+              "title": zotero_contract.role_title(role, naming_version=1), "contentType": "application/pdf",
               "filename": f"paper-{role}.pdf", "md5": "abc"}}
             for role in ("MAIN", "A", "B")
         ]
