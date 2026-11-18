@@ -75,6 +75,14 @@ v1.5.0 adds:
 
 ## Release History
 
+### v1.5.1
+
+- Track private paper platform evidence and generate the seven-column overview.
+- Bundle documentary SI with verified source/page coverage and stable media numbering.
+- Standardize Zotero attachment display names while retaining legacy contract readers.
+- See [v1.5.1 release notes](docs/releases/v1.5.1.md).
+
+
 ### v1.5.0 (software release; known manual acceptance limitations)
 
 - Replace translated English text objects with selectable/searchable Chinese PDF text and reject stale English layers.
