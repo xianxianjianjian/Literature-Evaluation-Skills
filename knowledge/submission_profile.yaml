@@ -1,8 +1,10 @@
 {
   "schema_version": 1,
   "weekly_review": {
+    "contract_version": "1.5.0",
     "reviewer_name": null,
-    "minimum_comment_chars": 500,
+    "minimum_comment_chars": 800,
+    "maximum_comment_chars": 1000,
     "language": "zh-CN",
     "original_abstract_required": true,
     "translated_abstract_required": true

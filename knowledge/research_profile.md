@@ -4,7 +4,7 @@
 
 ## Current Core Research Direction
 
-<!-- 待用户确认。Phase 1 不根据模型记忆推断。 -->
+<!-- 待用户确认。 -->
 
 ## Current Priority Questions
 
