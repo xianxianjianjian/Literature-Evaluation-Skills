@@ -2,7 +2,7 @@
 
 A research-oriented workflow framework for **literature search → full-text translation → systematic deep reading → weekly evaluation submission**.
 
-> Software version: **v1.5.0** (manual research-artifact acceptance pending; see [Issue #15](https://github.com/xianxianjianjian/Literature-Evaluation-Skills/issues/15))
+> Software version: **v1.5.1** (single source of truth: [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json); manual research-artifact acceptance pending, see [Issue #15](https://github.com/xianxianjianjian/Literature-Evaluation-Skills/issues/15))
 >
 > Validated with:
 > - Python 3.11 CI

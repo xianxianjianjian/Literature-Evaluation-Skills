@@ -79,6 +79,53 @@ def validate_manifest(plugin_root: Path) -> list[str]:
         errors.append("interface.defaultPrompt entries must be non-empty strings")
     elif any(len(item) > 128 for item in prompts):
         errors.append("interface.defaultPrompt entries must be <= 128 characters")
+    for icon_key in ("logo", "composerIcon"):
+        icon_rel = interface.get(icon_key)
+        if icon_rel is not None:
+            if not isinstance(icon_rel, str) or not icon_rel.strip():
+                errors.append(f"interface.{icon_key} must be a non-empty string path")
+            elif not (plugin_root / icon_rel).is_file():
+                errors.append(f"interface.{icon_key} target does not exist: {icon_rel}")
+    return errors
+
+
+def validate_version_consistency(plugin_root: Path) -> list[str]:
+    """Ensure README.md and docs/architecture.md stay synchronized with plugin.json version."""
+    manifest_path = plugin_root / ".codex-plugin" / "plugin.json"
+    if not manifest_path.is_file():
+        return []
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    version = str(manifest.get("version") or "").strip()
+    if not version:
+        return []
+    base_version = version.split("-", 1)[0].split("+", 1)[0]
+    allowed_versions = {version, base_version}
+    errors: list[str] = []
+
+    readme_path = plugin_root / "README.md"
+    if readme_path.is_file():
+        readme_text = readme_path.read_text(encoding="utf-8")
+        match = re.search(r"Software version:\s*\*\*v([0-9A-Za-z.+-]+)\*\*", readme_text)
+        if not match:
+            errors.append("README.md: missing 'Software version: **v<version>**' declaration")
+        elif match.group(1) not in allowed_versions:
+            errors.append(
+                f"README.md: Software version v{match.group(1)} does not match plugin.json version {version!r}"
+            )
+
+    arch_path = plugin_root / "docs" / "architecture.md"
+    if arch_path.is_file():
+        arch_text = arch_path.read_text(encoding="utf-8")
+        match = re.search(r"(?m)^##\s+Current Release\s*$\s+v([0-9A-Za-z.+-]+)\b", arch_text)
+        if not match:
+            errors.append("docs/architecture.md: missing 'v<version>' under '## Current Release'")
+        elif match.group(1) not in allowed_versions:
+            errors.append(
+                f"docs/architecture.md: Current Release v{match.group(1)} does not match plugin.json version {version!r}"
+            )
     return errors
 
 
@@ -143,6 +190,7 @@ def validate_skills(plugin_root: Path) -> list[str]:
 def validate_package(plugin_root: Path) -> list[str]:
     plugin_root = plugin_root.expanduser().resolve()
     errors = validate_manifest(plugin_root)
+    errors.extend(validate_version_consistency(plugin_root))
     errors.extend(validate_skills(plugin_root))
     for relative in ("shared", "scripts", "assets/workspace-template"):
         path = plugin_root / relative

@@ -173,6 +173,30 @@ class PluginMetadataTests(unittest.TestCase):
         self.assertEqual(manifest["interface"]["category"], "Education & Research")
         self.assertLessEqual(len(manifest["interface"]["shortDescription"]), 30)
 
+    def test_version_mismatch_in_readme_or_architecture_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            plugin = bundle.build_bundle(ROOT, Path(tmp) / "bundle")
+            self.assertEqual(plugin_validator.validate_package(plugin), [])
+
+            readme = plugin / "README.md"
+            original_readme = readme.read_text(encoding="utf-8")
+            readme.write_text(
+                original_readme.replace("**v1.5.1**", "**v0.0.1**", 1),
+                encoding="utf-8",
+            )
+            errors = plugin_validator.validate_package(plugin)
+            self.assertTrue(any("README.md" in err for err in errors), errors)
+            readme.write_text(original_readme, encoding="utf-8")
+
+            arch = plugin / "docs" / "architecture.md"
+            original_arch = arch.read_text(encoding="utf-8")
+            arch.write_text(
+                original_arch.replace("v1.5.1 is", "v0.0.1 is", 1),
+                encoding="utf-8",
+            )
+            errors = plugin_validator.validate_package(plugin)
+            self.assertTrue(any("docs/architecture.md" in err for err in errors), errors)
+
 
 class PluginBundleTests(unittest.TestCase):
     def test_bundle_contains_four_skills_and_resolvable_shared_contracts(self) -> None:
