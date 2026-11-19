@@ -671,12 +671,12 @@ class LegacyAndPathTests(unittest.TestCase):
                      patch("sys.stdout", io.StringIO()):
                     d.main(["--repo-root", str(root), "--manifest", str(path)])
                 self.assertEqual(check_c.call_args.args[2], version == "1.5.0")
-            real_legacy = ROOT / "tests/fixtures/legacy/yuksel_2026_w36_v142_manifest.yaml"
-            original = real_legacy.read_bytes()
-            parsed = workflow_state.load_manifest(real_legacy)
+            legacy_fixture = ROOT / "tests/fixtures/legacy/synthetic_v142_archive_manifest.yaml"
+            original = legacy_fixture.read_bytes()
+            parsed = workflow_state.load_manifest(legacy_fixture)
             self.assertEqual(parsed["contract_version"], "1.4.2")
             self.assertTrue(all(x.passed for x in d._archive_completion_checks(parsed)))
-            self.assertEqual(real_legacy.read_bytes(), original)
+            self.assertEqual(legacy_fixture.read_bytes(), original)
 
     def test_legacy_terminology_two_write_reload_cycles_preserve_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:

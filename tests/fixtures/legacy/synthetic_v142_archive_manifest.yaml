@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "contract_version": "1.4.2",
+  "workflow_id": "2026-W06-weekly-literature-evaluation",
+  "week": "2026-W06",
+  "paper_id": "10.99999-synthetic-legacy-archive",
+  "zotero_parent_key": "TESTP001",
+  "zotero_collection_key": "TESTC001",
+  "zotero_main_attachment_key": "TESTM001",
+  "zotero_archive_status": "COMPLETE",
+  "zotero_last_live_check": {
+    "checked_date": "2026-02-05",
+    "status": "MAIN_SI_AND_V1.4.2_OUTPUTS_VERIFIED",
+    "reason": "Synthetic archive check for parent TESTP001 in collection TESTC001 with Main TESTM001, SI TESTS001, A TESTA001 and B TESTB001."
+  },
+  "archive": {
+    "zotero_parent_key": "TESTP001",
+    "zotero_collection_key": "TESTC001",
+    "zotero_main_attachment_key": "TESTM001",
+    "required_si_source_ids": [
+      "SRC-S1"
+    ],
+    "zotero_si_attachment_keys": {
+      "SRC-S1": "TESTS001"
+    },
+    "metadata_only_fallback": false,
+    "source_archive": {
+      "status": "COMPLETE",
+      "source_ids": [
+        "SRC-M1",
+        "SRC-S1"
+      ],
+      "verified_date": "2026-02-03"
+    },
+    "output_archive": {
+      "status": "COMPLETE",
+      "output_attachment_keys": {
+        "A": "TESTA001",
+        "B": "TESTB001"
+      },
+      "verified_date": "2026-02-05"
+    }
+  },
+  "stages": {
+    "topic": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "search": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "source_package": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "source_archive": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    },
+    "translation": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": [],
+      "skill_version": "1.4.2",
+      "scope": "FULL_MIRROR",
+      "layout_fidelity": "EXACT_TEXT_FRAME",
+      "user_selected_layout": false,
+      "cjk_font_family": "SimSun",
+      "minimum_font_scale": 0.95,
+      "profile_change_reason": "Synthetic v1.4.2 Main and SI translation passed layout validation."
+    },
+    "deep_reading": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": [],
+      "skill_version": "1.4.2",
+      "scope": "MAIN_SI_FULL_RESEARCH_AUDIT",
+      "evidence_classes": [
+        "原文直接内容",
+        "作者解释",
+        "评译者分析",
+        "外部依据"
+      ],
+      "profile_change_reason": "Synthetic v1.4.2 Main and SI research notes passed validation."
+    },
+    "output_archive": {
+      "status": "COMPLETE",
+      "needs_update": false,
+      "update_reason": []
+    }
+  },
+  "outputs": {
+    "A": {
+      "status": "COMPLETE",
+      "local_path": "work/10.99999-synthetic-legacy-archive/v142_exact/[A] 中文全文翻译·精确镜像版_Synthetic_Paper_2026_v1.4.2.pdf",
+      "zotero_attachment_key": "TESTA001",
+      "archive_label": "[A] 中文全文翻译·精确镜像版 v1.4.2",
+      "validation_report": "work/10.99999-synthetic-legacy-archive/v142_exact/translation_validation.json",
+      "visual_qa_report": "work/10.99999-synthetic-legacy-archive/v142_exact/a_visual_qa.json",
+      "validation_note": "Synthetic exact-text-frame validation for attachment TESTA001."
+    },
+    "B": {
+      "status": "COMPLETE",
+      "local_path": "work/10.99999-synthetic-legacy-archive/handoff/[B] 文献研究笔记·完整精读版_Synthetic_Paper_2026_v1.4.2.docx",
+      "zotero_attachment_key": "TESTB001",
+      "archive_label": "[B] 文献研究笔记·完整精读版 v1.4.2",
+      "validation_report": "work/10.99999-synthetic-legacy-archive/v142_deep_reading/b_validation.json",
+      "rendered_pdf": "work/10.99999-synthetic-legacy-archive/v142_deep_reading/render/B_Synthetic_Paper_2026_v1.4.2.pdf",
+      "validation_note": "Synthetic academic validation for attachment TESTB001."
+    },
+    "C": {
+      "status": "COMPLETE",
+      "git_path": "weekly_reviews/2026/2026-W06/C_Synthetic_Paper_2026_周文献评价.md",
+      "git_repository": "https://example.invalid/synthetic/research",
+      "git_commit": "0123456789abcdef0123456789abcdef01234567",
+      "previous_content_validation": {
+        "reviewed_against_B_v1.4.2": true,
+        "reviewed_date": "2026-02-05"
+      },
+      "path": "weekly_reviews/2026/2026-W06/C_Synthetic_Paper_2026_周文献评价.md",
+      "reviewer_name": "测试评阅人",
+      "content_authority": "USER_CONFIRMED_WEBSITE",
+      "source_url": "https://example.invalid/reviews/2026-W06",
+      "website_published_at": "2026-02-04 12:00:00",
+      "synced_date": "2026-02-06",
+      "sync_record": "weekly_reviews/2026/2026-W06/c_web_sync_record.json",
+      "validation_note": "合成测试记录。网页同步后仍保留此前版本的校验字段。"
+    }
+  },
+  "pending_zotero_actions": [],
+  "blocking_issues": [],
+  "source_change": {
+    "last_checked": "2026-02-04"
+  },
+  "record_paths": {
+    "c_web_sync": "weekly_reviews/2026/C_归档记录_2026-02-06.json"
+  }
+}
