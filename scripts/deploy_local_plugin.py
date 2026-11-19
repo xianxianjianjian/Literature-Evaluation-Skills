@@ -150,6 +150,9 @@ def deploy_plugin(
         init_workspace.initialize_workspace(
             temp_data_root,
             template_root=plugin_target / "assets" / "workspace-template",
+        )
+        init_workspace.configure_workspace_marker(
+            temp_data_root,
             plugin_path=plugin_target,
         )
         checks = validate_deliverables.check_foundation(
