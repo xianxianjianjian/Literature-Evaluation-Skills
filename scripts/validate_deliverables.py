@@ -108,6 +108,7 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/build_paper_status_overview.py",
     "scripts/paper_status_live.py",
     "docs/paper-status-and-si.md",
+    "docs/legacy-compatibility.md",
     "scripts/validate_c_review.py",
     "scripts/zotero_attachment_contract.py",
     "scripts/validate_terminology_consistency.py",
