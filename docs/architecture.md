@@ -21,7 +21,7 @@ weekly-literature-evaluation
 
 ## Current Release
 
-v1.5.1 is the current release contract (version single source of truth: `.codex-plugin/plugin.json`).
+v1.6.0 is the current release contract (version single source of truth: `.codex-plugin/plugin.json`).
 
 Major features:
 

@@ -178,11 +178,14 @@ class PluginMetadataTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             plugin = bundle.build_bundle(ROOT, Path(tmp) / "bundle")
             self.assertEqual(plugin_validator.validate_package(plugin), [])
+            version = json.loads(
+                (plugin / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
+            )["version"]
 
             readme = plugin / "README.md"
             original_readme = readme.read_text(encoding="utf-8")
             readme.write_text(
-                original_readme.replace("**v1.5.1**", "**v0.0.1**", 1),
+                original_readme.replace(f"**v{version}**", "**v0.0.1**", 1),
                 encoding="utf-8",
             )
             errors = plugin_validator.validate_package(plugin)
@@ -192,7 +195,7 @@ class PluginMetadataTests(unittest.TestCase):
             arch = plugin / "docs" / "architecture.md"
             original_arch = arch.read_text(encoding="utf-8")
             arch.write_text(
-                original_arch.replace("v1.5.1 is", "v0.0.1 is", 1),
+                original_arch.replace(f"v{version} is", "v0.0.1 is", 1),
                 encoding="utf-8",
             )
             errors = plugin_validator.validate_package(plugin)

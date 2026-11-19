@@ -2,7 +2,7 @@
 
 A research-oriented workflow framework for **literature search → full-text translation → systematic deep reading → weekly evaluation submission**.
 
-> Software version: **v1.5.1** (single source of truth: [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json); manual research-artifact acceptance pending, see [Issue #15](https://github.com/xianxianjianjian/Literature-Evaluation-Skills/issues/15))
+> Software version: **v1.6.0** (single source of truth: [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json); manual research-artifact acceptance pending, see [Issue #15](https://github.com/xianxianjianjian/Literature-Evaluation-Skills/issues/15))
 >
 > Validated with:
 > - Python 3.11 CI
@@ -74,6 +74,15 @@ v1.5.0 adds:
 - Shared paragraph roles for Chinese body formatting, APA-oriented English/reference formatting, bilingual typography and Exact-Mirror layout exceptions.
 
 ## Release History
+
+### v1.6.0
+
+- Separate historical and live research records (`knowledge/` and `weekly_reviews/`) into a dedicated standalone research Git repository while keeping clean workspace templates and sanitized fixtures in the plugin repository.
+- Add plugin UI icon (`assets/literature-evaluation.svg`) and enforce single version source of truth across `.codex-plugin/plugin.json`, `README.md`, and `docs/architecture.md`.
+- Deduplicate status/SI instructions across `SKILL.md` files and consolidate historical compatibility guarantees in [`docs/legacy-compatibility.md`](docs/legacy-compatibility.md).
+- Package `scripts/` and modularize thousand-line scripts (`validate_translation_package.py`, `zotero_bridge.py`) while keeping all CLI entry points compatible.
+- Automate local deployment, verification, cache sync, and `workspace.json.plugin_root` updates via `scripts/deploy_local_plugin.py`.
+- See [v1.6.0 release notes](docs/releases/v1.6.0.md).
 
 ### v1.5.1
 
