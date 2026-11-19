@@ -24,7 +24,11 @@ class ZoteroBridgeError(RuntimeError):
 
 
 def emit(payload: Any) -> None:
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(json.dumps(payload, ensure_ascii=True, indent=2))
 
 
 def normalize_doi(value: str) -> str:
@@ -292,7 +296,7 @@ def command_verify_archive(args: argparse.Namespace) -> int:
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    emit(result)
+    _zb().emit(result)
     return 0 if result["passed"] else 2
 
 
@@ -354,7 +358,7 @@ def command_normalize_titles(args: argparse.Namespace) -> int:
             save(args.report, result)
         return result
     if not args.yes:
-        emit(migration_report("DRY_RUN"))
+        _zb().emit(migration_report("DRY_RUN"))
         return 0
     client = local_write.LocalWriteClient.connect(args.api_base_url, timeout=args.timeout)
     migration_report("PENDING")
@@ -382,7 +386,7 @@ def command_normalize_titles(args: argparse.Namespace) -> int:
     for change in changes:
         item = updated_by_key.get(change["key"], {})
         change["new_version"] = item.get("version") or item_data(item).get("version")
-    emit(migration_report("UPDATED_AND_VERIFIED" if verified else "UPDATE_NOT_VERIFIED"))
+    _zb().emit(migration_report("UPDATED_AND_VERIFIED" if verified else "UPDATE_NOT_VERIFIED"))
     return 0 if verified else 2
 
 
@@ -439,7 +443,7 @@ def command_ingest_pdf(args: argparse.Namespace) -> int:
             "Import the PDF into the selected Zotero collection with Zotero Desktop "
             "and rerun with --recognized-parent-key <key> --yes after recognition."
         )
-        emit(preview)
+        _zb().emit(preview)
         return 0
 
     metadata = load_metadata(args.metadata)
@@ -505,7 +509,7 @@ def command_ingest_pdf(args: argparse.Namespace) -> int:
                 "archive_complete": False,
             }
         )
-        emit(preview)
+        _zb().emit(preview)
         return 0 if main_title_pass else 4
 
     if args.fallback_metadata:
@@ -524,7 +528,7 @@ def command_ingest_pdf(args: argparse.Namespace) -> int:
                 ),
             }
         )
-        emit(preview)
+        _zb().emit(preview)
         return 4
 
     preview.update(
@@ -537,6 +541,6 @@ def command_ingest_pdf(args: argparse.Namespace) -> int:
             ),
         }
     )
-    emit(preview)
+    _zb().emit(preview)
     return 4
 
