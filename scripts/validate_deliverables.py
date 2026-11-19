@@ -117,6 +117,7 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/runtime_paths.py",
     "scripts/init_workspace.py",
     "scripts/build_plugin_bundle.py",
+    "scripts/deploy_local_plugin.py",
     "requirements-exact-mirror.txt",
 ]
 WORKSPACE_REQUIRED_DIRECTORIES = [

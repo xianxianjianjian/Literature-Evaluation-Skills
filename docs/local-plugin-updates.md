@@ -23,6 +23,17 @@ py -3.11 scripts/build_plugin_bundle.py --output dist/literature-evaluation-<ver
 py -3.11 scripts/validate_plugin_package.py --plugin-root dist/literature-evaluation-<version>-<commit>/plugins/literature-evaluation
 ```
 
+或使用 v1.6 新增的一体化部署脚本 `scripts/deploy_local_plugin.py`，一次性完成**构建 → 插件包结构/版本校验 → 独立临时工作区校验 →（可选）同步安装缓存与更新 `workspace.json.plugin_root` → 写入 `<bundle>.build.json`**：
+
+```powershell
+py -3.11 scripts/deploy_local_plugin.py `
+  --deployments-dir D:\Workplace\Skill\deployments `
+  --create-archive `
+  --install-cache-root C:\Users\Administrator\.codex\plugins\cache\literature-evaluation-local\literature-evaluation `
+  --workspace-root D:\Workplace\codex\workplace\reference\.literature-evaluation `
+  --rollback-marketplace D:\Workplace\Skill\deployments\literature-evaluation-1.5.1-6631793
+```
+
 构建脚本拒绝覆盖现有目录。保留旧构建并选择新的目录名，不删除目录来规避此保护。安装包只包含脚本规定的插件资源；研究数据、私人论文及字体文件不得加入包中。
 
 在包目录旁记录源码提交、构建时间与命令。不要为记录部署信息而修改已发布 Tag 或其源码。
