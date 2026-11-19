@@ -22,6 +22,8 @@
     "longDescription": "Run a complete weekly literature-evaluation workflow or invoke literature search, academic translation, and deep reading independently. The plugin keeps source identity, evidence, workflow state, and research archives traceable while storing user data outside the installed plugin.",
     "developerName": "JYW23.26",
     "category": "Education & Research",
+    "logo": "./assets/literature-evaluation.svg",
+    "composerIcon": "./assets/literature-evaluation.svg",
     "capabilities": [
       "Interactive",
       "Read",
