@@ -15,6 +15,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import build_plugin_bundle as bundle
+import deploy_local_plugin as deployer
 import init_workspace as workspace
 import runtime_paths
 import validate_deliverables as validator
@@ -173,6 +174,33 @@ class PluginMetadataTests(unittest.TestCase):
         self.assertEqual(manifest["interface"]["category"], "Education & Research")
         self.assertLessEqual(len(manifest["interface"]["shortDescription"]), 30)
 
+    def test_version_mismatch_in_readme_or_architecture_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            plugin = bundle.build_bundle(ROOT, Path(tmp) / "bundle")
+            self.assertEqual(plugin_validator.validate_package(plugin), [])
+            version = json.loads(
+                (plugin / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
+            )["version"]
+
+            readme = plugin / "README.md"
+            original_readme = readme.read_text(encoding="utf-8")
+            readme.write_text(
+                original_readme.replace(f"**v{version}**", "**v0.0.1**", 1),
+                encoding="utf-8",
+            )
+            errors = plugin_validator.validate_package(plugin)
+            self.assertTrue(any("README.md" in err for err in errors), errors)
+            readme.write_text(original_readme, encoding="utf-8")
+
+            arch = plugin / "docs" / "architecture.md"
+            original_arch = arch.read_text(encoding="utf-8")
+            arch.write_text(
+                original_arch.replace(f"v{version} is", "v0.0.1 is", 1),
+                encoding="utf-8",
+            )
+            errors = plugin_validator.validate_package(plugin)
+            self.assertTrue(any("docs/architecture.md" in err for err in errors), errors)
+
 
 class PluginBundleTests(unittest.TestCase):
     def test_bundle_contains_four_skills_and_resolvable_shared_contracts(self) -> None:
@@ -265,6 +293,33 @@ class PluginBundleTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(conflict, 1)
+
+    def test_deploy_local_plugin_builds_validates_installs_and_updates_workspace_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            deployments = root / "deployments"
+            cache_root = root / "cache"
+            data_root = root / "data"
+            workspace.initialize_workspace(
+                data_root,
+                template_root=ROOT / "assets" / "workspace-template",
+            )
+            record = deployer.deploy_plugin(
+                ROOT,
+                deployments_dir=deployments,
+                create_archive=True,
+                install_cache_root=cache_root,
+                workspace_root=data_root,
+            )
+            self.assertEqual(record["plugin_validation"], "PASS")
+            self.assertEqual(record["temporary_workspace_validation"]["failed"], 0)
+            self.assertTrue(Path(str(record["bundle_root"])).is_dir())
+            self.assertTrue(Path(str(record["archive_path"])).is_file())
+            self.assertTrue(Path(str(record["build_json_path"])).is_file())
+            installed_path = Path(str(record["installed_path"]))
+            self.assertTrue(installed_path.is_dir())
+            marker = json.loads((data_root / "workspace.json").read_text(encoding="utf-8"))
+            self.assertEqual(Path(marker["plugin_root"]), installed_path.resolve())
 
 
 if __name__ == "__main__":

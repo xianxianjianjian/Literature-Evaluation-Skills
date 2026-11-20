@@ -123,12 +123,12 @@
         "reviewed_date": "2026-09-10"
       },
       "path": "weekly_reviews/2026/2026-W36/C_Yuksel_2025_周文献评价.md",
-      "reviewer_name": "张紫涵",
+      "reviewer_name": "测试评阅人",
       "content_authority": "USER_CONFIRMED_WEBSITE",
-      "source_url": "http://www.leixulab.net/scale/paperstu.asp?sname=%D5%C5%D7%CF%BA%AD",
+      "source_url": "https://example.invalid/reviews/2026-W36",
       "website_published_at": "2026-09-06 19:52:53",
       "synced_date": "2026-10-14",
-      "sync_record": "D:\\codex\\workplace\\reference\\.literature-evaluation\\weekly_reviews\\2026\\2026-W36\\c_web_sync_record.json",
+      "sync_record": "weekly_reviews/2026/2026-W36/c_web_sync_record.json",
       "validation_note": "网页版C已按用户要求同步；此前内容的学术/字数校验为历史记录，不代表本次网页版本重新通过校验。"
     }
   },

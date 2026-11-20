@@ -81,7 +81,9 @@ PLUGIN_REQUIRED_FILES = [
     "shared/state-contract.md",
     "shared/data-format-policy.md",
     "shared/workspace-contract.md",
+    "scripts/__init__.py",
     "scripts/zotero_bridge.py",
+    "scripts/zotero_role_archive_ops.py",
     "scripts/terminology_registry.py",
     "scripts/history_manager.py",
     "scripts/workflow_state.py",
@@ -100,6 +102,7 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/main_source_index.py",
     "scripts/run_contract_tests.py",
     "scripts/validate_translation_package.py",
+    "scripts/translation_exact_validator.py",
     "scripts/translation_integrity.py",
     "scripts/validate_deep_reading_package.py",
     "scripts/export_b_pdf.py",
@@ -108,6 +111,7 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/build_paper_status_overview.py",
     "scripts/paper_status_live.py",
     "docs/paper-status-and-si.md",
+    "docs/legacy-compatibility.md",
     "scripts/validate_c_review.py",
     "scripts/zotero_attachment_contract.py",
     "scripts/validate_terminology_consistency.py",
@@ -116,6 +120,7 @@ PLUGIN_REQUIRED_FILES = [
     "scripts/runtime_paths.py",
     "scripts/init_workspace.py",
     "scripts/build_plugin_bundle.py",
+    "scripts/deploy_local_plugin.py",
     "requirements-exact-mirror.txt",
 ]
 WORKSPACE_REQUIRED_DIRECTORIES = [

@@ -100,11 +100,13 @@ pending_zotero_actions:
 
 New v1.5 C completion requires actual Main locator checks and an attributable source/comment-bound human academic review record. This is the existing academic QC responsibility, not an additional workflow user-confirmation Gate. B archive completion requires its file-content chain and actual Zotero file verification; a PASS flag or PDF header alone is insufficient.
 
-Historical v1.4.1/v1.4.2 C uses `submission_contract.weekly_review.minimum_comment_chars` recorded in its manifest, falling back to the released 500-Chinese-character rule. Respect an explicitly old-version workspace profile or an old profile without the new maximum; an unversioned/current 800–1000 default is not a historical requirement. Workspace initialization preserves existing profiles/manifests; loading manifests never writes them. Contract upgrades remain explicit, backed up and reversible.
+Historical compatibility rules across v1.2–v1.5 (legacy C 500-character threshold, structural mirror normalization, Naming v1, and 16-column terminology headers) are documented in [`../docs/legacy-compatibility.md`](../docs/legacy-compatibility.md). Workspace initialization preserves existing profiles/manifests; loading manifests never writes them. Contract upgrades remain explicit, backed up and reversible.
 
 If a previous v1.5 completion cannot be substantiated under repaired gates, preserve its historical statement and record an immutable correction/revalidation result with `needs_update`/PROVISIONAL where appropriate. Never silently rewrite the research archive or reuse an old PASS as new proof. Necessary ledgers, reviewed frame geometry, source identities and signed QA are evidence to retain after rendering-cache cleanup.
 
-## 文献平台状态（独立于学术阶段）
+## 文献平台状态与 SI 归档（独立于学术阶段）
+
+确认论文后以现有 `paper_id` 写入/关联单篇 intake 或周 manifest（`scripts/build_paper_status_overview.py --workspace-root <data-root> --record <record.json>`）。来源准备、A/B/C 验证、Zotero 回查及经观察的提交/推送/发布后执行 `--refresh --paper-id <paper_id>`；恢复先读取原记录；用户说“刷新文献状态”时路由此命令，仅重建用 `--rebuild-only`。阅读型 SI 先运行 `prepare_si_bundle.py` 并验证来源区间，视频/数据保留原格式及稳定编号。详细 CLI 与配置见 [`../docs/paper-status-and-si.md`](../docs/paper-status-and-si.md)。
 
 `platform_status.{zotero,local,git,github,web}` 属于对应 workflow manifest 或 `knowledge/intake/<paper_id>/paper_status.json`。每项含 status、detail、source、checked_at、evidence_ref（有报告时）。状态为 VERIFIED / PRESENT_UNVERIFIED / PENDING / MISSING / CONFLICT / UNKNOWN / NOT_APPLICABLE。UNKNOWN 保留 last_observation。未知字段、原有阶段及历史不重写。阅读周与 publication_year 分离。
 

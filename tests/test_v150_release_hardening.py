@@ -671,7 +671,7 @@ class LegacyAndPathTests(unittest.TestCase):
                      patch("sys.stdout", io.StringIO()):
                     d.main(["--repo-root", str(root), "--manifest", str(path)])
                 self.assertEqual(check_c.call_args.args[2], version == "1.5.0")
-            real_legacy = ROOT / "weekly_reviews/2026/2026-W36/workflow_manifest.yaml"
+            real_legacy = ROOT / "tests/fixtures/legacy/yuksel_2026_w36_v142_manifest.yaml"
             original = real_legacy.read_bytes()
             parsed = workflow_state.load_manifest(real_legacy)
             self.assertEqual(parsed["contract_version"], "1.4.2")

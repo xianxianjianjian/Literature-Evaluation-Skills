@@ -43,7 +43,7 @@ class RealAcceptanceTraceTests(unittest.TestCase):
         self.assertEqual(manifest.read_bytes(), before)
 
     def test_current_week_can_change_paper_without_changing_historical_trace(self) -> None:
-        manifest = ROOT / "weekly_reviews" / "2026" / "2026-W34" / "workflow_manifest.yaml"
+        manifest = ROOT / "tests" / "fixtures" / "legacy" / "reassigned_2026_w34_manifest.yaml"
         before = manifest.read_bytes()
         current = state.load_manifest(manifest)
         self.assertEqual(current["week"], "2026-W34")
