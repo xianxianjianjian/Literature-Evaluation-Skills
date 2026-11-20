@@ -5,9 +5,10 @@ import re
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -300,6 +301,9 @@ class PluginBundleTests(unittest.TestCase):
             deployments = root / "deployments"
             cache_root = root / "cache"
             data_root = root / "data"
+            previous = cache_root / deployer.read_manifest_version(ROOT)
+            previous.mkdir(parents=True)
+            (previous / "old-build.txt").write_text("previous install", encoding="utf-8")
             workspace.initialize_workspace(
                 data_root,
                 template_root=ROOT / "assets" / "workspace-template",
@@ -318,8 +322,74 @@ class PluginBundleTests(unittest.TestCase):
             self.assertTrue(Path(str(record["build_json_path"])).is_file())
             installed_path = Path(str(record["installed_path"]))
             self.assertTrue(installed_path.is_dir())
+            self.assertEqual(installed_path, previous.resolve())
+            self.assertFalse((installed_path / "old-build.txt").exists())
+            self.assertEqual(list(cache_root.iterdir()), [previous])
             marker = json.loads((data_root / "workspace.json").read_text(encoding="utf-8"))
             self.assertEqual(Path(marker["plugin_root"]), installed_path.resolve())
+
+    def test_deploy_rejects_invalid_workspace_before_writing_and_can_retry(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="le-test-codex-") as tmp:
+            root = Path(tmp)
+            output = root / "bundle"
+            cache_root = root / "cache"
+            data_root = root / "data"
+            data_root.mkdir()
+            marker = data_root / "workspace.json"
+            args = [
+                "--plugin-root", str(ROOT),
+                "--output", str(output),
+                "--create-archive",
+                "--install-cache-root", str(cache_root),
+                "--workspace-root", str(data_root),
+            ]
+            for contents, expected in (
+                (None, "workspace.json not found"),
+                ("{", "Invalid workspace.json"),
+                ("[]", "root must be a JSON object"),
+            ):
+                with self.subTest(contents=contents):
+                    if contents is not None:
+                        marker.write_text(contents, encoding="utf-8")
+                    with redirect_stderr(StringIO()) as errors:
+                        self.assertEqual(deployer.main(args), 2)
+                    self.assertIn(expected, errors.getvalue())
+                    self.assertFalse(output.exists())
+                    self.assertFalse(output.with_suffix(".zip").exists())
+                    self.assertFalse(output.with_suffix(".build.json").exists())
+                    self.assertFalse(cache_root.exists())
+
+            marker.write_text('{"user_setting": "preserve"}', encoding="utf-8")
+            with redirect_stdout(StringIO()) as result:
+                self.assertEqual(deployer.main(args), 0)
+            installed = Path(json.loads(result.getvalue())["installed_path"])
+            self.assertTrue(installed.is_dir())
+            self.assertEqual(json.loads(marker.read_text(encoding="utf-8")), {
+                "user_setting": "preserve",
+                "plugin_root": str(installed),
+            })
+
+    def test_failed_cache_copy_preserves_previous_install(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="le-test-codex-") as tmp:
+            root = Path(tmp)
+            source = root / "built-plugin"
+            source.mkdir()
+            installed = root / "cache" / "1.6.0"
+            installed.mkdir(parents=True)
+            previous_file = installed / "existing.txt"
+            previous_file.write_text("previous install", encoding="utf-8")
+
+            def fail_after_partial_copy(_source: Path, destination: Path) -> None:
+                destination.mkdir()
+                (destination / "partial.txt").write_text("partial copy", encoding="utf-8")
+                raise OSError("cache copy interrupted")
+
+            with patch.object(deployer.shutil, "copytree", side_effect=fail_after_partial_copy):
+                with self.assertRaisesRegex(OSError, "cache copy interrupted"):
+                    deployer.install_validated_plugin(source, installed)
+
+            self.assertEqual(previous_file.read_text(encoding="utf-8"), "previous install")
+            self.assertEqual(list(installed.parent.iterdir()), [installed])
 
 
 if __name__ == "__main__":

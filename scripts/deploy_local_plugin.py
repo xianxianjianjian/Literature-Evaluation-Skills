@@ -74,20 +74,42 @@ def read_manifest_version(plugin_root: Path) -> str:
     return version
 
 
-def update_workspace_plugin_root(workspace_root: Path, installed_plugin_root: Path) -> Path:
-    marker = workspace_root.resolve() / "workspace.json"
+def read_workspace_marker(workspace_root: Path) -> tuple[Path, dict[str, object]]:
+    marker = workspace_root.expanduser().resolve() / "workspace.json"
     if not marker.is_file():
         raise DeploymentError(f"workspace.json not found in data root: {marker}")
-    payload = json.loads(marker.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(marker.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise DeploymentError(f"Invalid workspace.json: {marker}: {exc}") from exc
     if not isinstance(payload, dict):
         raise DeploymentError("workspace.json root must be a JSON object.")
-    payload["plugin_root"] = str(installed_plugin_root.resolve())
-    marker.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-        newline="\n",
-    )
-    return marker
+    return marker, payload
+
+
+def install_validated_plugin(plugin_target: Path, installed_path: Path) -> None:
+    cache_root = installed_path.parent
+    cache_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".install-", dir=cache_root) as temp_dir:
+        staging_root = Path(temp_dir)
+        staged_plugin = staging_root / installed_path.name
+        shutil.copytree(plugin_target, staged_plugin)
+        errors = validate_plugin_package.validate_package(staged_plugin)
+        if errors:
+            raise DeploymentError("Staged cache copy failed package validation:\n" + "\n".join(errors))
+
+        # Keep the previous install outside temporary cleanup if rollback fails.
+        previous_install = staging_root.with_name(staging_root.name + "-previous")
+        if installed_path.exists():
+            installed_path.rename(previous_install)
+        try:
+            staged_plugin.rename(installed_path)
+        except OSError:
+            if previous_install.exists():
+                previous_install.rename(installed_path)
+            raise
+        if previous_install.exists():
+            shutil.rmtree(previous_install)
 
 
 def deploy_plugin(
@@ -129,16 +151,8 @@ def deploy_plugin(
             raise DeploymentError(f"Archive already exists; refusing to overwrite: {archive_path}")
         bundle.validate_archive_path(output_dir, archive_path)
 
+    workspace = read_workspace_marker(workspace_root) if workspace_root is not None else None
     plugin_target = bundle.build_bundle(plugin_root, output_dir)
-    if archive_path is not None:
-        archive_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.make_archive(
-            str(archive_path.with_suffix("")),
-            "zip",
-            root_dir=output_dir.parent,
-            base_dir=output_dir.name,
-        )
-
     pkg_errors = validate_plugin_package.validate_package(plugin_target)
     if pkg_errors:
         raise DeploymentError(
@@ -166,24 +180,33 @@ def deploy_plugin(
             raise DeploymentError(f"Temporary workspace validation failed: {details}")
         passed_count = len(checks)
 
+    if archive_path is not None:
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.make_archive(
+            str(archive_path.with_suffix("")),
+            "zip",
+            root_dir=output_dir.parent,
+            base_dir=output_dir.name,
+        )
+
     installed_path: Path | None = None
     if install_cache_root is not None:
-        cache_root = install_cache_root.expanduser().resolve()
-        installed_path = cache_root / version
-        if installed_path.exists():
-            shutil.rmtree(installed_path)
-        installed_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(plugin_target, installed_path)
-        cache_errors = validate_plugin_package.validate_package(installed_path)
-        if cache_errors:
-            raise DeploymentError(
-                "Installed cache copy failed package validation:\n" + "\n".join(cache_errors)
-            )
+        installed_path = install_cache_root.expanduser().resolve() / version
+        install_validated_plugin(plugin_target, installed_path)
 
     active_plugin_path = installed_path if installed_path is not None else plugin_target
     updated_marker: Path | None = None
-    if workspace_root is not None:
-        updated_marker = update_workspace_plugin_root(workspace_root, active_plugin_path)
+    if workspace is not None:
+        updated_marker, payload = workspace
+        payload["plugin_root"] = str(active_plugin_path)
+        with tempfile.TemporaryDirectory(prefix=".deploy-", dir=updated_marker.parent) as temp_dir:
+            staged_marker = Path(temp_dir) / updated_marker.name
+            staged_marker.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+            staged_marker.replace(updated_marker)
 
     build_record: dict[str, object] = {
         "built_at": datetime.now(timezone.utc).isoformat(),
